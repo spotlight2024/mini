@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# 虚拟环境
+.venv/
+venv/
+ENV/
+
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# pytest
+.pytest_cache/
+script/.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# VSCode
+.vscode/
+
+# MacOS
+.DS_Store
+
+# WebDriver Manager下载的驱动
+script/driver/
+.wdm/
+
+# 日志
+*.log
+logs/
+
+# 环境变量/配置
+.env
+.env.*
+
+# 其他
+*.swp
+*.swo
+
+# 覆盖性强的忽略项
+# 请根据实际需要增删 
