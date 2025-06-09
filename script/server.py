@@ -11,15 +11,11 @@ app = FastAPI()
 driver = SeleniumWebDriver()
 device_manager = DeviceManager()
 
-class SessionRequest(BaseModel):
-    session_id: str
-    android_process: str
-    android_package: str
-
 class ConnectRequest(BaseModel):
     serial_id: str
-    ip: str
-    port: int
+
+class DisconnectRequest(BaseModel):
+    serial_id: str
 
 class ActionRequest(BaseModel):
     serial_id: str
@@ -31,23 +27,21 @@ class FindElementRequest(BaseModel):
     method: str
     selector: str
 
-@app.post("/createSession/")
-def create_session(request: ConnectRequest):
-    pass
-
 @app.post("/connect")
 def connect(req: ConnectRequest):
-    device_manager.add_device(req.serial_id)
     success = driver.connect(req.serial_id)
     if success:
         return JSONResponse({"code": "success", "message": "连接成功"})
     else:
         return JSONResponse({"code": "fail", "message": "连接失败"})
 
+@app.post("/disconnect")
+def disconnect(req:  DisconnectRequest):
+    pass
+
 @app.post("/action")
 def action(req: ActionRequest):
-    result = driver.action(req.serial_id, req.type, req.params)
-    return result
+    return JSONResponse({"code":"success","message":req.session_id})
 
 @app.post("/findElement")
 def find_element(req: FindElementRequest):

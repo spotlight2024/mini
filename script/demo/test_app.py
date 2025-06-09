@@ -10,7 +10,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
 from web_driver import SeleniumWebDriver
+from log_config import setup_logging
 
+setup_logging()
 
 @dataclass
 class Page:
@@ -63,7 +65,7 @@ class PageVisibilityCondition:
 def try_close_popup(driver, timeout=5):
     """
     尝试在页面上关闭弹框。
-    1) 等待 timeout 秒，看是否出现带有 “.ad-pop-index--close-icon-new” 这个 class 的 close 按钮。
+    1) 等待 timeout 秒，看是否出现带有 "ad-pop-index--close-icon-new" 这个 class 的 close 按钮。
     2) 如果出现，就点击并返回 True；否则返回 False。
     """
     try:
