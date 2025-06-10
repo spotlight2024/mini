@@ -4,12 +4,23 @@ from selenium.webdriver.chrome.webdriver import WebDriver
 import adbutils
 import logging
 from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.common.by import By
 
 
 from log_config import setup_logging
 
 setup_logging()
 
+BY_MAP = {
+    "id": By.ID,
+    "xpath": By.XPATH,
+    "css selector": By.CSS_SELECTOR,
+    "name": By.NAME,
+    "class name": By.CLASS_NAME,
+    "tag name": By.TAG_NAME,
+    "link text": By.LINK_TEXT,
+    "partial link text": By.PARTIAL_LINK_TEXT,
+}
 
 class AndroidDevice:
     def __init__(self, serial_id: str, ip: str = None, port: int = None):
@@ -78,10 +89,29 @@ class AndroidDevice:
         return None
 
     def find_element(self, method, selector) -> WebElement:
+        """
+        查找元素。
+        参数 method 必须为以下字符串之一（与 Selenium By 枚举一一对应）：
+            "id"               -> By.ID
+            "xpath"            -> By.XPATH
+            "css selector"     -> By.CSS_SELECTOR
+            "name"             -> By.NAME
+            "class name"       -> By.CLASS_NAME
+            "tag name"         -> By.TAG_NAME
+            "link text"        -> By.LINK_TEXT
+            "partial link text"-> By.PARTIAL_LINK_TEXT
+        selector 为具体的定位表达式。
+        例如：
+            method="css selector", selector=".my-class"
+            method="xpath", selector="//div[@id='main']"
+        """
         if not self.driver:
             raise RuntimeError("WebDriver not connected")
-        logging.info(f"[AndroidDevice] 查找元素 selector={selector}, serial_id={self.serial_id}")
-        return self.driver.find_element(method, selector)
+        by = BY_MAP.get(method.lower())
+        if not by:
+            raise ValueError(f"不支持的查找方式: {method}")
+        logging.info(f"[AndroidDevice] 查找元素 method={method}, selector={selector}, serial_id={self.serial_id}")
+        return self.driver.find_element(by, selector)
 
 
 class DevicePool:
