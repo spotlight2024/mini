@@ -3,6 +3,8 @@ from typing import Optional
 from selenium.webdriver.chrome.webdriver import WebDriver
 import adbutils
 import logging
+from selenium.webdriver.remote.webelement import WebElement
+
 
 from log_config import setup_logging
 
@@ -75,7 +77,7 @@ class AndroidDevice:
         # 可扩展更多操作
         return None
 
-    def find_element(self, method, selector):
+    def find_element(self, method, selector) -> WebElement:
         if not self.driver:
             raise RuntimeError("WebDriver not connected")
         logging.info(f"[AndroidDevice] 查找元素 selector={selector}, serial_id={self.serial_id}")
