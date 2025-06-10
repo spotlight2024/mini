@@ -6,6 +6,9 @@ from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.webdriver import WebDriver as SeleniumDriver
+from webdriver.base import BaseWebDriver
 
 import logging
 import os
@@ -27,7 +30,9 @@ class Session:
         self.serial_id = serial_id
         self.driver = driver
 
-class SeleniumWebDriver(BaseDriver):
+class SeleniumWebDriver(BaseWebDriver):
+    def __init__(self):
+        self.driver = None
 
     def connect(self, serial_id: str) -> bool:
         try:
@@ -79,21 +84,12 @@ class SeleniumWebDriver(BaseDriver):
         except Exception as e:
             return {"code": "fail", "message": str(e)}
 
-    def find_element(self, serial_id: str, selector: str) -> dict:
-        if not self.driver:
-            return {"code": "fail", "message": "No session found"}
-        try:
-            element = self.driver.find_element("css selector", selector)
-            return {
-                "code": "success",
-                "element": {"tag": element.tag_name, "text": element.text},
-                "message": "Found",
-            }
-        except Exception as e:
-            return {"code": "fail", "message": str(e)}
-        
-    def get_driver(self,serial_id) -> AndroidDevice | None:
-        return self.sessions.get(serial_id)
+    def find_element(self, by, selector):
+        return self.driver.find_element(by, selector)
+
+    def quit(self):
+        if self.driver:
+            self.driver.quit()
 
 def find_chromedriver(path):
     # 如果 path 就是可执行文件且文件名正确，直接返回

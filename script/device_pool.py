@@ -5,6 +5,8 @@ import adbutils
 import logging
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.common.by import By
+from webdriver.base import BaseWebDriver
+from web_driver import SeleniumWebDriver
 
 
 from log_config import setup_logging
@@ -23,11 +25,12 @@ BY_MAP = {
 }
 
 class AndroidDevice:
-    def __init__(self, serial_id: str, ip: str = None, port: int = None):
+    def __init__(self, serial_id: str, ip: str = None, port: int = None, driver_cls=BaseWebDriver):
         self.serial_id = serial_id
         self.ip = ip
         self.port = port
-        self.driver: Optional[WebDriver] = None
+        self.driver: BaseWebDriver = None
+        self.driver_cls = driver_cls
         self.status = "disconnected"  # connected/disconnected
 
     def connect(self):
@@ -41,9 +44,9 @@ class AndroidDevice:
             logging.info(f"[AndroidDevice] adb 设备已找到 serial_id={self.serial_id}")
 
             # 初始化 WebDriver
-            from web_driver import SeleniumWebDriver
             logging.info(f"[AndroidDevice] 准备初始化 WebDriver，serial_id={self.serial_id}")
-            self.driver = SeleniumWebDriver().connect(self.serial_id)
+            self.driver = self.driver_cls()
+            self.driver.connect(self.serial_id)
             if not self.driver:
                 logging.error(f"[AndroidDevice] WebDriver 初始化失败 serial_id={self.serial_id}")
                 self.status = "disconnected"
@@ -115,16 +118,17 @@ class AndroidDevice:
 
 
 class DevicePool:
-    def __init__(self):
+    def __init__(self, driver_cls=BaseWebDriver):
         self.pool = {}  # serial_id -> AndroidDevice
         self.lock = threading.Lock()
+        self.driver_cls = driver_cls
 
     def connect(self, serial_id, ip=None, port=None) -> AndroidDevice:
         with self.lock:
             logging.info(f"[DevicePool] 尝试连接 serial_id={serial_id}, ip={ip}, port={port}")
             device = self.pool.get(serial_id)
             if device is None or not device.is_alive():
-                device = AndroidDevice(serial_id, ip, port)
+                device = AndroidDevice(serial_id, ip, port, driver_cls=self.driver_cls)
                 if device.connect():
                     self.pool[serial_id] = device
                     logging.info(f"[DevicePool] 设备连接成功 serial_id={serial_id}")

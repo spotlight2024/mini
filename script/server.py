@@ -1,14 +1,15 @@
 import logging
-from typing import Optional
+from typing import Optional, Any
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from device_pool import DevicePool
+from web_driver import SeleniumWebDriver
 
 app = FastAPI()
-device_pool = DevicePool()
+device_pool = DevicePool(driver_cls=SeleniumWebDriver)
 
 class ConnectRequest(BaseModel):
     serial_id: str
@@ -30,39 +31,46 @@ class FindElementRequest(BaseModel):
     selector: str
 
 
-@app.post("/connect")
+class APIResponse(BaseModel):
+    code: int
+    message: str
+    data: Optional[Any] = None
+    error: Optional[str] = None
+    trace_id: Optional[str] = None
+
+
+@app.post("/connect", response_model=APIResponse)
 def connect(req: ConnectRequest):
     try:
         device = device_pool.connect(req.serial_id)
+        if device is not None:
+            return APIResponse(code=0, message="success")
+        else:
+            return APIResponse(code=1001, message="连接失败")
     except Exception as ex:
-        return JSONResponse(status_code=404, content={"error": str(ex)})
-
-    if device is not None:
-        return JSONResponse(status_code=200, content={"message":"success"})
-    else:
-        return JSONResponse(status_code=404, content={"code": "fail", "message": "连接失败"})
+        return APIResponse(code=2000, message="系统异常", error=str(ex))
 
 
-@app.post("/disconnect")
+@app.post("/disconnect", response_model=APIResponse)
 def disconnect(req: DisconnectRequest):
     device = device_pool.get(req.serial_id)
     if device is None:
-        return JSONResponse(status_code=404, content={"error": "device not found"})
+        return APIResponse(code=1002, message="device not found")
     else:
         device.disconnect()
-        return JSONResponse(status_code=200, content={"message":"success"})
+        return APIResponse(code=0, message="success")
 
-@app.post("/action")
+@app.post("/action", response_model=APIResponse)
 def action(req: ActionRequest):
     device = device_pool.get(req.serial_id)
     if device is None:
-        return JSONResponse(status_code=404, content={"error": "device not found"})
+        return APIResponse(code=1002, message="device not found")
 
     device.find_element()
-    return JSONResponse({"code": "success", "message": req.session_id})
+    return APIResponse(code=0, message="success")
 
 
-@app.post("/find_element")
+@app.post("/find_element", response_model=APIResponse)
 def find_element(req: FindElementRequest):
     """
     查找元素接口。
@@ -82,11 +90,12 @@ def find_element(req: FindElementRequest):
     """
     try:
         device = device_pool.get(req.serial_id)
-        logging.info()
-        element = device.find_element(req.method,req.selector)
+        if device is None:
+            return APIResponse(code=1002, message="device not found")
+        element = device.find_element(req.method, req.selector)
         if element is None:
-            return JSONResponse(status_code=404, content={"error": "element not found"})
+            return APIResponse(code=1003, message="element not found")
         logging.info(f"find element : {element}")
-        return JSONResponse(status_code=200, content={"ok": True})
+        return APIResponse(code=0, message="success", data={"element": str(element)})
     except Exception as e:
-        return JSONResponse(status_code=403, content={"error": str(e)})
+        return APIResponse(code=2000, message="系统异常", error=str(e))
