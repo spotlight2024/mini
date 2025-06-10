@@ -25,6 +25,20 @@ class DeviceManager:
 
     def connect(self, serial_id: str):
         logging.info(f"connect device {serial_id}")
+
+        target_device = None
+        for d in adbutils.adb.device_list():
+            if d.serial == serial_id:
+                target_device = adb.device(d.serial)
+                break
+
+        print(target_device.info["state"])
+
+        if target_device is None:
+            logging.info(f"connect device {serial_id} failed")
+
+
+
         return None
 
     def disconnect(self, serial_id: str):
