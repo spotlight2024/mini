@@ -1,191 +1,103 @@
 import threading
 from typing import Optional
-from selenium.webdriver.chrome.webdriver import WebDriver
 import adbutils
 import logging
-from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.common.by import By
-from webdriver.base import BaseWebDriver
-from web_driver import SeleniumWebDriver
-from webdriver.pool import WebDriverPool
 import time
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
+from device.android_device import AndroidDevice
+from webdriver.selenium_executor import SeleniumWebExecutor
 
 from log_config import setup_logging
 
 setup_logging()
 
-BY_MAP = {
-    "id": By.ID,
-    "xpath": By.XPATH,
-    "css selector": By.CSS_SELECTOR,
-    "name": By.NAME,
-    "class name": By.CLASS_NAME,
-    "tag name": By.TAG_NAME,
-    "link text": By.LINK_TEXT,
-    "partial link text": By.PARTIAL_LINK_TEXT,
-}
-
-class AndroidDevice:
-    def __init__(self, serial_id: str, ip: str = None, port: int = None, driver_cls=BaseWebDriver):
-        self.serial_id = serial_id
-        self.ip = ip
-        self.port = port
-        self.driver: BaseWebDriver = None
-        self.driver_cls = driver_cls
-        self.status = "disconnected"  # connected/disconnected
-        self.common_popup_selectors = [
-            ".ad-pop-index--close-icon-new",
-            ".wx-popup-pannel .close-btn",
-            # 可扩展更多
-        ]
-
-    def connect(self):
-        try:
-            logging.info(f"[AndroidDevice] 尝试通过 adb 查找设备 serial_id={self.serial_id}")
-            device = adbutils.adb.device(serial=self.serial_id)
-            if not device:
-                logging.error(f"[AndroidDevice] adb 未找到设备 serial_id={self.serial_id}")
-                self.status = "disconnected"
-                return False
-            logging.info(f"[AndroidDevice] adb 设备已找到 serial_id={self.serial_id}")
-
-            # 初始化 WebDriver
-            logging.info(f"[AndroidDevice] 准备初始化 WebDriver，serial_id={self.serial_id}")
-            self.driver = self.driver_cls()
-            self.driver.connect(self.serial_id)
-            if not self.driver:
-                logging.error(f"[AndroidDevice] WebDriver 初始化失败 serial_id={self.serial_id}")
-                self.status = "disconnected"
-                return False
-            logging.info(f"[AndroidDevice] WebDriver 初始化成功 serial_id={self.serial_id}")
-            self.status = "connected"
-            return True
-        except Exception as e:
-            logging.exception(f"[AndroidDevice] 连接设备 serial_id={self.serial_id} 发生异常: {e}")
-            self.status = "disconnected"
-            return False
-
-    def disconnect(self):
-        if self.driver:
-            try:
-                logging.info(f"[AndroidDevice] 关闭 WebDriver serial_id={self.serial_id}")
-                self.driver.quit()
-            except Exception as e:
-                logging.error(f"[AndroidDevice] 关闭 WebDriver 发生异常 serial_id={self.serial_id}: {e}")
-            self.driver = None
-        self.status = "disconnected"
-
-    def is_alive(self):
-        try:
-            device = adbutils.adb.device(serial=self.serial_id)
-            alive = device is not None
-            logging.info(f"[AndroidDevice] 检查设备存活 serial_id={self.serial_id}, alive={alive}")
-            return alive
-        except Exception as e:
-            logging.error(f"[AndroidDevice] 检查设备存活异常 serial_id={self.serial_id}: {e}")
-            return False
-
-    def do_action(self, action_type, params):
-        if not self.driver:
-            raise RuntimeError("WebDriver not connected")
-        logging.info(f"[AndroidDevice] 执行操作 action_type={action_type}, params={params}, serial_id={self.serial_id}")
-        if action_type == "click":
-            selector = params.get("selector")
-            elem = self.driver.find_element_by_css_selector(selector)
-            elem.click()
-            return True
-        # 可扩展更多操作
-        return None
-
-    def find_element(self, method, selector) -> WebElement:
-        """
-        查找元素。
-        参数 method 必须为以下字符串之一（与 Selenium By 枚举一一对应）：
-            "id"               -> By.ID
-            "xpath"            -> By.XPATH
-            "css selector"     -> By.CSS_SELECTOR
-            "name"             -> By.NAME
-            "class name"       -> By.CLASS_NAME
-            "tag name"         -> By.TAG_NAME
-            "link text"        -> By.LINK_TEXT
-            "partial link text"-> By.PARTIAL_LINK_TEXT
-        selector 为具体的定位表达式。
-        例如：
-            method="css selector", selector=".my-class"
-            method="xpath", selector="//div[@id='main']"
-        """
-        if not self.driver:
-            raise RuntimeError("WebDriver not connected")
-        by = BY_MAP.get(method.lower())
-        if not by:
-            raise ValueError(f"不支持的查找方式: {method}")
-        logging.info(f"[AndroidDevice] 查找元素 driver = {self.driver} , method={method}, selector={selector}, serial_id={self.serial_id}")
-        return self.driver.find_element(by, selector)
-
-    def wait_for_element(self, method, selector, timeout=10, trace_id=None):
-        by = BY_MAP.get(method.lower())
-        if not by:
-            raise ValueError(f"不支持的查找方式: {method}")
-        logging.info(f"[{trace_id}] wait_for_element: {method} {selector} timeout={timeout}")
-        return WebDriverWait(self.driver.driver, timeout).until(
-            EC.presence_of_element_located((by, selector))
-        )
-
-    def handle_common_popups(self, trace_id=None):
-        for popup_selector in self.common_popup_selectors:
-            try:
-                popup = self.driver.find_element("css selector", popup_selector)
-                if popup and popup.is_displayed():
-                    popup.click()
-                    logging.info(f"[{trace_id}] 自动关闭弹框: {popup_selector}")
-            except Exception:
-                pass
-
 
 class DevicePool:
-    def __init__(self, driver_cls=SeleniumWebDriver):
-        self.pool = {}  # serial_id -> AndroidDevice
-        self.lock = threading.Lock()
-        self.driver_pool = WebDriverPool(driver_cls=driver_cls, max_size=10, idle_timeout=1800)
-        self._start_cleanup_task()
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        # 确保初始化代码只执行一次
+        if not hasattr(self, '_initialized'):
+            self.pool = {}  # serial_id -> AndroidDevice
+            self.lock = threading.Lock()
+            self._start_cleanup_task()
+            self._initialized = True
 
     def connect(self, serial_id, ip=None, port=None) -> AndroidDevice:
+        """连接设备并返回设备实例"""
         with self.lock:
             logging.info(f"[DevicePool] 尝试连接 serial_id={serial_id}, ip={ip}, port={port}")
             device = self.pool.get(serial_id)
-            if device is None or not device.is_alive():
-                driver = self.driver_pool.get(serial_id)
-                device = AndroidDevice(serial_id, ip, port, driver_cls=None)
-                device.driver = driver
-                self.pool[serial_id] = device
-                logging.info(f"[DevicePool] 设备连接成功 serial_id={serial_id}")
+
+            # 如果设备不存在或已断开，创建新设备
+            if device is None or not device.is_connected():
+                try:
+                    device = AndroidDevice(serial_id, web_execute_cls=SeleniumWebExecutor)
+                    if device.connect(ip=ip, port=port):
+                        self.pool[serial_id] = device
+                        logging.info(f"[DevicePool] 设备连接成功 serial_id={serial_id}")
+                    else:
+                        logging.error(f"[DevicePool] 设备连接失败 serial_id={serial_id}")
+                        raise RuntimeError(f"Failed to connect device: {serial_id}")
+                except Exception as e:
+                    logging.error(f"[DevicePool] 设备连接失败 serial_id={serial_id}: {e}")
+                    raise
             else:
                 logging.info(f"[DevicePool] 设备已存在且存活 serial_id={serial_id}")
+
             return device
 
     def get(self, serial_id) -> Optional[AndroidDevice]:
+        """获取设备实例，如果不存在返回 None"""
         with self.lock:
             logging.info(f"[DevicePool] 获取设备 serial_id={serial_id}")
             return self.pool.get(serial_id)
 
     def disconnect(self, serial_id):
+        """断开设备连接并释放资源"""
         with self.lock:
             logging.info(f"[DevicePool] 断开设备 serial_id={serial_id}")
             device = self.pool.pop(serial_id, None)
             if device:
-                self.driver_pool.release(serial_id)
-                device.disconnect()
+                try:
+                    device.disconnect()
+                except Exception as e:
+                    logging.error(f"[DevicePool] 断开设备失败 serial_id={serial_id}: {e}")
 
     def _start_cleanup_task(self, interval=600):
+        """启动清理任务，定期清理空闲设备"""
+
         def task():
             while True:
                 time.sleep(interval)
-                self.driver_pool.cleanup()
+                try:
+                    with self.lock:
+                        for serial_id in list(self.pool.keys()):
+                            device = self.pool[serial_id]
+                            if not device.is_connected():
+                                self.disconnect(serial_id)
+                except Exception as e:
+                    logging.error(f"[DevicePool] 清理任务异常: {e}")
+
         t = threading.Thread(target=task, daemon=True)
         t.start()
+
+    def __enter__(self):
+        """支持上下文管理器"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """退出上下文时清理所有设备"""
+        for serial_id in list(self.pool.keys()):
+            self.disconnect(serial_id)
 
 
 if __name__ == "__main__":

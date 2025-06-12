@@ -9,8 +9,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
-from web_driver import SeleniumWebDriver
 from log_config import setup_logging
+from webdriver.selenium_executor import SeleniumWebExecutor
 
 setup_logging()
 
@@ -165,7 +165,7 @@ def get_visible_page(driver: WebDriver) -> List[Page]:
 
 
 def test_real_connect():
-    driver = SeleniumWebDriver()
+    driver = SeleniumWebExecutor()
     devices = adbutils.adb.device_list()
     logging.info(f"start connect")
     for device in devices:

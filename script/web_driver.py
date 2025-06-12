@@ -90,20 +90,4 @@ class SeleniumWebDriver(BaseWebDriver):
         if self.driver:
             self.driver.quit()
 
-def find_chromedriver(path):
-    # 如果 path 就是可执行文件且文件名正确，直接返回
-    basename = os.path.basename(path)
-    logging.info(f"basename: {basename}, path: {path}")
-    if (basename in ("chromedriver", "chromedriver-mac-arm64")) and os.path.isfile(path) and os.access(path, os.X_OK):
-        return path
-    # 否则在目录下查找
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            # 只认精确文件名，且排除任何包含 'THIRD_PARTY' 的文件
-            if file in ("chromedriver", "chromedriver-mac-arm64") and "THIRD_PARTY" not in file:
-                full_path = os.path.join(root, file)
-                if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
-                    return full_path
-    raise FileNotFoundError("No valid chromedriver executable found.")
-
 

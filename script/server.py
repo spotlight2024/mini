@@ -7,11 +7,10 @@ from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from device_pool import DevicePool
-from web_driver import SeleniumWebDriver
 from operation import OperationSequence, FindElement, Click, Wait, JS, HandlePopup, build_operations
 
 app = FastAPI()
-device_pool = DevicePool(driver_cls=SeleniumWebDriver)
+device_pool = DevicePool()
 
 
 class ConnectRequest(BaseModel):
@@ -111,8 +110,9 @@ def find_element(req: FindElementRequest):
         device = device_pool.get(req.serial_id)
         if device is None:
             return APIResponse(code=1002, message="device not found")
-        element = device.find_element(req.method, req.selector)
+        element = device.wait_for_element(req.method, req.selector,timeout=3)
         if element is None:
+            logging.info("not found element")
             return APIResponse(code=1003, message="element not found")
         logging.info(f"find element : {element}")
         return APIResponse(code=0, message="success", data={"element": str(element)})
@@ -170,7 +170,7 @@ def run_operations(req: OperationRequest):
 
 if __name__ == "__main__":
     connect(ConnectRequest(serial_id="JJGICIN7QOAELNGI"))
-    find_element(FindElementRequest(serial_id="JJGICIN7QOAELNGI",method="css selector",selector=".home-coupon"))
+    find_element(FindElementRequest(serial_id="JJGICIN7QOAELNGI",method="css selector",selector=".wx-scroll-view"))
 
 
 
