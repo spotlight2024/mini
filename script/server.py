@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, Any
+from typing import Optional, Any, List
+import uuid
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -7,9 +8,11 @@ from starlette.responses import JSONResponse
 
 from device_pool import DevicePool
 from web_driver import SeleniumWebDriver
+from operation import OperationSequence, FindElement, Click, Wait, JS, HandlePopup, build_operations
 
 app = FastAPI()
 device_pool = DevicePool(driver_cls=SeleniumWebDriver)
+
 
 class ConnectRequest(BaseModel):
     serial_id: str
@@ -39,6 +42,21 @@ class APIResponse(BaseModel):
     trace_id: Optional[str] = None
 
 
+class OperationItem(BaseModel):
+    type: str
+    method: Optional[str] = None
+    selector: Optional[str] = None
+    timeout: Optional[int] = 10
+    seconds: Optional[int] = None
+    script: Optional[str] = None
+    popup_selector: Optional[str] = None
+
+
+class OperationRequest(BaseModel):
+    serial_id: str
+    operations: List[OperationItem]
+
+
 @app.post("/connect", response_model=APIResponse)
 def connect(req: ConnectRequest):
     try:
@@ -59,6 +77,7 @@ def disconnect(req: DisconnectRequest):
     else:
         device.disconnect()
         return APIResponse(code=0, message="success")
+
 
 @app.post("/action", response_model=APIResponse)
 def action(req: ActionRequest):
@@ -99,3 +118,59 @@ def find_element(req: FindElementRequest):
         return APIResponse(code=0, message="success", data={"element": str(element)})
     except Exception as e:
         return APIResponse(code=2000, message="系统异常", error=str(e))
+
+
+def gen_trace_id():
+    return str(uuid.uuid4())
+
+
+@app.post("/run_operations", response_model=APIResponse)
+def run_operations(req: OperationRequest):
+    """
+    {
+  "serial_id": "JJGICIN7QOAELNGI",
+  "operations": [
+    {
+      "type": "find",
+      "method": "css selector",
+      "selector": ".first-btn",
+      "timeout": 10
+    },
+    {
+      "type": "click",
+      "method": "css selector",
+      "selector": ".first-btn",
+      "timeout": 10
+    },
+    {
+      "type": "find",
+      "method": "css selector",
+      "selector": ".second-btn",
+      "timeout": 10
+    },
+    {
+      "type": "click",
+      "method": "css selector",
+      "selector": ".second-btn",
+      "timeout": 10
+    }
+  ]
+}
+    :param req:
+    :return:
+    """
+    trace_id = gen_trace_id()
+    device = device_pool.get(req.serial_id)
+    if not device:
+        return APIResponse(code=400101, message="device not found", trace_id=trace_id)
+    ops = build_operations([op.model_dump() for op in req.operations])
+    seq = OperationSequence(ops)
+    results = seq.run(device, trace_id=trace_id)
+    return APIResponse(code=0, message="success", data={"results": results}, trace_id=trace_id)
+
+if __name__ == "__main__":
+    connect(ConnectRequest(serial_id="JJGICIN7QOAELNGI"))
+    find_element(FindElementRequest(serial_id="JJGICIN7QOAELNGI",method="css selector",selector=".home-coupon"))
+
+
+

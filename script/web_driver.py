@@ -13,7 +13,6 @@ from webdriver.base import BaseWebDriver
 import logging
 import os
 
-from device import AndroidDevice
 from driver import BaseDriver
 
 TEST_CONFIG = {

@@ -7,6 +7,10 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.common.by import By
 from webdriver.base import BaseWebDriver
 from web_driver import SeleniumWebDriver
+from webdriver.pool import WebDriverPool
+import time
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 
 from log_config import setup_logging
@@ -32,6 +36,11 @@ class AndroidDevice:
         self.driver: BaseWebDriver = None
         self.driver_cls = driver_cls
         self.status = "disconnected"  # connected/disconnected
+        self.common_popup_selectors = [
+            ".ad-pop-index--close-icon-new",
+            ".wx-popup-pannel .close-btn",
+            # 可扩展更多
+        ]
 
     def connect(self):
         try:
@@ -113,28 +122,46 @@ class AndroidDevice:
         by = BY_MAP.get(method.lower())
         if not by:
             raise ValueError(f"不支持的查找方式: {method}")
-        logging.info(f"[AndroidDevice] 查找元素 method={method}, selector={selector}, serial_id={self.serial_id}")
+        logging.info(f"[AndroidDevice] 查找元素 driver = {self.driver} , method={method}, selector={selector}, serial_id={self.serial_id}")
         return self.driver.find_element(by, selector)
+
+    def wait_for_element(self, method, selector, timeout=10, trace_id=None):
+        by = BY_MAP.get(method.lower())
+        if not by:
+            raise ValueError(f"不支持的查找方式: {method}")
+        logging.info(f"[{trace_id}] wait_for_element: {method} {selector} timeout={timeout}")
+        return WebDriverWait(self.driver.driver, timeout).until(
+            EC.presence_of_element_located((by, selector))
+        )
+
+    def handle_common_popups(self, trace_id=None):
+        for popup_selector in self.common_popup_selectors:
+            try:
+                popup = self.driver.find_element("css selector", popup_selector)
+                if popup and popup.is_displayed():
+                    popup.click()
+                    logging.info(f"[{trace_id}] 自动关闭弹框: {popup_selector}")
+            except Exception:
+                pass
 
 
 class DevicePool:
-    def __init__(self, driver_cls=BaseWebDriver):
+    def __init__(self, driver_cls=SeleniumWebDriver):
         self.pool = {}  # serial_id -> AndroidDevice
         self.lock = threading.Lock()
-        self.driver_cls = driver_cls
+        self.driver_pool = WebDriverPool(driver_cls=driver_cls, max_size=10, idle_timeout=1800)
+        self._start_cleanup_task()
 
     def connect(self, serial_id, ip=None, port=None) -> AndroidDevice:
         with self.lock:
             logging.info(f"[DevicePool] 尝试连接 serial_id={serial_id}, ip={ip}, port={port}")
             device = self.pool.get(serial_id)
             if device is None or not device.is_alive():
-                device = AndroidDevice(serial_id, ip, port, driver_cls=self.driver_cls)
-                if device.connect():
-                    self.pool[serial_id] = device
-                    logging.info(f"[DevicePool] 设备连接成功 serial_id={serial_id}")
-                else:
-                    logging.error(f"[DevicePool] 设备连接失败 serial_id={serial_id}")
-                    raise RuntimeError(f"Failed to connect device {serial_id}")
+                driver = self.driver_pool.get(serial_id)
+                device = AndroidDevice(serial_id, ip, port, driver_cls=None)
+                device.driver = driver
+                self.pool[serial_id] = device
+                logging.info(f"[DevicePool] 设备连接成功 serial_id={serial_id}")
             else:
                 logging.info(f"[DevicePool] 设备已存在且存活 serial_id={serial_id}")
             return device
@@ -149,7 +176,16 @@ class DevicePool:
             logging.info(f"[DevicePool] 断开设备 serial_id={serial_id}")
             device = self.pool.pop(serial_id, None)
             if device:
+                self.driver_pool.release(serial_id)
                 device.disconnect()
+
+    def _start_cleanup_task(self, interval=600):
+        def task():
+            while True:
+                time.sleep(interval)
+                self.driver_pool.cleanup()
+        t = threading.Thread(target=task, daemon=True)
+        t.start()
 
 
 if __name__ == "__main__":
