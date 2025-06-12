@@ -46,6 +46,35 @@ def find_chromedriver(path):
     raise FileNotFoundError("No valid chromedriver executable found.")
 
 
+def connect_webdriver(serial_id: str) -> WebDriver:
+    logging.info(f"[SeleniumWebExecutor] 开始创建 WebDriver serial_id={serial_id}")
+    options = webdriver.ChromeOptions()
+
+    options.enable_mobile(
+        android_package=TEST_CONFIG["android_package"],
+        device_serial=serial_id,
+    )
+    options.add_experimental_option("androidUseRunningApp", True)
+    options.add_experimental_option("androidProcess", TEST_CONFIG["android_process"])
+
+    logging.info(f"[SeleniumWebExecutor] Chrome 选项配置: {options.to_capabilities()}")
+
+    path = ChromeDriverManager(driver_version=TEST_CONFIG["chrome_version"]).install()
+    logging.info(f"[SeleniumWebExecutor] ChromeDriver 路径: {path}")
+
+    # 新版本chromedriver的文件名是THIRD_PARTY_NOTICES.chromedriver，需要替换为chromedriver
+    if 'THIRD_PARTY_NOTICES.chromedriver' in path:
+        path = path.replace('THIRD_PARTY_NOTICES.chromedriver', 'chromedriver')
+        logging.info(f"[SeleniumWebExecutor] 更新后的 ChromeDriver 路径: {path}")
+
+    service = Service(executable_path=path)
+    driver = webdriver.Chrome(options=options, service=service)
+    driver.implicitly_wait(3)
+    logging.info(f"[SeleniumWebExecutor] WebDriver 创建成功 serial_id={serial_id}")
+
+    return driver
+
+
 class SeleniumWebExecutor(WebExecutor):
     """Selenium WebDriver 实现"""
 
@@ -59,41 +88,13 @@ class SeleniumWebExecutor(WebExecutor):
         """连接设备"""
         try:
             logging.info(f"[SeleniumWebExecutor] 开始连接设备 serial_id={serial_id}")
-            self._driver = self.connect_webdriver(serial_id)
+            self._driver = connect_webdriver(serial_id)
             self._device_id = serial_id
             logging.info(f"[SeleniumWebExecutor] 设备连接成功 serial_id={serial_id}")
             return True
         except WebDriverException as e:
             logging.error(f"[SeleniumWebExecutor] 设备连接失败 serial_id={serial_id}: {e}")
             return False
-
-    def connect_webdriver(self, serial_id: str) -> WebDriver:
-        logging.info(f"[SeleniumWebExecutor] 开始创建 WebDriver serial_id={serial_id}")
-        options = webdriver.ChromeOptions()
-
-        options.enable_mobile(
-            android_package=TEST_CONFIG["android_package"],
-            device_serial=serial_id,
-        )
-        options.add_experimental_option("androidUseRunningApp", True)
-        options.add_experimental_option("androidProcess", TEST_CONFIG["android_process"])
-
-        logging.info(f"[SeleniumWebExecutor] Chrome 选项配置: {options.to_capabilities()}")
-
-        path = ChromeDriverManager(driver_version=TEST_CONFIG["chrome_version"]).install()
-        logging.info(f"[SeleniumWebExecutor] ChromeDriver 路径: {path}")
-
-        # 新版本chromedriver的文件名是THIRD_PARTY_NOTICES.chromedriver，需要替换为chromedriver
-        if 'THIRD_PARTY_NOTICES.chromedriver' in path:
-            path = path.replace('THIRD_PARTY_NOTICES.chromedriver', 'chromedriver')
-            logging.info(f"[SeleniumWebExecutor] 更新后的 ChromeDriver 路径: {path}")
-
-        service = Service(executable_path=path)
-        driver = webdriver.Chrome(options=options, service=service)
-        driver.implicitly_wait(3)
-        logging.info(f"[SeleniumWebExecutor] WebDriver 创建成功 serial_id={serial_id}")
-
-        return driver
 
     def quit(self) -> None:
         """关闭连接"""
