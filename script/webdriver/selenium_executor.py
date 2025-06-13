@@ -51,7 +51,6 @@ class Page:
         return (
                 self.is_visible and
                 not self.is_hidden and
-                self.is_active and
                 self.viewport_width > 0 and
                 self.viewport_height > 0
         )
@@ -95,6 +94,33 @@ def try_close_popup(driver, timeout=5):
         # 弹框未出现或关闭按钮不可点击
         return False
 
+def get_miniprogram_current_page(driver):
+    """
+    获取微信小程序 WebView 当前业务页面的路由（如 pages/index/menu）
+    :param driver: Selenium WebDriver 实例
+    :return: 当前页面路由字符串，获取不到时返回空字符串
+    """
+    js = """
+        try {
+            if (window.__wxRoute__) return window.__wxRoute__;
+            if (typeof getCurrentPages === 'function') {
+                var pages = getCurrentPages();
+                if (pages && pages.length) {
+                    // 兼容微信原生和部分框架
+                    if (pages[pages.length-1].route) {
+                        return pages[pages.length-1].route;
+                    }
+                    if (pages[pages.length-1].__route__) {
+                        return pages[pages.length-1].__route__;
+                    }
+                }
+            }
+            return '';
+        } catch(e) {
+            return '';
+        }
+    """
+    return driver.execute_script(js)
 
 def get_visible_page(driver: WebDriver) -> List[Page]:
     """
@@ -107,9 +133,11 @@ def get_visible_page(driver: WebDriver) -> List[Page]:
         List[Page]: 可见页面列表
     """
     visible_pages = []
+    
 
     for handle in driver.window_handles:
         driver.switch_to.window(handle)
+
         current_url = driver.current_url
         current_title = driver.title
 
@@ -126,6 +154,8 @@ def get_visible_page(driver: WebDriver) -> List[Page]:
                 scrollY: window.scrollY
             }
         """)
+
+        logging.info(f"page_state : {page_state}")
 
         # 创建页面对象
         page = Page(
@@ -151,16 +181,16 @@ def get_visible_page(driver: WebDriver) -> List[Page]:
             """)
             page.is_foreground = is_foreground
 
-            # # 记录页面信息
-            # logging.info(
-            #     f"窗口状态 - Handle: {page.handle} | "
-            #     f"URL: {page.url} | "
-            #     f"Title: {page.title} | "
-            #     f"可见性: {page.is_actually_visible} | "
-            #     f"视口大小: {page.viewport_width}x{page.viewport_height} | "
-            #     f"焦点状态: {page.is_active} | "
-            #     f"隐藏状态: {page.is_hidden}"
-            # )
+            # 记录页面信息
+            logging.info(
+                f"窗口状态 - Handle: {page.handle} | "
+                f"URL: {page.url} | "
+                f"Title: {page.title} | "
+                f"可见性: {page.is_actually_visible} | "
+                f"视口大小: {page.viewport_width}x{page.viewport_height} | "
+                f"焦点状态: {page.is_active} | "
+                f"隐藏状态: {page.is_hidden}"
+            )
 
             if page.is_foreground:
                 logging.info(f"前台页面 - Handle: {page.handle} | URL: {page.url} | title: {page.title}")
@@ -169,7 +199,11 @@ def get_visible_page(driver: WebDriver) -> List[Page]:
             logging.error(f"检查页面状态时出错: {str(e)}")
             continue
 
-        if page.is_actually_visible:
+        # if page.is_actually_visible or ":VISIBLE" in current_title:
+        """
+        @TODO 可见页面判断逻辑需要优化，目前为了调试先按简单方案
+        """
+        if ":VISIBLE" in current_title:
             visible_pages.append(page)
 
     # 输出可见页面统计
