@@ -92,12 +92,14 @@ class DevicePool:
 
     def __enter__(self):
         """支持上下文管理器"""
+        logging.info("[DevicePool] enter")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        logging.info("[DevicePool] exit")
         """退出上下文时清理所有设备"""
-        for serial_id in list(self.pool.keys()):
-            self.disconnect(serial_id)
+        # for serial_id in list(self.pool.keys()):
+        #     self.disconnect(serial_id)
 
 
 if __name__ == "__main__":

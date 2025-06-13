@@ -77,7 +77,13 @@ class AndroidDevice:
         if not self.is_connected():
             return None
         return self._web_execute.find_element(by, value)
-    
+
+    def find_elements(self, by: str, value: str) -> Optional[WebElement]:
+        """查找元素"""
+        if not self.is_connected():
+            return None
+        return self._web_execute.find_elements(by, value)
+
     def wait_for_element(self, by: str, value: str, timeout: int = 10) -> Optional[WebElement]:
         """等待元素出现"""
         if not self.is_connected():

@@ -25,7 +25,12 @@ class WebExecutor(ABC):
     def find_element(self, by: str, value: str) -> Optional[WebElement]:
         """查找元素"""
         pass
-    
+
+    @abstractmethod
+    def find_elements(self, by: str, value: str) -> Optional[list[WebElement]]:
+        """查找元素"""
+        pass
+
     @abstractmethod
     def wait_for_element(self, by: str, value: str, timeout: int = 10) -> Optional[WebElement]:
         """等待元素出现"""
