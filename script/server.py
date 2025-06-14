@@ -49,6 +49,8 @@ class OperationItem(BaseModel):
     seconds: Optional[int] = None
     script: Optional[str] = None
     popup_selector: Optional[str] = None
+    wait_for_new_window: Optional[bool] = False
+    wait_for_render: Optional[bool] = True
 
 
 class OperationRequest(BaseModel):
@@ -126,39 +128,6 @@ def gen_trace_id():
 
 @app.post("/run_operations", response_model=APIResponse)
 def run_operations(req: OperationRequest):
-    """
-    {
-  "serial_id": "JJGICIN7QOAELNGI",
-  "operations": [
-    {
-      "type": "find",
-      "method": "css selector",
-      "selector": ".first-btn",
-      "timeout": 10
-    },
-    {
-      "type": "click",
-      "method": "css selector",
-      "selector": ".first-btn",
-      "timeout": 10
-    },
-    {
-      "type": "find",
-      "method": "css selector",
-      "selector": ".second-btn",
-      "timeout": 10
-    },
-    {
-      "type": "click",
-      "method": "css selector",
-      "selector": ".second-btn",
-      "timeout": 10
-    }
-  ]
-}
-    :param req:
-    :return:
-    """
     trace_id = gen_trace_id()
     device = device_pool.get(req.serial_id)
     if not device:
