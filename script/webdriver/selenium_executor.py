@@ -1,19 +1,26 @@
 import logging
+import uuid
 from dataclasses import dataclass
 from typing import Optional, Any, List, Dict
+import time
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
+from selenium.webdriver import ActionChains, Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.common.actions.wheel_input import ScrollOrigin
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
 
+from operation import FindElement, build_operations, OperationSequence, OperationItem
 from webdriver.popup_handler import PopupHandler
 from webdriver.web_executor import WebExecutor
+from webdriver.webdriver_utils import WebDriverUtils
 
 import os
 
@@ -94,6 +101,7 @@ def try_close_popup(driver, timeout=5):
         # 弹框未出现或关闭按钮不可点击
         return False
 
+
 def get_miniprogram_current_page(driver):
     """
     获取微信小程序 WebView 当前业务页面的路由（如 pages/index/menu）
@@ -122,6 +130,7 @@ def get_miniprogram_current_page(driver):
     """
     return driver.execute_script(js)
 
+
 def get_visible_page(driver: WebDriver) -> List[Page]:
     """
     获取所有可见页面的信息
@@ -133,7 +142,6 @@ def get_visible_page(driver: WebDriver) -> List[Page]:
         List[Page]: 可见页面列表
     """
     visible_pages = []
-    
 
     for handle in driver.window_handles:
         driver.switch_to.window(handle)
@@ -214,6 +222,7 @@ def get_visible_page(driver: WebDriver) -> List[Page]:
 
     return visible_pages
 
+
 def find_chromedriver(path):
     # 如果 path 就是可执行文件且文件名正确，直接返回
     basename = os.path.basename(path)
@@ -265,199 +274,266 @@ class SeleniumWebExecutor(WebExecutor):
     """Selenium WebDriver 实现"""
 
     def __init__(self):
-        self._driver: Optional[webdriver.Chrome] = None
-        self._device_id: Optional[str] = None
-        self._popup_handler = PopupHandler()
+        self._driver = None
+        self._device_id = None
         logging.info("[SeleniumWebExecutor] 初始化完成")
 
     def connect(self, serial_id: str, **kwargs) -> bool:
-        """连接设备"""
+        """
+        连接到设备
+        :param serial_id: 设备序列号
+        :param kwargs: 其他参数
+        :return: 是否连接成功
+        """
         try:
-            logging.info(f"[SeleniumWebExecutor] 开始连接设备 serial_id={serial_id}")
             self._driver = connect_webdriver(serial_id)
             self._device_id = serial_id
             logging.info(f"[SeleniumWebExecutor] 设备连接成功 serial_id={serial_id}")
             return True
-        except WebDriverException as e:
-            logging.error(f"[SeleniumWebExecutor] 设备连接失败 serial_id={serial_id}: {e}")
+        except Exception as e:
+            logging.error(f"[SeleniumWebExecutor] 设备连接失败: {e}")
             return False
 
     def quit(self) -> None:
-        """关闭连接"""
-        if self._driver:
-            try:
-                logging.info(f"[SeleniumWebExecutor] 开始关闭 WebDriver device_id={self._device_id}")
+        """
+        断开连接
+        """
+        try:
+            if self._driver:
                 self._driver.quit()
-                logging.info(f"[SeleniumWebExecutor] WebDriver 关闭成功 device_id={self._device_id}")
-            except Exception as e:
-                logging.error(f"[SeleniumWebExecutor] WebDriver 关闭失败 device_id={self._device_id}: {e}")
-            finally:
                 self._driver = None
                 self._device_id = None
                 logging.info(f"[SeleniumWebExecutor] WebDriver 资源已清理")
+        except Exception as e:
+            logging.error(f"[SeleniumWebExecutor] 断开连接失败: {e}")
 
     def is_alive(self) -> bool:
-        """检查连接是否存活"""
-        if not self._driver:
-            logging.debug("[SeleniumWebExecutor] WebDriver 未初始化")
-            return False
+        """
+        检查连接是否存活
+        :return: 是否存活
+        """
         try:
-            self._driver.current_url
-            logging.debug(f"[SeleniumWebExecutor] WebDriver 状态正常 device_id={self._device_id}")
-            return True
+            return self._driver is not None
         except:
-            logging.warning(f"[SeleniumWebExecutor] WebDriver 已断开连接 device_id={self._device_id}")
             return False
 
     def find_element(self, by: str, value: str) -> Optional[WebElement]:
-        """查找元素"""
-        if not self._driver:
-            logging.warning("[SeleniumWebExecutor] 查找元素失败: WebDriver 未初始化")
-            return None
+        """
+        查找元素
+        :param by: 定位方式
+        :param value: 定位值
+        :return: 元素对象
+        """
         try:
-            element = self._driver.find_element(by, value)
-            logging.debug(f"[SeleniumWebExecutor] 元素查找成功 by={by}, value={value}")
-            return element
-        except NoSuchElementException:
-            logging.warning(f"[SeleniumWebExecutor] 未找到元素 by={by}, value={value}")
+            return self._driver.find_element(by, value)
+        except Exception as e:
+            logging.error(f"[SeleniumWebExecutor] 查找元素失败: {e}")
             return None
 
     def find_elements(self, by: str, value: str) -> Optional[List[WebElement]]:
-        """查找元素"""
-        if not self._driver:
-            logging.warning("[SeleniumWebExecutor] 查找元素失败: WebDriver 未初始化")
-            return None
+        """
+        查找多个元素
+        :param by: 定位方式
+        :param value: 定位值
+        :return: 元素列表
+        """
         try:
-            elements = self._driver.find_elements(by, value)
-            logging.debug(f"[SeleniumWebExecutor] 元素查找成功 by={by}, value={value}")
-            return elements
-        except NoSuchElementException:
-            logging.warning(f"[SeleniumWebExecutor] 未找到元素 by={by}, value={value}")
+            return self._driver.find_elements(by, value)
+        except Exception as e:
+            logging.error(f"[SeleniumWebExecutor] 查找元素失败: {e}")
             return None
 
-    def wait_for_element(self, by: str, value: str, timeout: int = 10) -> Optional[WebElement]:
-        """等待元素出现"""
-        if not self._driver:
-            logging.warning(f"[SeleniumWebExecutor] 等待元素失败: WebDriver 未初始化, device_id={self._device_id}")
-            return None
-        try:
-            logging.info(f"[SeleniumWebExecutor] 开始等待元素 by={by}, value={value}, timeout={timeout}, device_id={self._device_id}")
-            element = WebDriverWait(self._driver, timeout).until(
-                EC.presence_of_element_located((by, value))
-            )
-            logging.info(f"[SeleniumWebExecutor] 元素等待成功 by={by}, value={value}, device_id={self._device_id}")
-            return element
-        except TimeoutException:
-            logging.warning(f"[SeleniumWebExecutor] 元素等待超时 by={by}, value={value}, timeout={timeout}, device_id={self._device_id}")
-            return None
+    def wait_for_element(self, by: str, value: str, timeout: int = 10, trace_id: str = None) -> Optional[WebElement]:
+        """
+        等待元素出现
+        :param by: 定位方式
+        :param value: 定位值
+        :param timeout: 超时时间
+        :param trace_id: 追踪ID
+        :return: 元素对象
+        """
+        return WebDriverUtils.wait_for_element(self._driver, by, value, timeout, trace_id)
+
+    def wait_for_new_window(self, timeout: int = 10, old_handles: Optional[set] = None) -> Optional[str]:
+        """
+        等待新窗口出现
+        :param timeout: 超时时间
+        :param old_handles: 旧窗口句柄集合
+        :return: 新窗口句柄
+        """
+        return WebDriverUtils.wait_for_new_window(self._driver, timeout, old_handles)
+
+    def wait_for_page_load(self, timeout: int = 10) -> bool:
+        """
+        等待页面加载完成
+        :param timeout: 超时时间
+        :return: 是否加载完成
+        """
+        return WebDriverUtils.wait_for_page_load(self._driver, timeout)
 
     def execute_script(self, script: str, *args) -> Any:
-        """执行 JavaScript"""
-        if not self._driver:
-            logging.warning("[SeleniumWebExecutor] 执行脚本失败: WebDriver 未初始化")
-            return None
+        """
+        执行JavaScript脚本
+        :param script: 脚本内容
+        :param args: 脚本参数
+        :return: 执行结果
+        """
         try:
-            result = self._driver.execute_script(script, *args)
-            logging.debug(f"[SeleniumWebExecutor] 脚本执行成功 script={script}")
-            return result
+            return self._driver.execute_script(script, *args)
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 脚本执行失败 script={script}: {e}")
+            logging.error(f"[SeleniumWebExecutor] 执行脚本失败: {e}")
             return None
 
     def get_current_url(self) -> str:
-        """获取当前 URL"""
-        if not self._driver:
-            logging.warning("[SeleniumWebExecutor] 获取 URL 失败: WebDriver 未初始化")
-            return ""
+        """
+        获取当前URL
+        :return: URL字符串
+        """
         try:
-            url = self._driver.current_url
-            logging.debug(f"[SeleniumWebExecutor] 当前 URL: {url}")
-            return url
+            return self._driver.current_url
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 获取 URL 失败: {e}")
+            logging.error(f"[SeleniumWebExecutor] 获取URL失败: {e}")
             return ""
 
     def get_page_source(self) -> str:
-        """获取页面源码"""
-        if not self._driver:
-            logging.warning("[SeleniumWebExecutor] 获取页面源码失败: WebDriver 未初始化")
-            return ""
+        """
+        获取页面源码
+        :return: 页面源码字符串
+        """
         try:
-            source = self._driver.page_source
-            logging.debug("[SeleniumWebExecutor] 页面源码获取成功")
-            return source
+            return self._driver.page_source
         except Exception as e:
             logging.error(f"[SeleniumWebExecutor] 获取页面源码失败: {e}")
             return ""
 
     def handle_common_popups(self) -> None:
-        """处理常见弹窗"""
-        if not self._driver:
-            logging.warning("[SeleniumWebExecutor] 处理弹窗失败: WebDriver 未初始化")
-            return
+        """
+        处理常见弹窗
+        """
         try:
-            logging.info("[SeleniumWebExecutor] 开始处理弹窗")
-            self._popup_handler.handle_popups(self._driver)
-            logging.info("[SeleniumWebExecutor] 弹窗处理完成")
+            popup_selectors = [
+                "button.close",
+                ".modal-close",
+                ".popup-close",
+                "#cookie-consent button",
+                ".cookie-banner button"
+            ]
+
+            logging.info(f"[SeleniumWebExecutor] start find dialog popup selectors: {popup_selectors}")
+            for selector in popup_selectors:
+                try:
+                    # 使用find_element而不是wait_for_element，避免不必要的等待
+                    element = self._driver.find_element(By.CSS_SELECTOR, selector)
+                    if element and element.is_displayed():
+                        element.click()
+                        logging.info(f"[SeleniumWebExecutor] 关闭弹窗: {selector}")
+                except NoSuchElementException:
+                    # 元素不存在，继续检查下一个
+                    continue
+                except Exception as e:
+                    logging.warning(f"[SeleniumWebExecutor] 处理弹窗异常: {selector}, error={e}")
+                    continue
         except Exception as e:
             logging.error(f"[SeleniumWebExecutor] 处理弹窗失败: {e}")
 
     def get_window_handles(self) -> list:
-        """获取所有窗口句柄"""
-        if not self._driver:
-            logging.warning("[SeleniumWebExecutor] 获取窗口句柄失败: WebDriver 未初始化")
-            return []
+        """
+        获取所有窗口句柄
+        :return: 窗口句柄列表
+        """
         try:
-            handles = self._driver.window_handles
-            logging.debug(f"[SeleniumWebExecutor] 获取到 {len(handles)} 个窗口句柄")
-            return handles
+            return self._driver.window_handles
         except Exception as e:
             logging.error(f"[SeleniumWebExecutor] 获取窗口句柄失败: {e}")
             return []
 
     def switch_to_window(self, handle: str) -> None:
-        """切换到指定窗口"""
-        if not self._driver:
-            logging.warning("[SeleniumWebExecutor] 切换窗口失败: WebDriver 未初始化")
-            return
+        """
+        切换到指定窗口
+        :param handle: 窗口句柄
+        """
         try:
-            logging.info(f"[SeleniumWebExecutor] 开始切换到窗口 handle={handle}")
             self._driver.switch_to.window(handle)
-            logging.info(f"[SeleniumWebExecutor] 窗口切换成功 handle={handle}")
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 切换窗口失败 handle={handle}: {e}")
+            logging.error(f"[SeleniumWebExecutor] 切换窗口失败: {e}")
 
     def get_current_window_handle(self) -> str:
-        """获取当前窗口句柄"""
-        if not self._driver:
-            logging.warning("[SeleniumWebExecutor] 获取当前窗口句柄失败: WebDriver 未初始化")
-            return ""
+        """
+        获取当前窗口句柄
+        :return: 窗口句柄
+        """
         try:
-            handle = self._driver.current_window_handle
-            logging.debug(f"[SeleniumWebExecutor] 当前窗口句柄: {handle}")
-            return handle
+            return self._driver.current_window_handle
         except Exception as e:
             logging.error(f"[SeleniumWebExecutor] 获取当前窗口句柄失败: {e}")
             return ""
 
-if __name__ == "__main__":
-    from device_pool import DevicePool
 
-    with DevicePool() as device_pool:
+"""
+search btn:
+
+
+"""
+
+
+def main():
+    try:
+        from device_pool import DevicePool
+
+        # 连接设备
         device = DevicePool().connect("JJGICIN7QOAELNGI")
-        
-        # 类型检查和转换
-        selenium_executor: SeleniumWebExecutor = device._web_execute
-        wait = WebDriverWait(selenium_executor._driver, 10)  # 最长等待 10 秒
-        logging.info(f"current handle: {selenium_executor._driver.current_window_handle}")
 
+        # switch to current page
+        selenium_executor: SeleniumWebExecutor = device._web_execute
+        wait = WebDriverWait(selenium_executor._driver, 3)  # 最长等待 10 秒
         # 等待页面加载完成并获取可见页面
         visible_pages = wait.until(PageVisibilityCondition(min_visible_pages=1))
         selenium_executor._driver.switch_to.window(visible_pages[0].handle)
 
-        logging.info(f"visible pages: {visible_pages}")
-        # logging.info(f"current handle: {selenium_executor._driver.page_source}")
+        driver = selenium_executor._driver
+        # 1) 找到 shadow host
+        host = driver.find_element(By.CSS_SELECTOR, "wx-input.query-bar--input_native")
+        # 2) 拿到 shadow root
+        shadow = driver.execute_script("return arguments[0].shadowRoot", host)
+        # 3) 在 shadow root 里定位 <div role="textbox">
+        textbox = shadow.find_element(By.CSS_SELECTOR, "div[role='textbox']")
+        textbox.click()
+        textbox.send_keys("拿铁")
 
-        elements = device.find_element(By.CSS_SELECTOR, "wx-view.menu-product_name.product--menu-product_name")
-        logging.info(f"[SeleniumWebExecutor] <UNK> element={elements}")
+    # try:
+    #     # 构建操作序列
+    #     operations = [
+    #         # 查找搜索按钮
+    #         OperationItem("find", method="css selector", selector="wx-view.query.menu-bar--query", timeout=10),
+    #         # 点击搜索按钮并等待新窗口
+    #         OperationItem("click", wait_for_new_window=True, timeout=10),
+    #         # 等待新页面渲染
+    #         OperationItem("wait_for_page_render", timeout=10),
+    #         # 查找输入框
+    #         OperationItem("find", method="css selector", selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=10),
+    #         # 输入搜索文本
+    #         OperationItem("input", text="拿铁"),
+    #         # 查找搜索按钮
+    #         OperationItem("find", method="css selector", selector="#submit-button", timeout=10),
+    #         # 点击搜索按钮
+    #         OperationItem("click")
+    #     ]
+    #
+    #     # 构建并执行操作序列
+    #     sequence = OperationSequence(operations)
+    #     results = sequence.execute(device)
+    #
+    #     # 打印结果
+    #     for i, result in enumerate(results):
+    #         print(f"Step {i + 1}: {'Success' if result['success'] else 'Failed'}")
+    #         if not result['success']:
+    #             print(f"Error: {result['error']}")
+    #         print(f"Time: {result['elapsed']:.2f}s")
+
+    finally:
+        # 断开设备连接
         device.disconnect()
+
+
+if __name__ == "__main__":
+    main()
