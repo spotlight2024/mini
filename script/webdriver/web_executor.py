@@ -69,4 +69,8 @@ class WebExecutor(ABC):
     @abstractmethod
     def get_current_window_handle(self) -> str:
         """获取当前窗口句柄"""
-        pass 
+        pass
+
+    @abstractmethod
+    def switch_to_new_window(self) -> None:
+        pass

@@ -16,18 +16,13 @@ class AndroidDevice:
         self._web_execute: Optional[WebExecutor] = None
         self._web_execute_cls = web_execute_cls
         self._status = "disconnected"  # connected/disconnected
-        self._common_popup_selectors = [
-            ".ad-pop-index--close-icon-new",
-            ".wx-popup-pannel .close-btn",
-            # 可扩展更多
-        ]
+        self.adb_device = adbutils.adb.device(serial=self._serial_id)
     
     def connect(self, **kwargs) -> bool:
         """连接设备"""
         try:
             logging.info(f"[AndroidDevice] 尝试通过 adb 查找设备 serial_id={self._serial_id}")
-            device = adbutils.adb.device(serial=self._serial_id)
-            if not device:
+            if not self.adb_device:
                 logging.error(f"[AndroidDevice] adb 未找到设备 serial_id={self._serial_id}")
                 self._status = "disconnected"
                 return False
@@ -66,12 +61,31 @@ class AndroidDevice:
         try:
             device = adbutils.adb.device(serial=self._serial_id)
             alive = device is not None and self._web_execute is not None
-            logging.info(f"[AndroidDevice] 检查设备存活 serial_id={self._serial_id}, alive={alive}")
+            # logging.info(f"[AndroidDevice] 检查设备存活 serial_id={self._serial_id}, alive={alive}")
             return alive
         except Exception as e:
             logging.error(f"[AndroidDevice] 检查设备存活异常 serial_id={self._serial_id}: {e}")
             return False
+
+    def wait_for_page_load(self, timeout: int = 10) -> bool:
+        """等待页面加载完成"""
+        if not self.is_connected():
+            return False
+        return self._web_execute.wait_for_page_load(timeout)
     
+    def wait_for_new_window(self, timeout: int = 10, old_handles: Optional[set] = None) -> Optional[str]:
+        """等待新窗口出现"""
+        if not self.is_connected():
+            return None
+        return self._web_execute.wait_for_new_window(timeout, old_handles)
+
+    def switch_to_new_window(self) -> None:
+        """<UNK>"""
+        if not self.is_connected():
+            return None
+        self._web_execute.switch_to_new_window()
+        return None
+
     def find_element(self, by: str, value: str) -> Optional[WebElement]:
         """查找元素"""
         if not self.is_connected():
@@ -145,6 +159,10 @@ class AndroidDevice:
                 return True
         return False
     
+    def get_adb_device(self):
+        """获取 ADB 设备实例"""
+        return self.adb_device
+
     def __enter__(self):
         """支持上下文管理器"""
         if not self.connect():
@@ -153,4 +171,4 @@ class AndroidDevice:
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """退出上下文时自动断开连接"""
-        self.disconnect() 
+        self.disconnect()

@@ -1,8 +1,36 @@
 import logging
+from dataclasses import dataclass
+from typing import List, Dict, Any
+
+from appium.webdriver.webdriver import WebDriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
 import time
+
+@dataclass
+class Page:
+    """页面信息类"""
+    handle: str
+    url: str
+    title: str
+    is_visible: bool
+    is_foreground: bool
+    viewport_width: int
+    viewport_height: int
+    is_active: bool
+    is_hidden: bool
+    state: Dict[str, Any]
+
+    @property
+    def is_actually_visible(self) -> bool:
+        """判断页面是否真正可见"""
+        return (
+                self.is_visible and
+                not self.is_hidden and
+                self.viewport_width > 0 and
+                self.viewport_height > 0
+        )
 
 class WebDriverUtils:
     @staticmethod
@@ -75,11 +103,79 @@ class WebDriverUtils:
                 if new_handles - old_handles:
                     new_handle = (new_handles - old_handles).pop()
                     driver.switch_to.window(new_handle)
-                    logging.info(f"[WebDriverUtils] 切换到新窗口: {new_handle}")
+                    logging.info(f"[WebDriverUtils] 切换到新窗口: {new_handle} , title : {driver.title}")
                     return new_handle
                 time.sleep(0.5)
             logging.warning(f"[WebDriverUtils] 等待新窗口超时: timeout={timeout}")
             return None
         except Exception as e:
             logging.error(f"[WebDriverUtils] 等待新窗口异常: {str(e)}")
-            return None 
+            return None
+
+    @staticmethod
+    def get_visible_page(driver, timeout=10) -> list[Page]:
+        """
+        获取可见页面，使用 Selenium 的等待机制
+        :param driver: WebDriver实例
+        :param timeout: 超时时间（秒）
+        :return: 可见页面列表，超时返回空列表
+        """
+        try:
+            wait = WebDriverWait(driver, timeout)
+            
+            def find_visible_pages(d):
+                visible_pages_list = []
+                # 先切换到第一个窗口，确保 handle 列表更新
+                if d.window_handles:
+                    d.switch_to.window(d.window_handles[0])
+                    time.sleep(0.1)  # 给一点时间让 handle 列表更新
+                
+                for handle in d.window_handles:
+                    d.switch_to.window(handle)
+                    
+                    # 获取页面状态
+                    page_state = d.execute_script("""
+                        return {
+                            visibilityState: document.visibilityState,
+                            hidden: document.hidden,
+                            displayState: document.webkitVisibilityState,
+                            isActive: document.hasFocus(),
+                            viewportWidth: window.innerWidth,
+                            viewportHeight: window.innerHeight,
+                            scrollX: window.scrollX,
+                            scrollY: window.scrollY
+                        }
+                    """)
+                    
+                    # 创建页面对象
+                    page = Page(
+                        handle=handle,
+                        url=d.current_url,
+                        title=d.title,
+                        is_visible=page_state['visibilityState'] == 'visible',
+                        is_foreground=False,
+                        viewport_width=page_state['viewportWidth'],
+                        viewport_height=page_state['viewportHeight'],
+                        is_active=page_state['isActive'],
+                        is_hidden=page_state['hidden'],
+                        state=page_state
+                    )
+                    
+                    if ":VISIBLE" in d.title:
+                        visible_pages_list.append(page)
+                        break
+                
+                return visible_pages_list if visible_pages_list else None
+            
+            # 使用 WebDriverWait 等待可见页面出现
+            visible_pages = wait.until(find_visible_pages)
+            logging.info(f"找到可见页面 : {visible_pages}")
+            return visible_pages
+            
+        except TimeoutException:
+            logging.warning(f"获取可见页面超时: {timeout}秒")
+            return []
+        except Exception as e:
+            logging.error(f"获取可见页面异常: {str(e)}")
+            return []
+        
