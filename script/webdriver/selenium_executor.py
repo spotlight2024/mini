@@ -33,57 +33,9 @@ TEST_CONFIG = {
     "ip": "172.16.1.125",
     "port": 6520,
     "device_serial": "test_serial",
-    "android_process": "com.tencent.mm:appbrand0",
+    "android_process": "com.tencent.mm:appbrand1",
     "android_package": "com.tencent.mm"
 }
-
-
-@dataclass
-class Page:
-    """页面信息类"""
-    handle: str
-    url: str
-    title: str
-    is_visible: bool
-    is_foreground: bool
-    viewport_width: int
-    viewport_height: int
-    is_active: bool
-    is_hidden: bool
-    state: Dict[str, Any]
-
-    @property
-    def is_actually_visible(self) -> bool:
-        """判断页面是否真正可见"""
-        return (
-                self.is_visible and
-                not self.is_hidden and
-                self.viewport_width > 0 and
-                self.viewport_height > 0
-        )
-
-
-class PageVisibilityCondition:
-    """页面可见性条件类"""
-
-    def __init__(self, min_visible_pages: int = 1):
-        self.min_visible_pages = min_visible_pages
-
-    def __call__(self, driver: WebDriver) -> List[Page]:
-        """
-        检查页面可见性条件
-
-        Args:
-            driver: WebDriver 实例
-
-        Returns:
-            List[Page]: 如果条件满足返回可见页面列表，否则返回 False
-        """
-        visible_pages = get_visible_page(driver)
-        if len(visible_pages) >= self.min_visible_pages:
-            return visible_pages
-        return False
-
 
 def try_close_popup(driver, timeout=5):
     """
@@ -129,99 +81,6 @@ def get_miniprogram_current_page(driver):
         }
     """
     return driver.execute_script(js)
-
-
-def get_visible_page(driver: WebDriver) -> List[Page]:
-    """
-    获取所有可见页面的信息
-
-    Args:
-        driver: WebDriver 实例
-
-    Returns:
-        List[Page]: 可见页面列表
-    """
-    visible_pages = []
-
-    for handle in driver.window_handles:
-        driver.switch_to.window(handle)
-
-        current_url = driver.current_url
-        current_title = driver.title
-
-        # 获取页面状态
-        page_state = driver.execute_script("""
-            return {
-                visibilityState: document.visibilityState,
-                hidden: document.hidden,
-                displayState: document.webkitVisibilityState,
-                isActive: document.hasFocus(),
-                viewportWidth: window.innerWidth,
-                viewportHeight: window.innerHeight,
-                scrollX: window.scrollX,
-                scrollY: window.scrollY
-            }
-        """)
-
-        logging.info(f"page_state : {page_state}")
-
-        # 创建页面对象
-        page = Page(
-            handle=handle,
-            url=current_url,
-            title=current_title,
-            is_visible=page_state['visibilityState'] == 'visible',
-            is_foreground=False,  # 将在下面更新
-            viewport_width=page_state['viewportWidth'],
-            viewport_height=page_state['viewportHeight'],
-            is_active=page_state['isActive'],
-            is_hidden=page_state['hidden'],
-            state=page_state
-        )
-
-        # 检查页面是否在前台
-        try:
-            is_foreground = driver.execute_script("""
-                return window.performance && 
-                       window.performance.now() && 
-                       document.hasFocus() &&
-                       !document.hidden;
-            """)
-            page.is_foreground = is_foreground
-
-            # 记录页面信息
-            logging.info(
-                f"窗口状态 - Handle: {page.handle} | "
-                f"URL: {page.url} | "
-                f"Title: {page.title} | "
-                f"可见性: {page.is_actually_visible} | "
-                f"视口大小: {page.viewport_width}x{page.viewport_height} | "
-                f"焦点状态: {page.is_active} | "
-                f"隐藏状态: {page.is_hidden}"
-            )
-
-            if page.is_foreground:
-                logging.info(f"前台页面 - Handle: {page.handle} | URL: {page.url} | title: {page.title}")
-
-        except Exception as e:
-            logging.error(f"检查页面状态时出错: {str(e)}")
-            continue
-
-        # if page.is_actually_visible or ":VISIBLE" in current_title:
-        """
-        @TODO 可见页面判断逻辑需要优化，目前为了调试先按简单方案
-        """
-        if ":VISIBLE" in current_title:
-            visible_pages.append(page)
-
-    # 输出可见页面统计
-    if visible_pages:
-        logging.info(f"可见页面统计 - 总数: {len(visible_pages)}")
-        for page in visible_pages:
-            logging.info(f"可见页面 - URL: {page.url}")
-
-    return visible_pages
-
 
 def find_chromedriver(path):
     # 如果 path 就是可执行文件且文件名正确，直接返回
@@ -457,6 +316,15 @@ class SeleniumWebExecutor(WebExecutor):
         except Exception as e:
             logging.error(f"[SeleniumWebExecutor] 切换窗口失败: {e}")
 
+    def switch_to_new_window(self) -> None:
+        try:
+            visible_page = WebDriverUtils.get_visible_page(self._driver)
+            self.switch_to_window(visible_page[0].handle)
+            logging.info(f"[SeleniumWebExecutor] <切换到当前可见的 page>: {visible_page[0]}")
+        except Exception as e:
+            logging.error(f"[SeleniumWebExecutor] 切换到新窗口失败: {e}")
+
+
     def get_current_window_handle(self) -> str:
         """
         获取当前窗口句柄
@@ -481,57 +349,54 @@ def main():
         from device_pool import DevicePool
 
         # 连接设备
-        device = DevicePool().connect("JJGICIN7QOAELNGI")
+        device = DevicePool().connect("172.16.1.125:6556")
 
         # switch to current page
-        selenium_executor: SeleniumWebExecutor = device._web_execute
-        wait = WebDriverWait(selenium_executor._driver, 3)  # 最长等待 10 秒
-        # 等待页面加载完成并获取可见页面
-        visible_pages = wait.until(PageVisibilityCondition(min_visible_pages=1))
-        selenium_executor._driver.switch_to.window(visible_pages[0].handle)
+        driver = device._web_execute._driver
 
-        driver = selenium_executor._driver
-        # 1) 找到 shadow host
-        host = driver.find_element(By.CSS_SELECTOR, "wx-input.query-bar--input_native")
-        # 2) 拿到 shadow root
-        shadow = driver.execute_script("return arguments[0].shadowRoot", host)
-        # 3) 在 shadow root 里定位 <div role="textbox">
-        textbox = shadow.find_element(By.CSS_SELECTOR, "div[role='textbox']")
-        textbox.click()
-        textbox.send_keys("拿铁")
+        pages = WebDriverUtils.get_visible_page(driver)
+        driver.switch_to.window(pages[0].handle)
 
-    # try:
-    #     # 构建操作序列
-    #     operations = [
-    #         # 查找搜索按钮
-    #         OperationItem("find", method="css selector", selector="wx-view.query.menu-bar--query", timeout=10),
-    #         # 点击搜索按钮并等待新窗口
-    #         OperationItem("click", wait_for_new_window=True, timeout=10),
-    #         # 等待新页面渲染
-    #         OperationItem("wait_for_page_render", timeout=10),
-    #         # 查找输入框
-    #         OperationItem("find", method="css selector", selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=10),
-    #         # 输入搜索文本
-    #         OperationItem("input", text="拿铁"),
-    #         # 查找搜索按钮
-    #         OperationItem("find", method="css selector", selector="#submit-button", timeout=10),
-    #         # 点击搜索按钮
-    #         OperationItem("click")
-    #     ]
-    #
-    #     # 构建并执行操作序列
-    #     sequence = OperationSequence(operations)
-    #     results = sequence.execute(device)
-    #
-    #     # 打印结果
-    #     for i, result in enumerate(results):
-    #         print(f"Step {i + 1}: {'Success' if result['success'] else 'Failed'}")
-    #         if not result['success']:
-    #             print(f"Error: {result['error']}")
-    #         print(f"Time: {result['elapsed']:.2f}s")
+        try:
+            # 构建操作序列
+            operations = [
+                # 查找搜索按钮
+                OperationItem("find", method="css selector", selector="wx-view.query.menu-bar--query", timeout=10),
+                # 点击搜索按钮并等待新窗口
+                OperationItem("click", wait_for_new_window=True, timeout=10),
+                # 等待新页面渲染
+                OperationItem("wait_for_page_render", timeout=10),
+                # 查找输入框
+                OperationItem("find", method="css selector",
+                              selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=10,wait_for_new_window=False),
+                OperationItem("click", wait_for_new_window=False, timeout=10),
+                # # 输入搜索文本
+                OperationItem("input_text", text="拿铁"),
+                # 查找搜索按钮
+                OperationItem("find", method="css selector", selector="wx-view.btn_query.query-bar--btn_query", timeout=10),
+                # 点击搜索按钮
+                OperationItem("click")
+            ]
 
+            # 构建并执行操作序列
+            sequence = OperationSequence(operations)
+            results = sequence.execute(device)
+
+            # 打印结果
+            for i, result in enumerate(results):
+                print(f"Step {i + 1}: {'Success' if result['success'] else 'Failed'}")
+                if not result['success']:
+                    print(f"Error: {result['error']}")
+                print(f"Time: {result['elapsed']:.2f}s")
+        except Exception as e:
+            logging.error(f"[SeleniumWebExecutor] <UNK>: {e}")
+        finally:
+            driver.quit()
+
+    # except Exception as e:
+    #     logging.error(f"[SeleniumWebExecutor] <UNK>: {e}")
     finally:
-        # 断开设备连接
+            # 断开设备连接
         device.disconnect()
 
 

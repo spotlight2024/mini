@@ -2,6 +2,8 @@ import time
 import logging
 from abc import ABC, abstractmethod
 
+from webdriver.webdriver_utils import WebDriverUtils
+
 # 日志配置（如有全局配置可省略）
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 
@@ -100,16 +102,9 @@ class Click(Operation):
 
             # 如果需要等待新窗口
             if self.wait_for_new_window:
-                new_handle = device.wait_for_new_window(timeout=self.timeout, old_handles=old_handles)
-                if new_handle:
-                    logging.info(f"[Click] Switched to new window: {new_handle}")
-                    # 更新上下文中的窗口句柄
-                    if context:
-                        context['window_handle'] = new_handle
-                    return True
-                else:
-                    logging.warning("[Click] No new window appeared after click")
-                    return False
+                # 1. 先切换到对应的 page  2.等待 page 渲染
+                device.switch_to_new_window()
+                device.wait_for_page_load()
 
             return True
         except Exception as e:
@@ -374,6 +369,15 @@ class WaitForPageRender(Operation):
         except Exception as e:
             logging.error(f"[WaitForPageRender] Exception: {e}")
             return False
+
+@OperationRegistry.register("input_text")
+class InputText(Operation):
+    def __init__(self, text):
+        self.text = text
+
+    def execute(self, device, context=None):
+        logging.info(f"[InputText] text={self.text}")
+        device.get_adb_device().shell(f"am broadcast -a ADB_INPUT_TEXT --es msg {self.text}")
 
 # ================= 条件判断指令 =================
 
