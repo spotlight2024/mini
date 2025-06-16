@@ -1,6 +1,7 @@
 import time
 from appium import webdriver
 from appium.options.android import UiAutomator2Options
+from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -15,11 +16,19 @@ class AppiumExecutor:
             options=options
         )
 
+    def test(self):
+        contexts = self.driver.contexts
+        element = self.driver.find_element(AppiumBy.ANDROID_UIAUTOMATOR, 'new UiSelector().text("菜单")')
+        print(element.text)
+        element.click()
+        print(contexts)
+
     def wait_for_context(self, context_name_part, timeout=20):
         for _ in range(timeout * 2):
             contexts = self.driver.contexts
+            element = self.driver.find_element(AppiumBy.ANDROID_UIAUTOMATOR,'new UiSelector().text("菜单")')
+            print(element.text)
             print(contexts)
-            print(self.driver.page_source)
             for ctx in contexts:
                 if context_name_part in ctx:
                     self.driver.switch_to.context(ctx)
@@ -50,12 +59,13 @@ class AppiumExecutor:
 if __name__ == "__main__":
     capabilities = {
         "platformName": "Android",
-        "deviceName": "172.16.1.125:6521",
+        "deviceName": "172.16.1.125:6556",
         "appPackage": "com.tencent.mm",
         "appActivity": "com.tencent.mm/.plugin.appbrand.ui.AppBrandUI00",
         "noReset": True,
         "unicodeKeyboard": True,
         "resetKeyboard": True,
+        "killUiAutomatorOnDevice": True,
         "chromeOptions": {
             "androidProcess": "com.tencent.mm:appbrand0"
         },
@@ -66,7 +76,8 @@ if __name__ == "__main__":
 
     executor = AppiumExecutor(appium_server_url, capabilities)
     try:
-        executor.wait_for_context('WEBVIEW')
-        executor.input_text(By.CSS_SELECTOR, 'input[type=\"text\"]', '拿铁')
+        # executor.wait_for_context('WEBVIEW')
+        # executor.input_text(By.CSS_SELECTOR, 'input[type=\"text\"]', '拿铁')
+        executor.test()
     finally:
         executor.quit()
