@@ -8,6 +8,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
 import time
 
+from log_config import get_logger
+
+logger = get_logger(__name__)
+
 @dataclass
 class Page:
     """页面信息类"""
@@ -45,20 +49,20 @@ class WebDriverUtils:
         :return: 元素对象或None
         """
         try:
-            logging.info(f"[WebDriverUtils] 开始等待元素: by={by}, value={value}, timeout={timeout}, trace_id={trace_id}")
+            logger.info(f"开始等待元素: by={by}, value={value}, timeout={timeout}, trace_id={trace_id}")
             element = WebDriverWait(driver, timeout).until(
                 EC.presence_of_element_located((by, value))
             )
-            logging.info(f"[WebDriverUtils] 元素已找到: by={by}, value={value}, trace_id={trace_id}")
+            logger.info(f"元素已找到: by={by}, value={value}, trace_id={trace_id}")
             return element
         except TimeoutException:
-            logging.warning(f"[WebDriverUtils] 等待元素超时: by={by}, value={value}, timeout={timeout}, trace_id={trace_id}")
+            logger.warning(f"等待元素超时: by={by}, value={value}, timeout={timeout}, trace_id={trace_id}")
             return None
         except WebDriverException as e:
-            logging.error(f"[WebDriverUtils] WebDriver异常: {str(e)}, by={by}, value={value}, trace_id={trace_id}")
+            logger.error(f"WebDriver异常: {str(e)}, by={by}, value={value}, trace_id={trace_id}")
             return None
         except Exception as e:
-            logging.error(f"[WebDriverUtils] 未知异常: {str(e)}, by={by}, value={value}, trace_id={trace_id}")
+            logger.error(f"未知异常: {str(e)}, by={by}, value={value}, trace_id={trace_id}")
             return None
 
     @staticmethod
@@ -70,17 +74,17 @@ class WebDriverUtils:
         :return: 是否加载完成
         """
         try:
-            logging.info(f"[WebDriverUtils] 等待页面加载: timeout={timeout}")
+            logger.info(f"等待页面加载: timeout={timeout}")
             start_time = time.time()
             while time.time() - start_time < timeout:
                 if driver.execute_script("return document.readyState") == "complete":
-                    logging.info("[WebDriverUtils] 页面加载完成")
+                    logger.info("页面加载完成")
                     return True
                 time.sleep(0.5)
-            logging.warning(f"[WebDriverUtils] 页面加载超时: timeout={timeout}")
+            logger.warning(f"页面加载超时: timeout={timeout}")
             return False
         except Exception as e:
-            logging.error(f"[WebDriverUtils] 等待页面加载异常: {str(e)}")
+            logger.error(f"等待页面加载异常: {str(e)}")
             return False
 
     @staticmethod
@@ -93,7 +97,7 @@ class WebDriverUtils:
         :return: 新窗口句柄或None
         """
         try:
-            logging.info(f"[WebDriverUtils] 等待新窗口: timeout={timeout}")
+            logger.info(f"等待新窗口: timeout={timeout}")
             if old_handles is None:
                 old_handles = set(driver.window_handles)
             
@@ -103,13 +107,13 @@ class WebDriverUtils:
                 if new_handles - old_handles:
                     new_handle = (new_handles - old_handles).pop()
                     driver.switch_to.window(new_handle)
-                    logging.info(f"[WebDriverUtils] 切换到新窗口: {new_handle} , title : {driver.title}")
+                    logger.info(f"切换到新窗口: {new_handle} , title : {driver.title}")
                     return new_handle
                 time.sleep(0.5)
-            logging.warning(f"[WebDriverUtils] 等待新窗口超时: timeout={timeout}")
+            logger.warning(f"等待新窗口超时: timeout={timeout}")
             return None
         except Exception as e:
-            logging.error(f"[WebDriverUtils] 等待新窗口异常: {str(e)}")
+            logger.error(f"等待新窗口异常: {str(e)}")
             return None
 
     @staticmethod
@@ -169,13 +173,13 @@ class WebDriverUtils:
             
             # 使用 WebDriverWait 等待可见页面出现
             visible_pages = wait.until(find_visible_pages)
-            logging.info(f"找到可见页面 : {visible_pages}")
+            logger.info(f"找到可见页面 : {visible_pages}")
             return visible_pages
             
         except TimeoutException:
-            logging.warning(f"获取可见页面超时: {timeout}秒")
+            logger.warning(f"获取可见页面超时: {timeout}秒")
             return []
         except Exception as e:
-            logging.error(f"获取可见页面异常: {str(e)}")
+            logger.error(f"获取可见页面异常: {str(e)}")
             return []
         

@@ -1,11 +1,10 @@
 import time
-import logging
 from abc import ABC, abstractmethod
+from log_config import get_logger
 
 from webdriver.webdriver_utils import WebDriverUtils
 
-# 日志配置（如有全局配置可省略）
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+logger = get_logger(__name__)
 
 class OperationRegistry:
     _registry = {}
@@ -40,28 +39,28 @@ class FindElement(Operation):
         self.timeout = timeout
 
     def execute(self, device, context=None):
-        logging.info(f"[FindElement] method={self.method}, selector={self.selector}, timeout={self.timeout}")
+        logger.info(f"method={self.method}, selector={self.selector}, timeout={self.timeout}")
         try:
             # 如果上下文中已有元素，且选择器匹配，则直接返回
             if context and 'element' in context:
                 element = context['element']
                 if self._element_matches(element):
-                    logging.info(f"[FindElement] Using cached element: {self.selector}")
+                    logger.info(f"Using cached element: {self.selector}")
                     return element
 
             # 查找元素
             elem = device.wait_for_element(self.method, self.selector, self.timeout)
             if elem:
-                logging.info(f"[FindElement] Element found: {elem}")
+                logger.info(f"Element found: {elem}")
                 # 更新上下文
                 if context:
                     context['element'] = elem
                 return elem
             else:
-                logging.warning(f"[FindElement] Element not found: {self.selector}")
+                logger.warning(f"Element not found: {self.selector}")
                 return None
         except Exception as e:
-            logging.error(f"[FindElement] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return None
 
     def _element_matches(self, element):
@@ -84,12 +83,12 @@ class Click(Operation):
         self.timeout = timeout
 
     def execute(self, device, context=None):
-        logging.info(f"[Click] wait_for_new_window={self.wait_for_new_window}, timeout={self.timeout}")
+        logger.info(f"wait_for_new_window={self.wait_for_new_window}, timeout={self.timeout}")
         try:
             # 获取要点击的元素
             element = context.get('element')
             if not element:
-                logging.error("[Click] No element to click")
+                logger.error("No element to click")
                 return False
 
             # 如果需要等待新窗口，先获取当前窗口句柄
@@ -98,7 +97,7 @@ class Click(Operation):
 
             # 执行点击
             element.click()
-            logging.info("[Click] Element clicked successfully")
+            logger.info("Element clicked successfully")
 
             # 如果需要等待新窗口
             if self.wait_for_new_window:
@@ -108,7 +107,7 @@ class Click(Operation):
 
             return True
         except Exception as e:
-            logging.error(f"[Click] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return False
 
 @OperationRegistry.register("wait")
@@ -117,7 +116,7 @@ class Wait(Operation):
         self.seconds = seconds
 
     def execute(self, device, trace_id=None, context=None):
-        logging.info(f"[Wait] trace_id={trace_id}, seconds={self.seconds}")
+        logger.info(f"trace_id={trace_id}, seconds={self.seconds}")
         time.sleep(self.seconds)
         return True
 
@@ -127,13 +126,13 @@ class JS(Operation):
         self.script = script
 
     def execute(self, device, context=None):
-        logging.info(f"[JS] script={self.script}")
+        logger.info(f"script={self.script}")
         try:
             result = device.execute_script(self.script)
-            logging.info(f"[JS] Script executed, result: {result}")
+            logger.info(f"Script executed, result: {result}")
             return result
         except Exception as e:
-            logging.error(f"[JS] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return None
 
 @OperationRegistry.register("handle_popup")
@@ -143,15 +142,15 @@ class HandlePopup(Operation):
         self.timeout = timeout
 
     def execute(self, device, context=None):
-        logging.info(f"[HandlePopup] selector={self.popup_selector}, timeout={self.timeout}")
+        logger.info(f"selector={self.popup_selector}, timeout={self.timeout}")
         try:
             popup = device.wait_for_element("css selector", self.popup_selector, self.timeout)
             if popup:
                 popup.click()
-                logging.info(f"[HandlePopup] Popup closed: {self.popup_selector}")
+                logger.info(f"Popup closed: {self.popup_selector}")
                 return True
         except Exception as e:
-            logging.warning(f"[HandlePopup] Exception: {e}")
+            logger.warning(f"Exception: {e}")
         return False
 
 @OperationRegistry.register("input")
@@ -161,21 +160,21 @@ class Input(Operation):
         self.timeout = timeout
 
     def execute(self, device, context=None):
-        logging.info(f"[Input] text={self.text}, timeout={self.timeout}")
+        logger.info(f"text={self.text}, timeout={self.timeout}")
         try:
             # 获取要输入的元素
             element = context.get('element')
             if not element:
-                logging.error("[Input] No element to input")
+                logger.error("No element to input")
                 return False
 
             # 执行输入
             element.clear()
             element.send_keys(self.text)
-            logging.info(f"[Input] Input text '{self.text}' successfully")
+            logger.info(f"Input text '{self.text}' successfully")
             return True
         except Exception as e:
-            logging.error(f"[Input] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return False
 
 @OperationRegistry.register("assert_text")
@@ -187,18 +186,18 @@ class AssertText(Operation):
         self.timeout = timeout
 
     def execute(self, device, trace_id=None, context=None):
-        logging.info(f"[AssertText] trace_id={trace_id}, method={self.method}, selector={self.selector}, expected={self.expected}")
+        logger.info(f"trace_id={trace_id}, method={self.method}, selector={self.selector}, expected={self.expected}")
         try:
             elem = device.wait_for_element(self.method, self.selector, self.timeout, trace_id=trace_id)
             if elem and self.expected in elem.text:
-                logging.info(f"[AssertText] Assertion passed: '{self.expected}' in '{elem.text}'")
+                logger.info(f"Assertion passed: '{self.expected}' in '{elem.text}'")
                 return True
             else:
-                msg = f"[AssertText] Assertion failed: '{self.expected}' not in '{elem.text if elem else None}'"
-                logging.warning(msg)
+                msg = f"Assertion failed: '{self.expected}' not in '{elem.text if elem else None}'"
+                logger.warning(msg)
                 raise AssertionError(msg)
         except Exception as e:
-            logging.error(f"[AssertText] Exception: {e}")
+            logger.error(f"Exception: {e}")
             raise
 
 # ================= 复合指令 =================
@@ -209,14 +208,14 @@ class Sequence(Operation):
         self.operations = operations
 
     def execute(self, device, trace_id=None, context=None):
-        logging.info(f"[Sequence] trace_id={trace_id}, steps={len(self.operations)}")
+        logger.info(f"trace_id={trace_id}, steps={len(self.operations)}")
         results = []
         for idx, op in enumerate(self.operations):
             try:
                 result = op.execute(device, trace_id=trace_id, context=context)
                 results.append(result)
             except Exception as e:
-                logging.error(f"[Sequence] Step {idx+1} ({op.__class__.__name__}) failed: {e}")
+                logger.error(f"Step {idx+1} ({op.__class__.__name__}) failed: {e}")
                 results.append(None)
         return results
 
@@ -228,20 +227,20 @@ class If(Operation):
         self.else_op = else_op
 
     def execute(self, device, trace_id=None, context=None):
-        logging.info(f"[If] trace_id={trace_id}, evaluating condition...")
+        logger.info(f"trace_id={trace_id}, evaluating condition...")
         try:
             cond = self.condition_op.execute(device, trace_id=trace_id, context=context)
             if cond:
-                logging.info(f"[If] Condition true, executing then_op")
+                logger.info("Condition true, executing then_op")
                 return self.then_op.execute(device, trace_id=trace_id, context=context)
             elif self.else_op:
-                logging.info(f"[If] Condition false, executing else_op")
+                logger.info("Condition false, executing else_op")
                 return self.else_op.execute(device, trace_id=trace_id, context=context)
             else:
-                logging.info(f"[If] Condition false, no else_op")
+                logger.info("Condition false, no else_op")
                 return None
         except Exception as e:
-            logging.error(f"[If] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return None
 
 # ================= 指令流运行器 =================
@@ -264,7 +263,7 @@ class OperationSequence:
             # try:
             #     device.handle_common_popups()
             # except Exception as e:
-            #     logging.warning(f"[OperationSequence] handle_common_popups failed: {e}")
+            #     logger.warning(f"handle_common_popups failed: {e}")
 
             start = time.time()
             try:
@@ -285,7 +284,7 @@ class OperationSequence:
                 result = None
                 success = False
                 error = str(e)
-                logging.error(f"[OperationSequence] Step {idx+1} ({op.__class__.__name__}) failed: {e}")
+                logger.error(f"Step {idx+1} ({op.__class__.__name__}) failed: {e}")
 
             elapsed = time.time() - start
             results.append({
@@ -299,7 +298,7 @@ class OperationSequence:
 
             # 如果操作失败且不是最后一个操作，可以选择是否继续
             if not success and idx < len(self.operations) - 1:
-                logging.warning(f"[OperationSequence] Operation failed, but continuing with next operation")
+                logger.warning("Operation failed, but continuing with next operation")
 
         return results
 
@@ -339,17 +338,17 @@ class WaitForNewWindow(Operation):
         self.timeout = timeout
 
     def execute(self, device, context=None):
-        logging.info(f"[WaitForNewWindow] timeout={self.timeout}")
+        logger.info(f"timeout={self.timeout}")
         try:
             new_handle = device.wait_for_new_window(timeout=self.timeout)
             if new_handle:
-                logging.info(f"[WaitForNewWindow] New window found and switched: {new_handle}")
+                logger.info(f"New window found and switched: {new_handle}")
                 return new_handle
             else:
-                logging.warning(f"[WaitForNewWindow] No new window appeared within {self.timeout} seconds")
+                logger.warning(f"No new window appeared within {self.timeout} seconds")
                 return None
         except Exception as e:
-            logging.error(f"[WaitForNewWindow] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return None
 
 @OperationRegistry.register("wait_for_page_render")
@@ -358,16 +357,16 @@ class WaitForPageRender(Operation):
         self.timeout = timeout
 
     def execute(self, device, context=None):
-        logging.info(f"[WaitForPageRender] timeout={self.timeout}")
+        logger.info(f"timeout={self.timeout}")
         try:
             if device.wait_for_page_load(timeout=self.timeout):
-                logging.info(f"[WaitForPageRender] Page rendered successfully")
+                logger.info("Page rendered successfully")
                 return True
             else:
-                logging.warning(f"[WaitForPageRender] Page did not render completely within {self.timeout} seconds")
+                logger.warning(f"Page did not render completely within {self.timeout} seconds")
                 return False
         except Exception as e:
-            logging.error(f"[WaitForPageRender] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return False
 
 @OperationRegistry.register("input_text")
@@ -376,7 +375,7 @@ class InputText(Operation):
         self.text = text
 
     def execute(self, device, context=None):
-        logging.info(f"[InputText] text={self.text}")
+        logger.info(f"text={self.text}")
         device.get_adb_device().shell(f"am broadcast -a ADB_INPUT_TEXT --es msg {self.text}")
 
 # ================= 条件判断指令 =================
@@ -390,12 +389,12 @@ class Exists(Operation):
         self.timeout = timeout
 
     def execute(self, device, trace_id=None, context=None):
-        logging.info(f"[Exists] trace_id={trace_id}, method={self.method}, selector={self.selector}")
+        logger.info(f"trace_id={trace_id}, method={self.method}, selector={self.selector}")
         try:
             elem = device.wait_for_element(self.method, self.selector, self.timeout, trace_id=trace_id)
             return elem is not None
         except Exception as e:
-            logging.error(f"[Exists] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return False
 
 @OperationRegistry.register("visible")
@@ -407,12 +406,12 @@ class Visible(Operation):
         self.timeout = timeout
 
     def execute(self, device, trace_id=None, context=None):
-        logging.info(f"[Visible] trace_id={trace_id}, method={self.method}, selector={self.selector}")
+        logger.info(f"trace_id={trace_id}, method={self.method}, selector={self.selector}")
         try:
             elem = device.wait_for_element(self.method, self.selector, self.timeout, trace_id=trace_id)
             return elem is not None and elem.is_displayed()
         except Exception as e:
-            logging.error(f"[Visible] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return False
 
 @OperationRegistry.register("contains_text")
@@ -425,12 +424,12 @@ class ContainsText(Operation):
         self.timeout = timeout
 
     def execute(self, device, trace_id=None, context=None):
-        logging.info(f"[ContainsText] trace_id={trace_id}, method={self.method}, selector={self.selector}, text={self.text}")
+        logger.info(f"trace_id={trace_id}, method={self.method}, selector={self.selector}, text={self.text}")
         try:
             elem = device.wait_for_element(self.method, self.selector, self.timeout, trace_id=trace_id)
             return elem is not None and self.text in elem.text
         except Exception as e:
-            logging.error(f"[ContainsText] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return False
 
 @OperationRegistry.register("and")
@@ -440,11 +439,11 @@ class And(Operation):
         self.conditions = conditions
 
     def execute(self, device, trace_id=None, context=None):
-        logging.info(f"[And] trace_id={trace_id}, conditions={len(self.conditions)}")
+        logger.info(f"trace_id={trace_id}, conditions={len(self.conditions)}")
         try:
             return all(cond.execute(device, trace_id=trace_id, context=context) for cond in self.conditions)
         except Exception as e:
-            logging.error(f"[And] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return False
 
 @OperationRegistry.register("or")
@@ -454,11 +453,11 @@ class Or(Operation):
         self.conditions = conditions
 
     def execute(self, device, trace_id=None, context=None):
-        logging.info(f"[Or] trace_id={trace_id}, conditions={len(self.conditions)}")
+        logger.info(f"trace_id={trace_id}, conditions={len(self.conditions)}")
         try:
             return any(cond.execute(device, trace_id=trace_id, context=context) for cond in self.conditions)
         except Exception as e:
-            logging.error(f"[Or] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return False
 
 @OperationRegistry.register("not")
@@ -468,11 +467,11 @@ class Not(Operation):
         self.condition = condition
 
     def execute(self, device, trace_id=None, context=None):
-        logging.info(f"[Not] trace_id={trace_id}")
+        logger.info(f"trace_id={trace_id}")
         try:
             return not self.condition.execute(device, trace_id=trace_id, context=context)
         except Exception as e:
-            logging.error(f"[Not] Exception: {e}")
+            logger.error(f"Exception: {e}")
             return False
 
 class OperationItem:
