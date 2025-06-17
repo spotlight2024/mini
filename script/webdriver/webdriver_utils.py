@@ -7,6 +7,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
 import time
+from selenium.webdriver.common.by import By
 
 from log_config import get_logger
 
@@ -124,6 +125,7 @@ class WebDriverUtils:
         :param timeout: 超时时间（秒）
         :return: 可见页面列表，超时返回空列表
         """
+        start_time = time.time()
         try:
             wait = WebDriverWait(driver, timeout)
             
@@ -182,4 +184,8 @@ class WebDriverUtils:
         except Exception as e:
             logger.error(f"获取可见页面异常: {str(e)}")
             return []
+        finally:
+            end_time = time.time()
+            execution_time_ms = (end_time - start_time) * 1000
+            logger.info(f"Method get_visible_page executed in {execution_time_ms:.2f}ms")
         
