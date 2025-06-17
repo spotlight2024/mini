@@ -17,6 +17,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 
+from log_config import get_logger
 from operation import FindElement, build_operations, OperationSequence, OperationItem
 from webdriver.popup_handler import PopupHandler
 from webdriver.web_executor import WebExecutor
@@ -24,16 +25,15 @@ from webdriver.webdriver_utils import WebDriverUtils
 
 import os
 
-from log_config import setup_logging
-
-setup_logging()
+# 获取logger实例
+logger = get_logger(__name__)
 
 TEST_CONFIG = {
     "chrome_version": "134.0.6998.136",
     "ip": "172.16.1.125",
     "port": 6520,
     "device_serial": "test_serial",
-    "android_process": "com.tencent.mm:appbrand1",
+    "android_process": "com.tencent.mm:appbrand0",
     "android_package": "com.tencent.mm"
 }
 
@@ -85,7 +85,7 @@ def get_miniprogram_current_page(driver):
 def find_chromedriver(path):
     # 如果 path 就是可执行文件且文件名正确，直接返回
     basename = os.path.basename(path)
-    logging.info(f"basename: {basename}, path: {path}")
+    logger.info(f"basename: {basename}, path: {path}")
     if (basename in ("chromedriver", "chromedriver-mac-arm64")) and os.path.isfile(path) and os.access(path,
                                                                                                        os.X_OK):
         return path
@@ -101,7 +101,7 @@ def find_chromedriver(path):
 
 
 def connect_webdriver(serial_id: str) -> WebDriver:
-    logging.info(f"[SeleniumWebExecutor] 开始创建 WebDriver serial_id={serial_id}")
+    logger.info(f"开始创建 WebDriver serial_id={serial_id}")
     options = webdriver.ChromeOptions()
 
     options.enable_mobile(
@@ -111,20 +111,20 @@ def connect_webdriver(serial_id: str) -> WebDriver:
     options.add_experimental_option("androidUseRunningApp", True)
     options.add_experimental_option("androidProcess", TEST_CONFIG["android_process"])
 
-    logging.info(f"[SeleniumWebExecutor] Chrome 选项配置: {options.to_capabilities()}")
+    logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
 
     path = ChromeDriverManager(driver_version=TEST_CONFIG["chrome_version"]).install()
-    logging.info(f"[SeleniumWebExecutor] ChromeDriver 路径: {path}")
+    logger.info(f"ChromeDriver 路径: {path}")
 
     # 新版本chromedriver的文件名是THIRD_PARTY_NOTICES.chromedriver，需要替换为chromedriver
     if 'THIRD_PARTY_NOTICES.chromedriver' in path:
         path = path.replace('THIRD_PARTY_NOTICES.chromedriver', 'chromedriver')
-        logging.info(f"[SeleniumWebExecutor] 更新后的 ChromeDriver 路径: {path}")
+        logger.info(f"更新后的 ChromeDriver 路径: {path}")
 
     service = Service(executable_path=path)
     driver = webdriver.Chrome(options=options, service=service)
     driver.implicitly_wait(3)
-    logging.info(f"[SeleniumWebExecutor] WebDriver 创建成功 serial_id={serial_id}")
+    logger.info(f"WebDriver 创建成功 serial_id={serial_id}")
 
     return driver
 
@@ -135,7 +135,7 @@ class SeleniumWebExecutor(WebExecutor):
     def __init__(self):
         self._driver = None
         self._device_id = None
-        logging.info("[SeleniumWebExecutor] 初始化完成")
+        logger.info("初始化完成")
 
     def connect(self, serial_id: str, **kwargs) -> bool:
         """
@@ -147,10 +147,10 @@ class SeleniumWebExecutor(WebExecutor):
         try:
             self._driver = connect_webdriver(serial_id)
             self._device_id = serial_id
-            logging.info(f"[SeleniumWebExecutor] 设备连接成功 serial_id={serial_id}")
+            logger.info(f"设备连接成功 serial_id={serial_id}")
             return True
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 设备连接失败: {e}")
+            logger.error(f"设备连接失败: {e}")
             return False
 
     def quit(self) -> None:
@@ -162,9 +162,9 @@ class SeleniumWebExecutor(WebExecutor):
                 self._driver.quit()
                 self._driver = None
                 self._device_id = None
-                logging.info(f"[SeleniumWebExecutor] WebDriver 资源已清理")
+                logger.info("WebDriver 资源已清理")
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 断开连接失败: {e}")
+            logger.error(f"断开连接失败: {e}")
 
     def is_alive(self) -> bool:
         """
@@ -186,7 +186,7 @@ class SeleniumWebExecutor(WebExecutor):
         try:
             return self._driver.find_element(by, value)
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 查找元素失败: {e}")
+            logger.error(f"查找元素失败: {e}")
             return None
 
     def find_elements(self, by: str, value: str) -> Optional[List[WebElement]]:
@@ -199,7 +199,7 @@ class SeleniumWebExecutor(WebExecutor):
         try:
             return self._driver.find_elements(by, value)
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 查找元素失败: {e}")
+            logger.error(f"查找元素失败: {e}")
             return None
 
     def wait_for_element(self, by: str, value: str, timeout: int = 10, trace_id: str = None) -> Optional[WebElement]:
@@ -240,7 +240,7 @@ class SeleniumWebExecutor(WebExecutor):
         try:
             return self._driver.execute_script(script, *args)
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 执行脚本失败: {e}")
+            logger.error(f"执行脚本失败: {e}")
             return None
 
     def get_current_url(self) -> str:
@@ -251,7 +251,7 @@ class SeleniumWebExecutor(WebExecutor):
         try:
             return self._driver.current_url
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 获取URL失败: {e}")
+            logger.error(f"获取URL失败: {e}")
             return ""
 
     def get_page_source(self) -> str:
@@ -262,7 +262,7 @@ class SeleniumWebExecutor(WebExecutor):
         try:
             return self._driver.page_source
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 获取页面源码失败: {e}")
+            logger.error(f"获取页面源码失败: {e}")
             return ""
 
     def handle_common_popups(self) -> None:
@@ -278,22 +278,22 @@ class SeleniumWebExecutor(WebExecutor):
                 ".cookie-banner button"
             ]
 
-            logging.info(f"[SeleniumWebExecutor] start find dialog popup selectors: {popup_selectors}")
+            logger.info(f"开始查找弹窗选择器: {popup_selectors}")
             for selector in popup_selectors:
                 try:
                     # 使用find_element而不是wait_for_element，避免不必要的等待
                     element = self._driver.find_element(By.CSS_SELECTOR, selector)
                     if element and element.is_displayed():
                         element.click()
-                        logging.info(f"[SeleniumWebExecutor] 关闭弹窗: {selector}")
+                        logger.info(f"关闭弹窗: {selector}")
                 except NoSuchElementException:
                     # 元素不存在，继续检查下一个
                     continue
                 except Exception as e:
-                    logging.warning(f"[SeleniumWebExecutor] 处理弹窗异常: {selector}, error={e}")
+                    logger.warning(f"处理弹窗异常: {selector}, error={e}")
                     continue
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 处理弹窗失败: {e}")
+            logger.error(f"处理弹窗失败: {e}")
 
     def get_window_handles(self) -> list:
         """
@@ -303,7 +303,7 @@ class SeleniumWebExecutor(WebExecutor):
         try:
             return self._driver.window_handles
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 获取窗口句柄失败: {e}")
+            logger.error(f"获取窗口句柄失败: {e}")
             return []
 
     def switch_to_window(self, handle: str) -> None:
@@ -314,16 +314,15 @@ class SeleniumWebExecutor(WebExecutor):
         try:
             self._driver.switch_to.window(handle)
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 切换窗口失败: {e}")
+            logger.error(f"切换窗口失败: {e}")
 
     def switch_to_new_window(self) -> None:
         try:
             visible_page = WebDriverUtils.get_visible_page(self._driver)
             self.switch_to_window(visible_page[0].handle)
-            logging.info(f"[SeleniumWebExecutor] <切换到当前可见的 page>: {visible_page[0]}")
+            logger.info(f"切换到当前可见的 page: {visible_page[0]}")
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 切换到新窗口失败: {e}")
-
+            logger.error(f"切换到新窗口失败: {e}")
 
     def get_current_window_handle(self) -> str:
         """
@@ -333,7 +332,7 @@ class SeleniumWebExecutor(WebExecutor):
         try:
             return self._driver.current_window_handle
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] 获取当前窗口句柄失败: {e}")
+            logger.error(f"获取当前窗口句柄失败: {e}")
             return ""
 
 
@@ -349,7 +348,7 @@ def main():
         from device_pool import DevicePool
 
         # 连接设备
-        device = DevicePool().connect("172.16.1.125:6556")
+        device = DevicePool().connect("JJGICIN7QOAELNGI")
 
         # switch to current page
         driver = device._web_execute._driver
@@ -389,14 +388,12 @@ def main():
                     print(f"Error: {result['error']}")
                 print(f"Time: {result['elapsed']:.2f}s")
         except Exception as e:
-            logging.error(f"[SeleniumWebExecutor] <UNK>: {e}")
+            logger.error(f"执行操作序列失败: {e}")
         finally:
             driver.quit()
 
-    # except Exception as e:
-    #     logging.error(f"[SeleniumWebExecutor] <UNK>: {e}")
     finally:
-            # 断开设备连接
+        # 断开设备连接
         device.disconnect()
 
 

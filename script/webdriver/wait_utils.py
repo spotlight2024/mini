@@ -9,6 +9,11 @@ from selenium.common.exceptions import (
     ElementClickInterceptedException,
     ElementNotInteractableException
 )
+from log_config import get_logger
+
+# 获取logger实例
+logger = get_logger(__name__)
+
 
 class WaitUtils:
     """等待工具类，提供最优的等待机制"""
@@ -70,14 +75,14 @@ class WaitUtils:
                 raise ValueError(f"Unsupported condition: {condition}")
                 
             element = wait.until(conditions[condition])
-            logging.info(f"Element found: {by}={value}, condition={condition}")
+            logger.info(f"Element found: {by}={value}, condition={condition}")
             return element
             
         except TimeoutException:
-            logging.warning(f"Timeout waiting for element: {by}={value}, condition={condition}")
+            logger.warning(f"Timeout waiting for element: {by}={value}, condition={condition}")
             return None
         except Exception as e:
-            logging.error(f"Error waiting for element: {by}={value}, error={str(e)}")
+            logger.error(f"Error waiting for element: {by}={value}, error={str(e)}")
             return None
 
     @classmethod
@@ -118,14 +123,14 @@ class WaitUtils:
             except:
                 pass
                 
-            logging.info("Page loaded successfully")
+            logger.info("Page loaded successfully")
             return True
             
         except TimeoutException:
-            logging.warning("Timeout waiting for page load")
+            logger.warning("Timeout waiting for page load")
             return False
         except Exception as e:
-            logging.error(f"Error waiting for page load: {str(e)}")
+            logger.error(f"Error waiting for page load: {str(e)}")
             return False
 
     @classmethod
@@ -168,14 +173,14 @@ class WaitUtils:
             # 切换到新窗口
             driver.switch_to.window(new_handle)
             
-            logging.info(f"New window opened and switched: {new_handle}")
+            logger.info(f"New window opened and switched: {new_handle}")
             return new_handle
             
         except TimeoutException:
-            logging.warning("Timeout waiting for new window")
+            logger.warning("Timeout waiting for new window")
             return None
         except Exception as e:
-            logging.error(f"Error waiting for new window: {str(e)}")
+            logger.error(f"Error waiting for new window: {str(e)}")
             return None
 
     @classmethod
@@ -204,12 +209,12 @@ class WaitUtils:
             )
             
             result = wait.until(condition)
-            logging.info("Custom condition met")
+            logger.info("Custom condition met")
             return result
             
         except TimeoutException:
-            logging.warning("Timeout waiting for custom condition")
+            logger.warning("Timeout waiting for custom condition")
             return False
         except Exception as e:
-            logging.error(f"Error waiting for custom condition: {str(e)}")
+            logger.error(f"Error waiting for custom condition: {str(e)}")
             return False 

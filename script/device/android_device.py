@@ -1,11 +1,15 @@
-import logging
 from typing import Optional, Any, Dict, Type
+
+import adbutils
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
-import adbutils
 
+from log_config import get_logger
 from webdriver.selenium_executor import SeleniumWebExecutor
 from webdriver.web_executor import WebExecutor
+
+# 获取logger实例
+logger = get_logger(__name__)
 
 
 class AndroidDevice:
@@ -21,26 +25,26 @@ class AndroidDevice:
     def connect(self, **kwargs) -> bool:
         """连接设备"""
         try:
-            logging.info(f"[AndroidDevice] 尝试通过 adb 查找设备 serial_id={self._serial_id}")
+            logger.info(f"尝试通过 adb 查找设备 serial_id={self._serial_id}")
             if not self.adb_device:
-                logging.error(f"[AndroidDevice] adb 未找到设备 serial_id={self._serial_id}")
+                logger.error(f"adb 未找到设备 serial_id={self._serial_id}")
                 self._status = "disconnected"
                 return False
-            logging.info(f"[AndroidDevice] adb 设备已找到 serial_id={self._serial_id}")
+            logger.info(f"adb 设备已找到 serial_id={self._serial_id}")
 
             # 初始化 WebExecutor
-            logging.info(f"[AndroidDevice] 准备初始化 WebExecutor，serial_id={self._serial_id}")
+            logger.info(f"准备初始化 WebExecutor，serial_id={self._serial_id}")
             self._web_execute = self._web_execute_cls()
             if not self._web_execute.connect(self._serial_id, **kwargs):
-                logging.error(f"[AndroidDevice] WebExecutor 初始化失败 serial_id={self._serial_id}")
+                logger.error(f"WebExecutor 初始化失败 serial_id={self._serial_id}")
                 self._status = "disconnected"
                 return False
             
-            logging.info(f"[AndroidDevice] WebExecutor 初始化成功 serial_id={self._serial_id}")
+            logger.info(f"WebExecutor 初始化成功 serial_id={self._serial_id}")
             self._status = "connected"
             return True
         except Exception as e:
-            logging.exception(f"[AndroidDevice] 连接设备 serial_id={self._serial_id} 发生异常: {e}")
+            logger.exception(f"连接设备 serial_id={self._serial_id} 发生异常: {e}")
             self._status = "disconnected"
             return False
     
@@ -48,10 +52,10 @@ class AndroidDevice:
         """断开连接"""
         if self._web_execute:
             try:
-                logging.info(f"[AndroidDevice] 关闭 WebExecutor serial_id={self._serial_id}")
+                logger.info(f"关闭 WebExecutor serial_id={self._serial_id}")
                 self._web_execute.quit()
             except Exception as e:
-                logging.error(f"[AndroidDevice] 关闭 WebExecutor 发生异常 serial_id={self._serial_id}: {e}")
+                logger.error(f"关闭 WebExecutor 发生异常 serial_id={self._serial_id}: {e}")
             finally:
                 self._web_execute = None
         self._status = "disconnected"
@@ -61,10 +65,9 @@ class AndroidDevice:
         try:
             device = adbutils.adb.device(serial=self._serial_id)
             alive = device is not None and self._web_execute is not None
-            # logging.info(f"[AndroidDevice] 检查设备存活 serial_id={self._serial_id}, alive={alive}")
             return alive
         except Exception as e:
-            logging.error(f"[AndroidDevice] 检查设备存活异常 serial_id={self._serial_id}: {e}")
+            logger.error(f"检查设备存活异常 serial_id={self._serial_id}: {e}")
             return False
 
     def wait_for_page_load(self, timeout: int = 10) -> bool:
@@ -150,7 +153,7 @@ class AndroidDevice:
         """执行操作"""
         if not self.is_connected():
             raise RuntimeError("WebExecutor not connected")
-        logging.info(f"[AndroidDevice] 执行操作 action_type={action_type}, params={params}, serial_id={self._serial_id}")
+        logger.info(f"执行操作 action_type={action_type}, params={params}, serial_id={self._serial_id}")
         if action_type == "click":
             selector = params.get("selector")
             elem = self.find_element(By.CSS_SELECTOR, selector)

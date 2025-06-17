@@ -247,3 +247,78 @@ class DevicePool:
 3. 配置化与依赖解耦
 4. 接口安全与参数校验
 5. 分布式/多进程扩展能力（如有需求）
+
+日志配置与使用说明
+---
+
+1. 日志配置
+
+项目使用 Python 的 `logging` 模块进行日志管理，默认配置如下：
+
+```python
+import logging
+
+# 日志配置
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # 控制台输出
+        logging.FileHandler('spotium.log')  # 文件输出
+    ]
+)
+
+# 获取logger
+logger = logging.getLogger(__name__)
+```
+
+2. 日志级别
+
+- DEBUG: 详细的调试信息
+- INFO: 确认程序按预期运行
+- WARNING: 警告信息（默认级别）
+- ERROR: 错误信息
+- CRITICAL: 严重错误信息
+
+3. 使用方式
+
+在代码中使用日志：
+
+```python
+from script.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+# 记录不同级别的日志
+logger.debug("调试信息")
+logger.info("普通信息")
+logger.warning("警告信息")
+logger.error("错误信息")
+logger.critical("严重错误信息")
+```
+
+4. 日志文件
+
+- 日志文件默认保存在项目根目录下的 `spotium.log`
+- 可以通过环境变量 `SPOTIUM_LOG_PATH` 修改日志文件路径
+- 日志文件会自动按天进行轮转，保留最近 7 天的日志
+
+5. 日志格式
+
+日志格式包含以下信息：
+- 时间戳
+- 模块名称
+- 日志级别
+- 日志消息
+
+示例：
+```
+2024-03-21 10:30:45,123 - script.webdriver - INFO - 成功连接到WebDriver
+```
+
+6. 注意事项
+
+- 生产环境建议将日志级别设置为 INFO 或 WARNING
+- 开发环境可以设置为 DEBUG 级别以获取更详细的信息
+- 敏感信息（如密码、token等）不应记录在日志中
+- 建议使用结构化日志，便于后续分析和处理
