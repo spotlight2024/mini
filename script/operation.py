@@ -39,25 +39,25 @@ class FindElement(Operation):
         self.timeout = timeout
 
     def execute(self, device, context=None):
-        logger.info(f"method={self.method}, selector={self.selector}, timeout={self.timeout}")
+        logger.info(f"[{FindElement}], method={self.method}, selector={self.selector}, timeout={self.timeout}")
         try:
             # 如果上下文中已有元素，且选择器匹配，则直接返回
             if context and 'element' in context:
                 element = context['element']
                 if self._element_matches(element):
-                    logger.info(f"Using cached element: {self.selector}")
+                    logger.info(f"[{FindElement}], Using cached element: {self.selector}")
                     return element
 
             # 查找元素
             elem = device.wait_for_element(self.method, self.selector, self.timeout)
             if elem:
-                logger.info(f"Element found: {elem}")
+                logger.info(f"[{FindElement}], Element found: {elem}")
                 # 更新上下文
                 if context:
                     context['element'] = elem
                 return elem
             else:
-                logger.warning(f"Element not found: {self.selector}")
+                logger.warning(f"[{FindElement}], Element not found: {self.selector}")
                 return None
         except Exception as e:
             logger.error(f"Exception: {e}")
@@ -83,12 +83,12 @@ class Click(Operation):
         self.timeout = timeout
 
     def execute(self, device, context=None):
-        logger.info(f"wait_for_new_window={self.wait_for_new_window}, timeout={self.timeout}")
+        logger.info(f"[{Click}], wait_for_new_window={self.wait_for_new_window}, timeout={self.timeout}")
         try:
             # 获取要点击的元素
             element = context.get('element')
             if not element:
-                logger.error("No element to click")
+                logger.error(f"[{Click}], No element to click")
                 return False
 
             # 如果需要等待新窗口，先获取当前窗口句柄

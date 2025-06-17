@@ -360,19 +360,19 @@ def main():
             # 构建操作序列
             operations = [
                 # 查找搜索按钮
-                OperationItem("find", method="css selector", selector="wx-view.query.menu-bar--query", timeout=10),
+                OperationItem("find", method="css selector", selector="wx-view.query.menu-bar--query", timeout=2),
                 # 点击搜索按钮并等待新窗口
-                OperationItem("click", wait_for_new_window=True, timeout=10),
+                OperationItem("click", wait_for_new_window=True, timeout=2),
                 # 等待新页面渲染
-                OperationItem("wait_for_page_render", timeout=10),
+                OperationItem("wait_for_page_render", timeout=1),
                 # 查找输入框
                 OperationItem("find", method="css selector",
-                              selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=10,wait_for_new_window=False),
-                OperationItem("click", wait_for_new_window=False, timeout=10),
+                              selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=2,wait_for_new_window=False),
+                OperationItem("click", wait_for_new_window=False, timeout=2),
                 # # 输入搜索文本
                 OperationItem("input_text", text="拿铁"),
                 # 查找搜索按钮
-                OperationItem("find", method="css selector", selector="wx-view.btn_query.query-bar--btn_query", timeout=10),
+                OperationItem("find", method="css selector", selector="wx-view.btn_query.query-bar--btn_query", timeout=2),
                 # 点击搜索按钮
                 OperationItem("click")
             ]
