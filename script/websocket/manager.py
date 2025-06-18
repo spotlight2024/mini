@@ -23,7 +23,17 @@ class WebSocketManager:
         self.groups: Dict[str, Set[str]] = {}
     
     async def connect(self, websocket: WebSocket, client_id: str) -> None:
-        """建立 WebSocket 连接"""
+        """建立 WebSocket 连接，处理 uid 冲突：只保留最新连接"""
+        # 如果已存在同 uid 连接，先踢掉旧连接
+        old_ws = self.active_connections.get(client_id)
+        if old_ws is not None:
+            try:
+                await old_ws.send_text("您的账号已在其他设备登录，当前连接将被断开。")
+                await old_ws.close(code=4000)
+                logger.info(f"Kicked old connection for client {client_id}")
+            except Exception as e:
+                logger.warning(f"Error kicking old connection for client {client_id}: {str(e)}")
+            self.disconnect(client_id)
         await websocket.accept()
         self.active_connections[client_id] = websocket
         logger.info(f"Client {client_id} connected")
