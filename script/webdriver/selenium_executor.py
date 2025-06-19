@@ -37,6 +37,7 @@ TEST_CONFIG = {
     "android_package": "com.tencent.mm"
 }
 
+
 def try_close_popup(driver, timeout=5):
     """
     尝试在页面上关闭弹框。
@@ -81,6 +82,7 @@ def get_miniprogram_current_page(driver):
         }
     """
     return driver.execute_script(js)
+
 
 def find_chromedriver(path):
     # 如果 path 就是可执行文件且文件名正确，直接返回
@@ -348,7 +350,7 @@ def main():
         from device_pool import DevicePool
 
         # 连接设备
-        device = DevicePool().connect("JJGICIN7QOAELNGI")
+        device = DevicePool().connect("172.16.1.125:6524")
 
         # switch to current page
         driver = device._web_execute._driver
@@ -359,6 +361,10 @@ def main():
         try:
             # 构建操作序列
             operations = [
+                # click menu
+                OperationItem("click",
+                              native_action="ACTION_CLICK --close_dialog=1 --pkg=com.tencent.mm --id=com.tencent.mm:id/a0g --text=菜单",
+                              context_type="NATIVE", wait_for_new_window=True),
                 # 查找搜索按钮
                 OperationItem("find", method="css selector", selector="wx-view.query.menu-bar--query", timeout=2),
                 # 点击搜索按钮并等待新窗口
@@ -367,12 +373,13 @@ def main():
                 OperationItem("wait_for_page_render", timeout=1),
                 # 查找输入框
                 OperationItem("find", method="css selector",
-                              selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=2,wait_for_new_window=False),
+                              selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=2),
                 OperationItem("click", wait_for_new_window=False, timeout=2),
                 # # 输入搜索文本
                 OperationItem("input_text", text="拿铁"),
                 # 查找搜索按钮
-                OperationItem("find", method="css selector", selector="wx-view.btn_query.query-bar--btn_query", timeout=2),
+                OperationItem("find", method="css selector", selector="wx-view.btn_query.query-bar--btn_query",
+                              timeout=2),
                 # 点击搜索按钮
                 OperationItem("click")
             ]
@@ -396,6 +403,11 @@ def main():
         # 断开设备连接
         device.disconnect()
 
+def lucky_login():
+
+    operations = [
+        OperationItem("click", wait_for_new_window=True, timeout=2),
+    ]
 
 if __name__ == "__main__":
     main()

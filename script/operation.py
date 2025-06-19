@@ -78,19 +78,50 @@ class FindElement(Operation):
 
 @OperationRegistry.register("click")
 class Click(Operation):
-    def __init__(self, wait_for_new_window=False, timeout=10):
+    def __init__(self, wait_for_new_window=False, timeout=10, method=None, selector=None,native_action=None, context_type="WEB"):
+        self.native_action = native_action
         self.wait_for_new_window = wait_for_new_window
         self.timeout = timeout
+        self.method = method
+        self.selector = selector
+        self.context_type = context_type.upper()  # 统一转为大写
 
     def execute(self, device, context=None):
-        logger.info(f"[{Click}], wait_for_new_window={self.wait_for_new_window}, timeout={self.timeout}")
+        logger.info(f"[{Click}], wait_for_new_window={self.wait_for_new_window}, timeout={self.timeout}, method={self.method}, selector={self.selector}, context_type={self.context_type}")
         try:
             # 获取要点击的元素
-            element = context.get('element')
-            if not element:
-                logger.error(f"[{Click}], No element to click")
-                return False
+            element = context.get('element') if context else None
 
+            # 根据context_type执行不同的点击逻辑
+            if self.context_type == "WEB":
+                self._execute_web_click(device, element, context)
+            elif self.context_type == "NATIVE":
+                self._execute_native_click(device, self.native_action, context)
+            else:
+                logger.error(f"[{Click}], Unsupported context_type: {self.context_type}")
+
+            # 如果需要等待新窗口
+            if self.wait_for_new_window:
+                # 1. 先切换到对应的 page  2.等待 page 渲染
+                device.switch_to_new_window()
+                device.wait_for_page_load()
+            return True
+        except Exception as e:
+            logger.error(f"Exception: {e}")
+            return False
+
+    def _execute_web_click(self, device, element, context):
+        """执行WEB类型的点击操作"""
+        logger.info(f"[{Click}], Executing WEB click")
+        # 如果提供了method和selector，先查找元素
+        if self.method and self.selector:
+            logger.info(f"[{Click}], Finding element with method={self.method}, selector={self.selector}")
+            find_op = FindElement(self.method, self.selector, self.timeout)
+            element = find_op.execute(device, context)
+            if not element:
+                logger.error(f"[{Click}], Element not found with method={self.method}, selector={self.selector}")
+                return False
+        try:
             # 如果需要等待新窗口，先获取当前窗口句柄
             if self.wait_for_new_window:
                 old_handles = set(device.get_window_handles())
@@ -98,16 +129,22 @@ class Click(Operation):
             # 执行点击
             element.click()
             logger.info("Element clicked successfully")
-
-            # 如果需要等待新窗口
-            if self.wait_for_new_window:
-                # 1. 先切换到对应的 page  2.等待 page 渲染
-                device.switch_to_new_window()
-                device.wait_for_page_load()
-
             return True
         except Exception as e:
-            logger.error(f"Exception: {e}")
+            logger.error(f"WEB click failed: {e}")
+            return False
+
+    def _execute_native_click(self, device, native_action, context):
+        """执行NATIVE类型的点击操作"""
+        logger.info(f"[{Click}], Executing NATIVE click")
+        try:
+            cmd = f'am broadcast -a ai.guangfan.execution.ACTION_EXECUTE_COMMAND -n ai.guangfan.assistant/ai.guangfan.execution.AdbCommandReceiver --es command "{native_action}"'
+            logger.info(f"NATIVE click : action : {cmd}")
+            device.get_adb_device().shell(cmd)
+            # 临时返回成功，等待后续实现
+            return True
+        except Exception as e:
+            logger.error(f"NATIVE click failed: {e}")
             return False
 
 @OperationRegistry.register("wait")
@@ -163,7 +200,7 @@ class Input(Operation):
         logger.info(f"text={self.text}, timeout={self.timeout}")
         try:
             # 获取要输入的元素
-            element = context.get('element')
+            element = context.get('element') if context else None
             if not element:
                 logger.error("No element to input")
                 return False

@@ -162,7 +162,7 @@ class AndroidDevice:
                 return True
         return False
     
-    def get_adb_device(self):
+    def get_adb_device(self) -> adbutils.AdbDevice:
         """获取 ADB 设备实例"""
         return self.adb_device
 
