@@ -1,0 +1,33 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# SpotLight 项目概览
+
+## 项目简介
+SpotLight 是一个云服务器上的Android虚拟机自动化操作平台，通过WebDriver连接微信小程序WebView实现模拟操作。
+
+## 技术架构
+- **云服务器**: Linux远程服务器，运行多个Android虚拟机
+- **Android虚拟机**: Google Android模拟器
+- **脚本服务**: Python脚本通过WebDriver连接虚拟机内的微信小程序WebView
+- **客户端APP**: 安装在虚拟机上的Android应用，接收用户指令并调用脚本服务
+
+## 核心流程
+用户指令 → APP → Script → Selenium Driver → 小程序WebView
+
+## 主要入口点
+- 服务启动: [script/main.py](mdc:script/main.py) - FastAPI服务入口
+- HTTP服务: [script/server.py](mdc:script/server.py) - 提供REST API接口
+- 设备管理: [script/device_pool.py](mdc:script/device_pool.py) - 管理Android设备连接池
+- WebDriver: [script/web_driver.py](mdc:script/web_driver.py) - Selenium WebDriver实现
+
+## 依赖管理
+- Python依赖: [script/requirements.txt](mdc:script/requirements.txt)
+- 项目配置: [requirements.txt](mdc:requirements.txt)
+
+## 项目文档
+- 项目说明: [README.md](mdc:README.md)
+- 开发指南: [Instruction.MD](mdc:Instruction.MD)
+- 开发工具推荐: [DEV_TOOLS_RECOMMEND.md](mdc:DEV_TOOLS_RECOMMEND.md)
