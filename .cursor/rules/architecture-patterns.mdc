@@ -1,0 +1,42 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 架构模式与设计原则
+
+## 模块职责分离
+- **设备管理层**: [script/device_pool.py](mdc:spot_light/script/device_pool.py) - 管理Android设备连接池
+- **驱动抽象层**: [script/driver.py](mdc:spot_light/script/driver.py) - 驱动能力抽象接口
+- **WebDriver实现**: [script/web_driver.py](mdc:spot_light/script/web_driver.py) - Selenium WebDriver具体实现
+- **操作执行层**: [script/operation.py](mdc:spot_light/script/operation.py) - 操作序列执行引擎
+- **HTTP服务层**: [script/server.py](mdc:spot_light/script/server.py) - REST API服务
+
+## 设计模式应用
+- **工厂模式**: WebDriver实现类的创建和管理
+- **策略模式**: 不同操作类型的执行策略
+- **单例模式**: 设备连接池管理
+- **观察者模式**: 设备状态变化通知
+
+## 依赖注入原则
+- 高层模块不依赖低层模块，都依赖抽象
+- 抽象不依赖细节，细节依赖抽象
+- 使用接口而非具体实现类
+
+## 资源管理
+- 设备连接池自动回收机制
+- WebDriver实例生命周期管理
+- 内存泄漏防护
+- 连接超时处理
+
+## 扩展性设计
+- 支持多种WebDriver实现（Selenium、Appium等）
+- 操作类型可扩展
+- 设备类型可扩展
+- 配置化管理
+
+## 错误处理策略
+- 分层异常处理
+- 优雅降级
+- 自动重试机制
+- 错误恢复策略

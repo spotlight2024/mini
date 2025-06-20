@@ -1,0 +1,43 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 编码规范与最佳实践
+
+## Python代码规范
+- 遵循PEP 8代码风格指南
+- 使用类型注解（Type Hints）
+- 函数和类名使用snake_case
+- 常量使用UPPER_CASE
+- 导入顺序：标准库 → 第三方库 → 本地模块
+
+## 日志记录规范
+- 所有关键操作必须启用日志记录
+- 使用结构化日志，包含trace_id追踪
+- 日志级别：DEBUG < INFO < WARNING < ERROR < CRITICAL
+- 日志配置参考: [script/log_config.py](mdc:spot_light/script/log_config.py)
+
+## 异常处理
+- 所有外部调用必须包含异常处理
+- 使用具体的异常类型而非通用Exception
+- 提供有意义的错误信息和错误码
+- 关键操作需要回滚机制
+
+## API设计规范
+- RESTful API设计原则
+- 统一的响应格式：code、message、data、error、trace_id
+- 使用Pydantic模型进行请求/响应验证
+- 参考: [script/server.py](mdc:spot_light/script/server.py)中的APIResponse模型
+
+## 测试规范
+- 单元测试覆盖率不低于80%
+- 测试文件命名：test_*.py
+- 使用pytest框架
+- 测试配置: [script/pytest.ini](mdc:spot_light/script/pytest.ini)
+
+## 文档规范
+- 所有公共API必须有文档字符串
+- 复杂业务逻辑需要注释说明
+- 更新README.md记录重要变更
+- 使用中文注释和文档
