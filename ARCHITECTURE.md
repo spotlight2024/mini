@@ -1,15 +1,15 @@
-# SpotLight Script服务架构文档
+# SpotLight 混合驱动服务架构文档
 
 ## 概述
 
-本文档详细描述了SpotLight项目中Script服务的内部架构设计，包括核心组件、数据流、接口设计和技术实现细节。
+本文档详细描述了SpotLight项目中混合驱动服务的内部架构设计，包括核心组件、数据流、接口设计和技术实现细节。
 
 ## 系统架构图
 
 ```
-┌─────────────────┐    WebSocket    ┌─────────────────┐    HTTP API    ┌─────────────────┐
-│   Android APP   │ ◄─────────────► │   Script服务    │ ◄─────────────► │   WebDriver     │
-│   (aidaemon)    │                 │   (script/)     │                 │   (Selenium)    │
+┌─────────────────┐    HTTP API    ┌─────────────────┐    WebDriver    ┌─────────────────┐
+│   Android APP   │ ◄─────────────► │   混合驱动服务    │ ◄─────────────► │   混合WebDriver   │
+│   (aidaemon)    │                 │  (hybrid_driver) │                 │  (Selenium/Appium)│
 └─────────────────┘                 └─────────────────┘                 └─────────────────┘
                                               │
                                               ▼
@@ -55,19 +55,19 @@ class AndroidDevice:
     
     核心功能:
     - ADB设备连接管理
-    - WebDriver实例管理
+    - 混合WebDriver实例管理
     - 元素查找和操作
     - 页面状态管理
     - 上下文管理器支持
 ```
 
 **设计特点:**
-- 封装ADB和WebDriver的复杂性
+- 封装ADB和混合WebDriver的复杂性
 - 提供统一的设备操作接口
 - 支持连接状态检查
 - 实现上下文管理器模式
 
-### 2. WebDriver执行层 (WebDriver Execution Layer)
+### 2. 混合WebDriver执行层 (Hybrid WebDriver Execution Layer)
 
 #### 2.1 WebExecutor接口
 ```python
@@ -78,7 +78,7 @@ class WebExecutor(ABC):
     """
     
     核心方法:
-    - connect(serial_id: str) -> bool
+    - connect(device_id: str) -> bool
     - quit() -> None
     - find_element(by: str, value: str) -> Optional[WebElement]
     - wait_for_element(by: str, value: str, timeout: int) -> Optional[WebElement]
@@ -111,6 +111,28 @@ class SeleniumWebExecutor(WebExecutor):
 - 支持微信小程序WebView
 - 自动处理ChromeDriver管理
 - 集成弹窗处理机制
+
+#### 2.3 AppiumExecutor (Appium实现)
+```python
+class AppiumExecutor:
+    """
+    基于Appium的WebDriver实现
+    支持原生Android应用和混合应用
+    """
+    
+    核心功能:
+    - Appium Server连接管理
+    - 原生Android应用操作
+    - 混合应用支持
+    - 上下文切换管理
+    - 元素定位和交互
+```
+
+**设计特点:**
+- 基于Appium WebDriver
+- 支持原生Android应用
+- 支持混合应用（WebView + 原生）
+- 上下文切换管理
 
 ### 3. 操作指令系统 (Operation System)
 
@@ -206,9 +228,9 @@ class APIResponse(BaseModel):
    ↓
 3. 创建AndroidDevice实例
    ↓
-4. 初始化SeleniumWebExecutor
+4. 初始化混合WebDriver（Selenium或Appium）
    ↓
-5. 连接Chrome WebDriver
+5. 连接WebDriver
    ↓
 6. 返回连接结果
 ```
@@ -345,6 +367,7 @@ PORT = int(os.getenv("PORT", "8000"))
 # WebDriver配置
 CHROME_VERSION = os.getenv("CHROME_VERSION", "134.0.6998.136")
 ANDROID_PACKAGE = os.getenv("ANDROID_PACKAGE", "com.tencent.mm")
+APPIUM_SERVER_URL = os.getenv("APPIUM_SERVER_URL", "http://localhost:4723")
 ```
 
 ### 2. 测试配置
@@ -355,7 +378,8 @@ TEST_CONFIG = {
     "port": 6520,
     "device_serial": "test_serial",
     "android_process": "com.tencent.mm:appbrand0",
-    "android_package": "com.tencent.mm"
+    "android_package": "com.tencent.mm",
+    "appium_server_url": "http://localhost:4723"
 }
 ```
 
@@ -379,7 +403,7 @@ TEST_CONFIG = {
 ## 安全考虑
 
 ### 1. 网络安全
-- 使用HTTPS/WSS协议
+- 使用HTTPS协议
 - 实现身份认证机制
 - 添加请求限流保护
 
@@ -439,14 +463,58 @@ def health_check():
 - 松耦合的组件设计
 - 便于独立测试和维护
 
+## 混合驱动特性
+
+### 1. 多驱动支持
+- **Selenium WebDriver**: 适用于WebView操作
+- **Appium WebDriver**: 适用于原生应用和混合应用
+- **可扩展接口**: 支持添加新的WebDriver实现
+
+### 2. 驱动选择策略
+```python
+class DriverSelector:
+    """
+    根据应用类型和操作需求选择合适的WebDriver
+    """
+    
+    def select_driver(self, app_type: str, operation_type: str):
+        if app_type == "webview":
+            return SeleniumWebExecutor()
+        elif app_type == "native":
+            return AppiumExecutor()
+        elif app_type == "hybrid":
+            # 根据具体操作选择
+            if operation_type == "webview_operation":
+                return SeleniumWebExecutor()
+            else:
+                return AppiumExecutor()
+```
+
+### 3. 上下文管理
+```python
+class ContextManager:
+    """
+    管理混合应用中的上下文切换
+    """
+    
+    def switch_to_webview(self):
+        # 切换到WebView上下文
+        pass
+    
+    def switch_to_native(self):
+        # 切换到原生上下文
+        pass
+```
+
 ## 总结
 
-SpotLight Script服务采用了分层架构设计，通过抽象接口和模块化组件实现了高内聚、低耦合的系统架构。主要特点包括：
+SpotLight 混合驱动服务采用了分层架构设计，通过抽象接口和模块化组件实现了高内聚、低耦合的系统架构。主要特点包括：
 
 1. **可扩展性**: 支持多种WebDriver实现和操作类型
 2. **可维护性**: 清晰的模块划分和接口设计
 3. **可测试性**: 完善的单元测试和集成测试
 4. **高性能**: 连接池管理和资源优化
 5. **高可用**: 异常处理和自动恢复机制
+6. **混合驱动**: 支持Selenium和Appium两种WebDriver实现
 
-这种架构设计为系统的长期维护和功能扩展提供了良好的基础。 
+这种架构设计为系统的长期维护和功能扩展提供了良好的基础，特别是在支持不同类型的Android应用操作方面具有很大的灵活性。 
