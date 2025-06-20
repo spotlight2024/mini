@@ -1,14 +1,14 @@
-# SpotLight - 云服务器Android虚拟机自动化操作平台
+# SpotLight - 混合驱动Android虚拟机自动化操作平台
 
 ## 项目概述
 
-SpotLight 是一个基于云服务器的Android虚拟机自动化操作平台，专门用于操作微信小程序和WebView应用。通过WebSocket通信，实现云端脚本服务与Android虚拟机应用的协同工作，为用户提供智能化的应用操作服务。
+SpotLight 是一个基于云服务器的混合驱动Android虚拟机自动化操作平台，专门用于操作微信小程序和WebView应用。通过支持多种WebDriver实现（Selenium、Appium），实现云端脚本服务与Android虚拟机应用的协同工作，为用户提供智能化的应用操作服务。
 
 ## 系统架构
 
 ### 整体架构图
 ```
-用户指令 → Android虚拟机APP → 云服务器Script服务 → Selenium WebDriver → 微信小程序/WebView
+用户指令 → Android虚拟机APP → 云服务器Script服务 → 混合WebDriver → 微信小程序/WebView
 ```
 
 ### 核心组件
@@ -17,28 +17,29 @@ SpotLight 是一个基于云服务器的Android虚拟机自动化操作平台，
 - **操作系统**: Linux
 - **部署环境**: Python 3.8+
 - **服务框架**: FastAPI + Uvicorn
-- **主要功能**: 运行Script服务，管理多个Android虚拟机连接
+- **主要功能**: 运行混合驱动服务，管理多个Android虚拟机连接
 
 #### 2. Android虚拟机 (Android Emulator)
 - **模拟器**: Google Android Emulator
 - **系统版本**: Android 8.0+
-- **网络配置**: 与云服务器通过WebSocket通信
+- **网络配置**: 与云服务器通过HTTP API通信
 - **主要功能**: 运行目标应用（微信、小程序等）
 
 #### 3. Android APP (aidaemon)
 - **运行环境**: Android虚拟机
-- **通信协议**: WebSocket
+- **通信协议**: HTTP RESTful API
 - **主要功能**: 
   - 接收用户指令
-  - 与云服务器Script服务通信
+  - 与云服务器混合驱动服务通信
   - 管理本地应用状态
   - 提供操作反馈
 
-#### 4. Script服务 (script/)
+#### 4. 混合驱动服务 (hybrid_driver/)
 - **运行环境**: 云服务器
-- **技术栈**: Python + Selenium + FastAPI
+- **技术栈**: Python + FastAPI + 混合WebDriver
 - **主要功能**:
   - 管理Android设备连接池
+  - 支持多种WebDriver实现（Selenium、Appium）
   - 执行WebDriver自动化操作
   - 处理微信小程序和WebView操作
   - 提供RESTful API接口
@@ -62,21 +63,41 @@ class DevicePool:
 # 封装单个Android设备的操作接口
 class AndroidDevice:
     - ADB设备连接
-    - WebDriver管理
+    - 混合WebDriver管理
     - 元素查找和操作
     - 页面状态管理
 ```
 
-### 2. WebDriver执行层 (WebDriver Execution)
+### 2. 混合WebDriver执行层 (Hybrid WebDriver Execution)
 
-#### SeleniumWebExecutor (Selenium执行器)
+#### WebExecutor接口 (抽象基类)
+```python
+# 定义所有WebDriver实现必须遵循的接口
+class WebExecutor(ABC):
+    - connect(device_id: str) -> bool
+    - find_element(by: str, value: str) -> Optional[WebElement]
+    - wait_for_element(by: str, value: str, timeout: int) -> Optional[WebElement]
+    - execute_script(script: str, *args) -> Any
+```
+
+#### SeleniumWebExecutor (Selenium实现)
 ```python
 # 基于Selenium的WebDriver实现
-class SeleniumWebExecutor:
-    - Chrome WebDriver连接
+class SeleniumWebExecutor(WebExecutor):
+    - Chrome WebDriver连接管理
     - 微信小程序WebView操作
     - 元素定位和交互
     - 页面导航和状态管理
+```
+
+#### AppiumExecutor (Appium实现)
+```python
+# 基于Appium的WebDriver实现
+class AppiumExecutor:
+    - Appium Server连接管理
+    - 原生Android应用操作
+    - 混合应用支持
+    - 上下文切换管理
 ```
 
 #### 操作指令系统 (Operation System)
@@ -105,53 +126,71 @@ class SeleniumWebExecutor:
 
 ```
 spot_light/
-├── script/                          # 云服务器脚本服务
-│   ├── main.py                      # 服务入口
-│   ├── server.py                    # FastAPI服务器
-│   ├── device_pool.py               # 设备池管理
-│   ├── device/                      # 设备抽象层
+├── hybrid_driver/                    # 混合驱动服务核心
+│   ├── main.py                       # 服务入口
+│   ├── server.py                     # FastAPI服务器
+│   ├── device_pool.py                # 设备池管理
+│   ├── device/                       # 设备抽象层
 │   │   ├── __init__.py
-│   │   └── android_device.py        # Android设备封装
-│   ├── webdriver/                   # WebDriver实现
+│   │   └── android_device.py         # Android设备封装
+│   ├── webdriver/                    # 混合WebDriver实现
 │   │   ├── __init__.py
-│   │   ├── selenium_executor.py     # Selenium执行器
-│   │   ├── web_executor.py          # Web执行器接口
-│   │   ├── webdriver_utils.py       # WebDriver工具
-│   │   └── popup_handler.py         # 弹窗处理器
-│   ├── operation.py                 # 操作指令系统
-│   ├── utils/                       # 工具模块
-│   │   └── logger.py                # 日志工具
-│   ├── tests/                       # 测试用例
-│   ├── logs/                        # 日志文件
-│   ├── requirements.txt             # Python依赖
-│   └── setup.py                     # 安装配置
-├── aidaemon/                        # Android虚拟机APP (不修改)
-├── uploads/                         # 上传文件目录
-├── docs/                            # 项目文档
-├── docker/                          # Docker配置
-└── README.md                        # 项目说明
+│   │   ├── base.py                   # WebDriver基类
+│   │   ├── web_executor.py           # Web执行器接口
+│   │   ├── selenium_executor.py      # Selenium执行器
+│   │   ├── appium_executor.py        # Appium执行器
+│   │   ├── webdriver_utils.py        # WebDriver工具
+│   │   ├── wait_utils.py             # 等待工具
+│   │   ├── popup_handler.py          # 弹窗处理器
+│   │   └── pool.py                   # WebDriver连接池
+│   ├── operation.py                  # 操作指令系统
+│   ├── utils/                        # 工具模块
+│   │   └── logger.py                 # 日志工具
+│   ├── tests/                        # 测试用例
+│   ├── logs/                         # 日志文件
+│   ├── demo/                         # 演示代码
+│   ├── requirements.txt              # Python依赖
+│   └── setup.py                      # 安装配置
+├── aidaemon/                         # Android虚拟机APP (不修改)
+├── uploads/                          # 上传文件目录
+├── docs/                             # 项目文档
+├── docker/                           # Docker配置
+├── requirements.txt                  # 项目依赖
+├── README.md                         # 项目说明
+├── ARCHITECTURE.md                   # 架构文档
+├── DEPLOYMENT.md                     # 部署指南
+├── API.md                           # API文档
+├── Instruction.MD                    # 操作指令说明
+└── DEV_TOOLS_RECOMMEND.md           # 开发工具推荐
 ```
 
 ## 核心功能特性
 
-### 1. 多设备并发管理
+### 1. 混合驱动支持
+- 支持Selenium WebDriver（WebView操作）
+- 支持Appium WebDriver（原生应用操作）
+- 可扩展的WebDriver接口设计
+- 自动选择合适的驱动实现
+
+### 2. 多设备并发管理
 - 支持同时连接多个Android虚拟机
 - 设备池自动管理和资源回收
 - 连接状态监控和故障恢复
+- 线程安全的设备管理
 
-### 2. 智能操作指令
+### 3. 智能操作指令
 - 支持复杂的操作序列
 - 参数化操作和数据驱动
 - 条件判断和异常处理
 - 操作结果验证和反馈
 
-### 3. 微信小程序支持
+### 4. 微信小程序支持
 - 原生微信小程序WebView操作
 - 小程序页面路由管理
 - 弹窗自动处理
 - 数据采集和验证
 
-### 4. 高可用性设计
+### 5. 高可用性设计
 - 线程安全的设备管理
 - 自动重连和故障恢复
 - 详细的日志记录和监控
@@ -168,10 +207,10 @@ spot_light/
 - Python 3.8+
 - Chrome/Chromium浏览器
 - ADB工具
+- Appium Server (可选)
 
 # 网络要求
 - 与Android虚拟机网络连通
-- WebSocket端口开放
 - HTTP API端口开放
 ```
 
@@ -186,7 +225,8 @@ python3 -m venv venv
 source venv/bin/activate
 
 # 安装Python依赖
-cd script
+pip install -r requirements.txt
+cd hybrid_driver
 pip install -r requirements.txt
 ```
 
@@ -200,6 +240,7 @@ PORT=8000
 LOG_LEVEL=INFO
 CHROME_VERSION=134.0.6998.136
 ANDROID_PACKAGE=com.tencent.mm
+APPIUM_SERVER_URL=http://localhost:4723
 EOF
 
 # 创建必要目录
@@ -210,6 +251,7 @@ mkdir -p logs uploads
 
 ```bash
 # 开发模式
+cd hybrid_driver
 python main.py
 
 # 生产模式
@@ -291,18 +333,20 @@ Content-Type: application/json
 ### 1. 单元测试
 ```bash
 # 运行所有测试
-PYTHONPATH=script pytest script/tests/
+cd hybrid_driver
+PYTHONPATH=. pytest tests/
 
 # 运行指定测试
-PYTHONPATH=script pytest script/tests/test_web_driver.py
+PYTHONPATH=. pytest tests/test_web_driver.py
 
 # 显示详细日志
-PYTHONPATH=script pytest script/tests/ -s --log-cli-level=INFO
+PYTHONPATH=. pytest tests/ -s --log-cli-level=INFO
 ```
 
 ### 2. 集成测试
 ```bash
 # 启动测试服务
+cd hybrid_driver
 python main.py
 
 # 测试设备连接
@@ -342,6 +386,7 @@ GET /health
 - 检查Chrome/Chromium安装
 - 验证ChromeDriver版本
 - 确认端口占用情况
+- 检查Appium Server状态（如果使用Appium）
 
 #### 操作执行超时
 - 检查网络延迟
@@ -352,11 +397,28 @@ GET /health
 - 启用DEBUG日志级别
 - 使用浏览器开发者工具
 - 检查ADB日志输出
+- 查看Appium日志（如果使用Appium）
 
 ## 开发指南
 
-### 1. 添加新的操作类型
+### 1. 添加新的WebDriver实现
 ```python
+from hybrid_driver.webdriver.web_executor import WebExecutor
+
+class CustomWebExecutor(WebExecutor):
+    def connect(self, device_id: str, **kwargs) -> bool:
+        # 实现连接逻辑
+        pass
+    
+    def find_element(self, by: str, value: str) -> Optional[WebElement]:
+        # 实现元素查找逻辑
+        pass
+```
+
+### 2. 添加新的操作类型
+```python
+from hybrid_driver.operation import OperationRegistry
+
 @OperationRegistry.register("custom_action")
 class CustomAction(Operation):
     def __init__(self, **kwargs):
@@ -364,14 +426,6 @@ class CustomAction(Operation):
         
     def execute(self, device, context=None):
         # 实现操作逻辑
-        pass
-```
-
-### 2. 扩展WebDriver支持
-```python
-class CustomWebExecutor(WebExecutor):
-    def connect(self, serial_id: str, **kwargs) -> bool:
-        # 实现连接逻辑
         pass
 ```
 
@@ -403,7 +457,7 @@ def custom_endpoint(req: CustomRequest):
 ## 安全考虑
 
 ### 1. 网络安全
-- 使用HTTPS/WSS协议
+- 使用HTTPS协议
 - 实现身份认证
 - 添加请求限流
 
@@ -417,14 +471,20 @@ def custom_endpoint(req: CustomRequest):
 ### v1.0.0 (2024-01-01)
 - 初始版本发布
 - 基础设备管理功能
-- WebDriver自动化支持
+- Selenium WebDriver支持
 - RESTful API接口
 
 ### v1.1.0 (2024-02-01)
-- 添加操作指令系统
-- 支持微信小程序操作
+- 添加Appium WebDriver支持
+- 混合驱动架构设计
 - 优化设备池管理
 - 增强错误处理
+
+### v2.0.0 (2024-03-01)
+- 重构为混合驱动架构
+- 支持多种WebDriver实现
+- 改进项目结构
+- 增强可扩展性
 
 ## 相关文档
 
