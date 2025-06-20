@@ -17,13 +17,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 
-from log_config import get_logger
-from operation import FindElement, build_operations, OperationSequence, OperationItem
-from webdriver.popup_handler import PopupHandler
-from webdriver.web_executor import WebExecutor
-from webdriver.webdriver_utils import WebDriverUtils
-
 import os
+
+from hybrid_driver.log_config import get_logger
+from hybrid_driver.operation import OperationItem, OperationSequence
+from hybrid_driver.webdriver.web_executor import WebExecutor
+from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
 
 # 获取logger实例
 logger = get_logger(__name__)
@@ -346,62 +345,55 @@ search btn:
 
 
 def main():
+    from hybrid_driver.device_pool import DevicePool
+    device = DevicePool().connect("172.16.1.125:6524")
+
+    # switch to current page
+    driver = device._web_execute._driver
+
+    pages = WebDriverUtils.get_visible_page(driver)
+    driver.switch_to.window(pages[0].handle)
+
     try:
-        from device_pool import DevicePool
+        # 构建操作序列
+        operations = [
+            # click menu
+            OperationItem("click",
+                          native_action="ACTION_CLICK --close_dialog=1 --pkg=com.tencent.mm --id=com.tencent.mm:id/a0g --text=菜单",
+                          context_type="NATIVE", wait_for_new_window=True),
+            # 查找搜索按钮
+            OperationItem("find", method="css selector", selector="wx-view.query.menu-bar--query", timeout=2),
+            # 点击搜索按钮并等待新窗口
+            OperationItem("click", wait_for_new_window=True, timeout=2),
+            # 等待新页面渲染
+            OperationItem("wait_for_page_render", timeout=1),
+            # 查找输入框
+            OperationItem("find", method="css selector",
+                          selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=2),
+            OperationItem("click", wait_for_new_window=False, timeout=2),
+            # # 输入搜索文本
+            OperationItem("input_text", text="拿铁"),
+            # 查找搜索按钮
+            OperationItem("find", method="css selector", selector="wx-view.btn_query.query-bar--btn_query",
+                          timeout=2),
+            # 点击搜索按钮
+            OperationItem("click")
+        ]
 
-        # 连接设备
-        device = DevicePool().connect("172.16.1.125:6524")
+        # 构建并执行操作序列
+        sequence = OperationSequence(operations)
+        results = sequence.execute(device)
 
-        # switch to current page
-        driver = device._web_execute._driver
-
-        pages = WebDriverUtils.get_visible_page(driver)
-        driver.switch_to.window(pages[0].handle)
-
-        try:
-            # 构建操作序列
-            operations = [
-                # click menu
-                OperationItem("click",
-                              native_action="ACTION_CLICK --close_dialog=1 --pkg=com.tencent.mm --id=com.tencent.mm:id/a0g --text=菜单",
-                              context_type="NATIVE", wait_for_new_window=True),
-                # 查找搜索按钮
-                OperationItem("find", method="css selector", selector="wx-view.query.menu-bar--query", timeout=2),
-                # 点击搜索按钮并等待新窗口
-                OperationItem("click", wait_for_new_window=True, timeout=2),
-                # 等待新页面渲染
-                OperationItem("wait_for_page_render", timeout=1),
-                # 查找输入框
-                OperationItem("find", method="css selector",
-                              selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=2),
-                OperationItem("click", wait_for_new_window=False, timeout=2),
-                # # 输入搜索文本
-                OperationItem("input_text", text="拿铁"),
-                # 查找搜索按钮
-                OperationItem("find", method="css selector", selector="wx-view.btn_query.query-bar--btn_query",
-                              timeout=2),
-                # 点击搜索按钮
-                OperationItem("click")
-            ]
-
-            # 构建并执行操作序列
-            sequence = OperationSequence(operations)
-            results = sequence.execute(device)
-
-            # 打印结果
-            for i, result in enumerate(results):
-                print(f"Step {i + 1}: {'Success' if result['success'] else 'Failed'}")
-                if not result['success']:
-                    print(f"Error: {result['error']}")
-                print(f"Time: {result['elapsed']:.2f}s")
-        except Exception as e:
-            logger.error(f"执行操作序列失败: {e}")
-        finally:
-            driver.quit()
-
+        # 打印结果
+        for i, result in enumerate(results):
+            print(f"Step {i + 1}: {'Success' if result['success'] else 'Failed'}")
+            if not result['success']:
+                print(f"Error: {result['error']}")
+            print(f"Time: {result['elapsed']:.2f}s")
+    except Exception as e:
+        logger.error(f"执行操作序列失败: {e}")
     finally:
-        # 断开设备连接
-        device.disconnect()
+        driver.quit()
 
 def lucky_login():
 

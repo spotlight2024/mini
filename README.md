@@ -1,324 +1,456 @@
-spotium
-项目介绍
+# SpotLight - 云服务器Android虚拟机自动化操作平台
 
-在云服务上跑多个 android 虚拟机，用户指令帮我点一杯咖啡，我可以操作微信小程序，帮用户在服务器上的虚拟机打开微信小程序，实现操作
+## 项目概述
 
-定义概念：
-1. 云服务器，一个 Linux 的远程服务器
-2. android 虚拟机：一个 google 的 android 模拟器
-3. 脚本（script）：通过脚本使用 webdriver 去连接，虚拟机里面的微信小程序的 webview，脚本会运行在云服务器上。
-4. APP：安装在虚拟机上的 android app，用户指令会发送到这个 app，app 通过发送命令到脚本，脚本执行真正的 web 操作。
+SpotLight 是一个基于云服务器的Android虚拟机自动化操作平台，专门用于操作微信小程序和WebView应用。通过WebSocket通信，实现云端脚本服务与Android虚拟机应用的协同工作，为用户提供智能化的应用操作服务。
 
-技术架构：
-1. 一个云服务器，上面跑多个android 虚拟机
-2. 脚本通过 webdriver 连接微信小程序，实现模拟操作
-3. 虚拟机上会有一个 app，这个 app 用来和脚本交互，用户指令发送到这个 app，app 调用脚本连接，脚本逻辑要简单不要有业务逻辑，尽量只负责连接 web。
-4. 整体方案，需要能够快速部署和方便管理
-流程：
-用户指令 -> APP ->  script -> selenuim driver -> 小程序 webview
+## 系统架构
 
-技术选型和模块
-项目结构
-spotium/
-├── app/             # Android APP 源码
-├── script/          # Python 脚本服务
-│   ├── main.py      # 服务入口
-│   ├── webdriver/   # WebDriver 相关代码
-│   ├── server/      # 和客户端 APP 通信代码
-│   └── requirements.txt
-├── docs/            # 项目文档
-├── docker/          # Dockerfile、docker-compose.yml
-└── README.md        # 项目说明文件
+### 整体架构图
+```
+用户指令 → Android虚拟机APP → 云服务器Script服务 → Selenium WebDriver → 微信小程序/WebView
+```
 
-暂时无法在飞书文档外展示此内容
-客户端：android 代码
-- 通过 http 请求和脚本通信，接口协议见 
+### 核心组件
 
-script：
-  - 使用 python，可以部署到云服务器，作为 server 和客户端通信。APP 通过 http 请求，和脚本通信
-  - 使用 selenium 通过 webdriver 连接 微信小程序
+#### 1. 云服务器 (Cloud Server)
+- **操作系统**: Linux
+- **部署环境**: Python 3.8+
+- **服务框架**: FastAPI + Uvicorn
+- **主要功能**: 运行Script服务，管理多个Android虚拟机连接
 
-- 主要模块和职责
-- ** app/ **  手机上运行的 android app 的代码
+#### 2. Android虚拟机 (Android Emulator)
+- **模拟器**: Google Android Emulator
+- **系统版本**: Android 8.0+
+- **网络配置**: 与云服务器通过WebSocket通信
+- **主要功能**: 运行目标应用（微信、小程序等）
 
-- **script/**  脚本代码，脚本运行在云服务器上，可接受多个 app 客户端的请求，需要维护对一个的 app 设备
-  - ** driver.py** , 驱动的能力层，调用 driver 的真正实现类
-    - web_driver.py, webdriver 的实现类，使用  @selenuim 实现，设计时考虑可以替换 selenuim 的实现
-  - ** server.py ** ,提供 HTTP 服务，处理客户端的逻辑，接口见 @接口协议
-    - connect,通过 web_driver 去连接
-    - action， 根据 type 去调用 web_driver
-  - ** device.py ** 维护对应的 app client 信息
-    - 包含 ip端口号，等，可支持扩展
-  - 整个脚本需要支持 命令行 CLI 的方式调用
+#### 3. Android APP (aidaemon)
+- **运行环境**: Android虚拟机
+- **通信协议**: WebSocket
+- **主要功能**: 
+  - 接收用户指令
+  - 与云服务器Script服务通信
+  - 管理本地应用状态
+  - 提供操作反馈
 
-接口协议
-- POST /connect 
-连接 webview
-请求：{ serier_id, ... }
+#### 4. Script服务 (script/)
+- **运行环境**: 云服务器
+- **技术栈**: Python + Selenium + FastAPI
+- **主要功能**:
+  - 管理Android设备连接池
+  - 执行WebDriver自动化操作
+  - 处理微信小程序和WebView操作
+  - 提供RESTful API接口
 
-响应：{ code: "success" | "fail", message: "xxx" }
+## 技术架构详解
 
-- POST /action
-通过 webview 去执行操作
-请求：{ type:"", ... }
-# type :
-    click,findElement
+### 1. 设备管理层 (Device Management)
 
-响应：{ code: "success" | "fail", message: "xxx" }
-- POST /findElement
+#### DevicePool (设备池)
+```python
+# 单例模式，管理多个Android设备连接
+class DevicePool:
+    - 设备连接管理
+    - 连接状态监控
+    - 自动清理机制
+    - 线程安全操作
+```
 
-手机 ADB 连接
+#### AndroidDevice (设备抽象)
+```python
+# 封装单个Android设备的操作接口
+class AndroidDevice:
+    - ADB设备连接
+    - WebDriver管理
+    - 元素查找和操作
+    - 页面状态管理
+```
 
-# 获取当前 activity
-adb shell dumpsys activity top | grep ACTIVITY
+### 2. WebDriver执行层 (WebDriver Execution)
 
-# 获取进程
-adb shell ps | grep tencent
+#### SeleniumWebExecutor (Selenium执行器)
+```python
+# 基于Selenium的WebDriver实现
+class SeleniumWebExecutor:
+    - Chrome WebDriver连接
+    - 微信小程序WebView操作
+    - 元素定位和交互
+    - 页面导航和状态管理
+```
 
+#### 操作指令系统 (Operation System)
+```python
+# 支持多种操作类型的指令系统
+- ACTION_CLICK: 点击操作
+- ACTION_SET_TEXT: 文本输入
+- ACTION_COLLECT_ITEM_INFO: 数据收集
+- ACTION_TEST: 验证测试
+- ACTION_OPEN_HOME: 打开首页
+```
 
-adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
+### 3. API服务层 (API Service)
 
+#### FastAPI服务
+```python
+# RESTful API接口
+- POST /connect: 连接设备
+- POST /disconnect: 断开设备
+- POST /action: 执行操作
+- POST /find_element: 查找元素
+- POST /run_operations: 执行操作序列
+```
 
+## 项目结构
 
-测试说明
-1. 安装依赖
+```
+spot_light/
+├── script/                          # 云服务器脚本服务
+│   ├── main.py                      # 服务入口
+│   ├── server.py                    # FastAPI服务器
+│   ├── device_pool.py               # 设备池管理
+│   ├── device/                      # 设备抽象层
+│   │   ├── __init__.py
+│   │   └── android_device.py        # Android设备封装
+│   ├── webdriver/                   # WebDriver实现
+│   │   ├── __init__.py
+│   │   ├── selenium_executor.py     # Selenium执行器
+│   │   ├── web_executor.py          # Web执行器接口
+│   │   ├── webdriver_utils.py       # WebDriver工具
+│   │   └── popup_handler.py         # 弹窗处理器
+│   ├── operation.py                 # 操作指令系统
+│   ├── utils/                       # 工具模块
+│   │   └── logger.py                # 日志工具
+│   ├── tests/                       # 测试用例
+│   ├── logs/                        # 日志文件
+│   ├── requirements.txt             # Python依赖
+│   └── setup.py                     # 安装配置
+├── aidaemon/                        # Android虚拟机APP (不修改)
+├── uploads/                         # 上传文件目录
+├── docs/                            # 项目文档
+├── docker/                          # Docker配置
+└── README.md                        # 项目说明
+```
 
-pip install -r script/requirements.txt
-pip install pytest
+## 核心功能特性
 
-2. 运行所有单元测试
+### 1. 多设备并发管理
+- 支持同时连接多个Android虚拟机
+- 设备池自动管理和资源回收
+- 连接状态监控和故障恢复
 
-在项目根目录下执行：
+### 2. 智能操作指令
+- 支持复杂的操作序列
+- 参数化操作和数据驱动
+- 条件判断和异常处理
+- 操作结果验证和反馈
 
+### 3. 微信小程序支持
+- 原生微信小程序WebView操作
+- 小程序页面路由管理
+- 弹窗自动处理
+- 数据采集和验证
+
+### 4. 高可用性设计
+- 线程安全的设备管理
+- 自动重连和故障恢复
+- 详细的日志记录和监控
+- 优雅的资源清理
+
+## 快速开始
+
+### 1. 环境准备
+
+#### 系统要求
+```bash
+# 操作系统
+- Ubuntu 20.04 LTS / CentOS 8+
+- Python 3.8+
+- Chrome/Chromium浏览器
+- ADB工具
+
+# 网络要求
+- 与Android虚拟机网络连通
+- WebSocket端口开放
+- HTTP API端口开放
+```
+
+#### 安装依赖
+```bash
+# 克隆项目
+git clone <repository_url>
+cd spot_light
+
+# 创建虚拟环境
+python3 -m venv venv
+source venv/bin/activate
+
+# 安装Python依赖
+cd script
+pip install -r requirements.txt
+```
+
+### 2. 配置服务
+
+```bash
+# 创建配置文件
+cat > .env << EOF
+HOST=0.0.0.0
+PORT=8000
+LOG_LEVEL=INFO
+CHROME_VERSION=134.0.6998.136
+ANDROID_PACKAGE=com.tencent.mm
+EOF
+
+# 创建必要目录
+mkdir -p logs uploads
+```
+
+### 3. 启动服务
+
+```bash
+# 开发模式
+python main.py
+
+# 生产模式
+uvicorn server:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+### 4. 测试连接
+
+```bash
+# 测试健康检查
+curl http://localhost:8000/health
+
+# 测试设备连接
+curl -X POST http://localhost:8000/connect \
+  -H "Content-Type: application/json" \
+  -d '{"serial_id": "test_device"}'
+```
+
+## API接口文档
+
+### 设备管理接口
+
+#### 连接设备
+```http
+POST /connect
+Content-Type: application/json
+
+{
+  "serial_id": "device_serial_id"
+}
+```
+
+#### 断开设备
+```http
+POST /disconnect
+Content-Type: application/json
+
+{
+  "serial_id": "device_serial_id"
+}
+```
+
+### 操作执行接口
+
+#### 执行单个操作
+```http
+POST /action
+Content-Type: application/json
+
+{
+  "serial_id": "device_serial_id",
+  "type": "click",
+  "params": {
+    "selector": "#button"
+  }
+}
+```
+
+#### 执行操作序列
+```http
+POST /run_operations
+Content-Type: application/json
+
+{
+  "serial_id": "device_serial_id",
+  "operations": [
+    {
+      "type": "click",
+      "method": "css selector",
+      "selector": "#button",
+      "timeout": 10
+    }
+  ]
+}
+```
+
+## 测试指南
+
+### 1. 单元测试
+```bash
+# 运行所有测试
 PYTHONPATH=script pytest script/tests/
 
-3. 运行指定测试用例
-
-例如只运行真实连接测试：
-
-PYTHONPATH=script pytest script/tests/test_web_driver.py -k test_real_connect
-
-4. 显示 print/logging 日志
-
-加 -s 参数显示 print 日志：
-
-PYTHONPATH=script pytest script/tests/ -s
-
-加 --log-cli-level=INFO 显示 logging 日志：
-
-PYTHONPATH=script pytest script/tests/ --log-cli-level=INFO
-
-5. 注意事项
-- 真实连接测试（如 test_real_connect）需要本地有可用的 Chrome/Chromium 并开启了 9222 端口。
-- 推荐将所有测试代码放在 script/tests/ 目录，便于管理和自动化。
-
-
-优化
-
-您的整体架构已经非常专业，具备高扩展性和良好的解耦能力。下面我从**资源管理、健壮性、可维护性、可扩展性、性能与安全**等角度，结合您的业务场景，给出进一步的优化建议：
-
-
----
-
-一、资源管理与回收
-
-1. WebDriver 实例泄漏与内存占用
-
-问题：  
-- 当前 DevicePool 中的 AndroidDevice 及其 WebDriver 实例只要未手动 disconnect，就会一直常驻内存。
-- 如果有大量虚拟机连接但长时间不活跃，WebDriver 实例会持续增加，导致内存和句柄泄漏，最终影响服务稳定性。
-
-优化建议：
-- 空闲超时回收机制：为每个 AndroidDevice 增加 last_active_time 字段，定期扫描 pool，自动断开和清理长时间未活跃的设备及其 WebDriver 实例。
-- 最大连接数限制：为 pool 设置最大容量，超出时拒绝新连接或优先回收最久未用的连接（LRU）。
-- 定期健康检查：定时检测 WebDriver/adb 连接是否可用，不可用时自动回收。
-
-伪代码示例：
-import time
-
-class AndroidDevice:
-    def __init__(...):
-        ...
-        self.last_active_time = time.time()
-
-    def touch(self):
-        self.last_active_time = time.time()
-
-class DevicePool:
-    def cleanup(self, timeout=1800):
-        now = time.time()
-        to_remove = []
-        for serial_id, device in self.pool.items():
-            if now - device.last_active_time > timeout:
-                device.disconnect()
-                to_remove.append(serial_id)
-        for serial_id in to_remove:
-            del self.pool[serial_id]
-- 可用定时任务或后台线程定期调用 cleanup()。
-
-
----
-
-二、健壮性与异常处理
-
-1. 连接异常与自动重连
-
-- WebDriver/adb 连接断开时自动重连，避免因偶发网络或设备异常导致服务不可用。
-- 异常兜底：所有接口和核心方法应有异常捕获和详细日志，便于线上问题定位。
-
-2. 连接状态监控
-
-- 提供 /status 或 /health 接口，实时监控各虚拟机连接状态，便于运维和自动化监控。
-
-
----
-
-三、可维护性与扩展性
-
-1. 配置与依赖解耦
-
-- WebDriver 实现类、连接参数、超时等建议全部配置化，便于多环境部署和动态切换。
-- 支持通过环境变量或配置文件切换 WebDriver 实现，无需改动代码。
-
-2. 业务与驱动解耦
-
-- 业务层只依赖接口，所有驱动实现都可热插拔，便于未来支持更多自动化框架。
-
-3. 日志与审计
-
-- 关键操作（连接、断开、异常、回收等）都应有详细日志，便于追踪和审计。
-
-
----
-
-四、性能与并发
-
-1. 并发安全
-
-- 当前已用线程锁，适合多线程场景。若后续用协程（如 FastAPI 的 async），可考虑用异步锁或队列。
-
-2. 进程/分布式扩展
-
-- 单机 pool 适合单进程。若需多进程/多节点部署，建议 pool 状态持久化到 Redis/数据库，实现分布式资源管理。
-
-
----
-
-五、安全性
-
-1. 权限与认证
-
-- 所有接口建议加认证（如 token/session 校验），防止未授权访问。
-- 对敏感操作（如 disconnect、action）做权限校验。
-
-2. 参数校验与防注入
-
-- 所有外部参数（如 selector、method）都应严格校验，防止注入攻击。
-
-
----
-
-六、接口与协议
-
-1. 错误码与响应规范
-
-- 统一接口响应格式，区分业务错误与系统错误，便于前后端协作和自动化处理。
-
-2. OpenAPI/Swagger 文档
-
-- 保持接口文档与实现同步，便于团队协作和自动化测试。
-
-
----
-
-七、可测试性
-
-- 为核心模块（DevicePool、AndroidDevice、WebDriver 实现）编写单元测试，保证重构和扩展时的稳定性。
-- 可用 mock WebDriver 实现做自动化测试。
-
-
----
-
-八、总结与建议
-
-重点优化方向
-1. 资源自动回收（防止 WebDriver 泄漏）
-2. 连接健康检查与自动重连
-3. 配置化与依赖解耦
-4. 接口安全与参数校验
-5. 分布式/多进程扩展能力（如有需求）
-
-日志配置与使用说明
----
-
-1. 日志配置
-
-项目使用 Python 的 `logging` 模块进行日志管理，默认配置如下：
-
+# 运行指定测试
+PYTHONPATH=script pytest script/tests/test_web_driver.py
+
+# 显示详细日志
+PYTHONPATH=script pytest script/tests/ -s --log-cli-level=INFO
+```
+
+### 2. 集成测试
+```bash
+# 启动测试服务
+python main.py
+
+# 测试设备连接
+curl -X POST http://localhost:8000/connect \
+  -H "Content-Type: application/json" \
+  -d '{"serial_id": "test_device"}'
+```
+
+## 监控和日志
+
+### 1. 日志配置
+- 日志级别: INFO/DEBUG/ERROR
+- 日志格式: 时间戳 + 级别 + 模块 + 消息
+- 日志轮转: 按大小和时间自动轮转
+
+### 2. 监控指标
+- 设备连接状态
+- 操作执行成功率
+- 响应时间统计
+- 错误率监控
+
+### 3. 健康检查
+```http
+GET /health
+```
+
+## 故障排除
+
+### 1. 常见问题
+
+#### 设备连接失败
+- 检查ADB连接状态
+- 验证设备序列号
+- 确认网络连通性
+
+#### WebDriver初始化失败
+- 检查Chrome/Chromium安装
+- 验证ChromeDriver版本
+- 确认端口占用情况
+
+#### 操作执行超时
+- 检查网络延迟
+- 验证元素定位器
+- 确认页面加载状态
+
+### 2. 调试技巧
+- 启用DEBUG日志级别
+- 使用浏览器开发者工具
+- 检查ADB日志输出
+
+## 开发指南
+
+### 1. 添加新的操作类型
 ```python
-import logging
-
-# 日志配置
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),  # 控制台输出
-        logging.FileHandler('spotium.log')  # 文件输出
-    ]
-)
-
-# 获取logger
-logger = logging.getLogger(__name__)
+@OperationRegistry.register("custom_action")
+class CustomAction(Operation):
+    def __init__(self, **kwargs):
+        # 初始化参数
+        
+    def execute(self, device, context=None):
+        # 实现操作逻辑
+        pass
 ```
 
-2. 日志级别
-
-- DEBUG: 详细的调试信息
-- INFO: 确认程序按预期运行
-- WARNING: 警告信息（默认级别）
-- ERROR: 错误信息
-- CRITICAL: 严重错误信息
-
-3. 使用方式
-
-在代码中使用日志：
-
+### 2. 扩展WebDriver支持
 ```python
-from script.utils.logger import get_logger
-
-logger = get_logger(__name__)
-
-# 记录不同级别的日志
-logger.debug("调试信息")
-logger.info("普通信息")
-logger.warning("警告信息")
-logger.error("错误信息")
-logger.critical("严重错误信息")
+class CustomWebExecutor(WebExecutor):
+    def connect(self, serial_id: str, **kwargs) -> bool:
+        # 实现连接逻辑
+        pass
 ```
 
-4. 日志文件
-
-- 日志文件默认保存在项目根目录下的 `spotium.log`
-- 可以通过环境变量 `SPOTIUM_LOG_PATH` 修改日志文件路径
-- 日志文件会自动按天进行轮转，保留最近 7 天的日志
-
-5. 日志格式
-
-日志格式包含以下信息：
-- 时间戳
-- 模块名称
-- 日志级别
-- 日志消息
-
-示例：
-```
-2024-03-21 10:30:45,123 - script.webdriver - INFO - 成功连接到WebDriver
+### 3. 添加新的API接口
+```python
+@app.post("/custom_endpoint")
+def custom_endpoint(req: CustomRequest):
+    # 实现接口逻辑
+    pass
 ```
 
-6. 注意事项
+## 性能优化
 
-- 生产环境建议将日志级别设置为 INFO 或 WARNING
-- 开发环境可以设置为 DEBUG 级别以获取更详细的信息
-- 敏感信息（如密码、token等）不应记录在日志中
-- 建议使用结构化日志，便于后续分析和处理
+### 1. 连接池优化
+- 实现连接复用
+- 添加连接超时机制
+- 优化资源清理策略
+
+### 2. 操作优化
+- 批量操作支持
+- 异步操作处理
+- 缓存机制优化
+
+### 3. 内存管理
+- 及时释放WebDriver资源
+- 优化大对象生命周期
+- 监控内存使用情况
+
+## 安全考虑
+
+### 1. 网络安全
+- 使用HTTPS/WSS协议
+- 实现身份认证
+- 添加请求限流
+
+### 2. 数据安全
+- 敏感信息加密
+- 日志脱敏处理
+- 访问权限控制
+
+## 版本历史
+
+### v1.0.0 (2024-01-01)
+- 初始版本发布
+- 基础设备管理功能
+- WebDriver自动化支持
+- RESTful API接口
+
+### v1.1.0 (2024-02-01)
+- 添加操作指令系统
+- 支持微信小程序操作
+- 优化设备池管理
+- 增强错误处理
+
+## 相关文档
+
+- **[架构文档](ARCHITECTURE.md)** - 详细的系统架构设计说明
+- **[部署指南](DEPLOYMENT.md)** - 完整的部署和运维指南
+- **[API文档](API.md)** - 完整的API接口文档和示例
+- **[操作指令说明](Instruction.MD)** - 操作指令系统的详细说明
+- **[开发工具推荐](DEV_TOOLS_RECOMMEND.md)** - 推荐的开发工具和环境配置
+
+## 贡献指南
+
+1. Fork项目
+2. 创建功能分支
+3. 提交代码变更
+4. 创建Pull Request
+
+## 许可证
+
+MIT License
+
+## 联系方式
+
+- 项目维护者: [维护者信息]
+- 邮箱: [联系邮箱]
+- 项目地址: [项目URL]
+
+---
+
+**注意**: 本项目仅用于学习和研究目的，请遵守相关法律法规和平台使用条款。

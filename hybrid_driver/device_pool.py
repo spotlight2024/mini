@@ -4,10 +4,10 @@ import adbutils
 import logging
 import time
 
-from device.android_device import AndroidDevice
-from webdriver.selenium_executor import SeleniumWebExecutor
+from hybrid_driver.device.android_device import AndroidDevice
+from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
 
-from log_config import setup_logging
+from hybrid_driver.log_config import setup_logging
 
 setup_logging()
 
