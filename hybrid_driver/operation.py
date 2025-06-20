@@ -1,8 +1,7 @@
 import time
 from abc import ABC, abstractmethod
-from log_config import get_logger
-
-from webdriver.webdriver_utils import WebDriverUtils
+from hybrid_driver.log_config import get_logger
+from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
 
 logger = get_logger(__name__)
 

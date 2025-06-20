@@ -4,9 +4,9 @@ import adbutils
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
-from log_config import get_logger
-from webdriver.selenium_executor import SeleniumWebExecutor
-from webdriver.web_executor import WebExecutor
+from hybrid_driver.log_config import get_logger
+from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
+from hybrid_driver.webdriver.web_executor import WebExecutor
 
 # 获取logger实例
 logger = get_logger(__name__)

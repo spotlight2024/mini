@@ -9,7 +9,7 @@ from selenium.common.exceptions import TimeoutException, WebDriverException
 import time
 from selenium.webdriver.common.by import By
 
-from log_config import get_logger
+from hybrid_driver.log_config import get_logger
 
 logger = get_logger(__name__)
 
