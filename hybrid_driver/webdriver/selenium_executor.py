@@ -1,22 +1,23 @@
-import logging
-import uuid
-from dataclasses import dataclass
-from typing import Optional, Any, List, Dict
 import time
-
+import logging
+from typing import Optional, List, Dict, Any, Union
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
-from selenium.webdriver import ActionChains, Keys
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.webdriver import WebDriver
-from selenium.webdriver.common.actions.wheel_input import ScrollOrigin
-from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.firefox.service import Service as FirefoxService
+from selenium.webdriver.edge.options import Options as EdgeOptions
+from selenium.webdriver.edge.service import Service as EdgeService
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.options import Options
-
+from webdriver_manager.firefox import GeckoDriverManager
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
+import json
 import os
 
 from hybrid_driver.log_config import get_logger
@@ -103,7 +104,7 @@ def find_chromedriver(path):
 
 def connect_webdriver(serial_id: str) -> WebDriver:
     logger.info(f"开始创建 WebDriver serial_id={serial_id}")
-    options = webdriver.ChromeOptions()
+    options = ChromeOptions()
 
     options.enable_mobile(
         android_package=TEST_CONFIG["android_package"],
@@ -122,7 +123,7 @@ def connect_webdriver(serial_id: str) -> WebDriver:
         path = path.replace('THIRD_PARTY_NOTICES.chromedriver', 'chromedriver')
         logger.info(f"更新后的 ChromeDriver 路径: {path}")
 
-    service = Service(executable_path=path)
+    service = ChromeService(executable_path=path)
     driver = webdriver.Chrome(options=options, service=service)
     driver.implicitly_wait(3)
     logger.info(f"WebDriver 创建成功 serial_id={serial_id}")

@@ -1,13 +1,13 @@
-fastapi>=0.68.0
-uvicorn>=0.15.0
+fastapi>=0.100.0
+uvicorn>=0.23.0
 selenium==4.33.0
-pydantic==2.11.5
+pydantic>=2.0.0,<3.0.0
 webdriver-manager==4.0.2
 adbutils~=2.9.2
 pytest>=6.2.5
 pytest-asyncio>=0.16.0
 requests~=2.32.4
-starlette~=0.46.2
+starlette>=0.27.0
 Appium-Python-Client~=5.1.1
 loguru==0.7.2
 websockets>=10.0

@@ -4,10 +4,10 @@ import uuid
 
 from fastapi import FastAPI
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
 
-from device_pool import DevicePool
-from operation import OperationSequence, FindElement, Click, Wait, JS, HandlePopup, build_operations
+from hybrid_driver.device_pool import DevicePool
+from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
+from hybrid_driver.operation import OperationSequence, FindElement, Click, Wait, JS, HandlePopup, build_operations
 
 app = FastAPI()
 device_pool = DevicePool()
@@ -58,6 +58,22 @@ class OperationRequest(BaseModel):
     operations: List[OperationItem]
 
 
+class ClickRequest(BaseModel):
+    serial_id: str
+    method: str
+    selector: str
+    timeout: Optional[int] = 10
+    wait_for_new_window: Optional[bool] = False
+
+
+class SetTextRequest(BaseModel):
+    serial_id: str
+    method: str
+    selector: str
+    text: str
+    timeout: Optional[int] = 10
+
+
 @app.post("/connect", response_model=APIResponse)
 def connect(req: ConnectRequest):
     try:
@@ -86,7 +102,7 @@ def action(req: ActionRequest):
     if device is None:
         return APIResponse(code=1002, message="device not found")
 
-    device.find_element()
+    # TODO: 实现具体的action逻辑
     return APIResponse(code=0, message="success")
 
 
@@ -126,6 +142,134 @@ def gen_trace_id():
     return str(uuid.uuid4())
 
 
+@app.post("/click", response_model=APIResponse)
+def click(req: ClickRequest):
+    """
+    点击元素接口
+    """
+    trace_id = gen_trace_id()
+    try:
+        # 1. 检查设备连接状态
+        device = device_pool.get(req.serial_id)
+        if device is None:
+            # 尝试自动连接设备
+            device = device_pool.connect(req.serial_id)
+            if device is None:
+                return APIResponse(
+                    code=1002, 
+                    message="设备未找到或连接失败", 
+                    error=f"Device {req.serial_id} not found or connection failed",
+                    trace_id=trace_id
+                )
+
+        # 2. 检查WebDriver状态
+        if not hasattr(device, '_web_execute') or device._web_execute is None:
+            return APIResponse(
+                code=1004, 
+                message="WebDriver未初始化", 
+                error="WebDriver not initialized",
+                trace_id=trace_id
+            )
+
+        driver = device._web_execute._driver
+        if driver is None:
+            return APIResponse(
+                code=1005, 
+                message="WebDriver实例为空", 
+                error="WebDriver instance is null",
+                trace_id=trace_id
+            )
+
+        # 3. 检查页面状态
+        try:
+            pages = WebDriverUtils.get_visible_page(driver)
+            if not pages:
+                return APIResponse(
+                    code=1006, 
+                    message="没有可用的页面", 
+                    error="No available pages found",
+                    trace_id=trace_id
+                )
+            driver.switch_to.window(pages[0].handle)
+        except Exception as e:
+            return APIResponse(
+                code=1007, 
+                message="页面切换失败", 
+                error=f"Failed to switch to page: {str(e)}",
+                trace_id=trace_id
+            )
+
+        # 4. 创建并执行Click操作
+        try:
+            click_op = Click(
+                method=req.method,
+                selector=req.selector,
+                timeout=req.timeout or 10,
+                wait_for_new_window=req.wait_for_new_window or False,
+                context_type="WEB"
+            )
+            
+            # 执行点击操作
+            result = click_op.execute(device)
+            
+            if result:
+                return APIResponse(
+                    code=0, 
+                    message="点击操作成功", 
+                    data={"method": req.method, "selector": req.selector},
+                    trace_id=trace_id
+                )
+            else:
+                return APIResponse(
+                    code=1003, 
+                    message="点击操作失败", 
+                    error="Click operation returned false",
+                    trace_id=trace_id
+                )
+                
+        except Exception as e:
+            error_msg = str(e)
+            if "element not found" in error_msg.lower() or "no such element" in error_msg.lower():
+                return APIResponse(
+                    code=1008, 
+                    message="元素未找到", 
+                    error=f"Element not found: {error_msg}",
+                    data={"method": req.method, "selector": req.selector},
+                    trace_id=trace_id
+                )
+            elif "element not interactable" in error_msg.lower() or "element click intercepted" in error_msg.lower():
+                return APIResponse(
+                    code=1009, 
+                    message="元素不可交互", 
+                    error=f"Element not interactable: {error_msg}",
+                    data={"method": req.method, "selector": req.selector},
+                    trace_id=trace_id
+                )
+            elif "timeout" in error_msg.lower():
+                return APIResponse(
+                    code=1010, 
+                    message="操作超时", 
+                    error=f"Operation timeout: {error_msg}",
+                    data={"method": req.method, "selector": req.selector, "timeout": req.timeout},
+                    trace_id=trace_id
+                )
+            else:
+                return APIResponse(
+                    code=1011, 
+                    message="点击操作异常", 
+                    error=f"Click operation exception: {error_msg}",
+                    data={"method": req.method, "selector": req.selector},
+                    trace_id=trace_id
+                )
+            
+    except Exception as e:
+        return APIResponse(
+            code=2000, 
+            message="系统异常", 
+            error=f"System exception: {str(e)}",
+            trace_id=trace_id
+        )
+
 @app.post("/run_operations", response_model=APIResponse)
 def run_operations(req: OperationRequest):
     trace_id = gen_trace_id()
@@ -134,12 +278,130 @@ def run_operations(req: OperationRequest):
         return APIResponse(code=400101, message="device not found", trace_id=trace_id)
     ops = build_operations([op.model_dump() for op in req.operations])
     seq = OperationSequence(ops)
-    results = seq.run(device, trace_id=trace_id)
+    results = seq.execute(device)
     return APIResponse(code=0, message="success", data={"results": results}, trace_id=trace_id)
 
+
+@app.post("/check_page")
+async def check_page(request: dict):
+    """检查当前页面状态"""
+    try:
+        serial_id = request.get("serial_id")
+        required_page = request.get("required_page")
+        
+        if not serial_id:
+            return {"code": 1, "message": "serial_id is required"}
+        
+        if not required_page:
+            return {"code": 1, "message": "required_page is required"}
+        
+        # 获取设备
+        device = device_pool.get(serial_id)
+        if device is None:
+            return {"code": 2, "message": f"Device {serial_id} not found"}
+        
+        try:
+            # 获取当前页面信息
+            current_url = device.get_current_url()
+            page_source = device.get_page_source()
+            
+            # 简单的页面检测逻辑，可以根据需要扩展
+            is_current_page = check_page_type(current_url, page_source, required_page)
+            
+            return {
+                "code": 0,
+                "message": "Page check completed",
+                "isCurrentPage": is_current_page,
+                "currentPage": detect_current_page(current_url, page_source),
+                "currentUrl": current_url
+            }
+            
+        except Exception as e:
+            logging.error(f"Page check failed: {str(e)}")
+            return {
+                "code": 3,
+                "message": f"Page check error: {str(e)}"
+            }
+    
+    except Exception as e:
+        logging.error(f"Check page request failed: {str(e)}")
+        return {
+            "code": 4,
+            "message": f"Request processing error: {str(e)}"
+        }
+
+def check_page_type(url: str, page_source: str, required_page: str) -> bool:
+    """检查页面类型"""
+    try:
+        # 根据URL和页面内容判断页面类型
+        if required_page == "Home":
+            # 检查是否为首页
+            if "home" in url.lower() or "index" in url.lower():
+                return True
+            # 检查页面源码中是否包含首页特征
+            if any(keyword in page_source.lower() for keyword in ["首页", "主页", "home", "menu_page"]):
+                return True
+        
+        elif required_page == "ShopDetail":
+            # 检查是否为店铺详情页
+            if "shop" in url.lower() or "store" in url.lower():
+                return True
+            # 检查页面源码中是否包含店铺详情页特征
+            if any(keyword in page_source.lower() for keyword in ["店铺", "商店", "shop", "store", "商品"]):
+                return True
+        
+        elif required_page == "SearchShopList":
+            # 检查是否为店铺搜索页
+            if "search" in url.lower():
+                return True
+            if any(keyword in page_source.lower() for keyword in ["搜索", "search", "店铺列表"]):
+                return True
+        
+        # 更多页面类型可以在此扩展
+        
+        return False
+        
+    except Exception as e:
+        logging.error(f"Page type check failed: {str(e)}")
+        return False
+
+def detect_current_page(url: str, page_source: str) -> str:
+    """检测当前页面类型"""
+    try:
+        # 根据URL和页面内容检测当前页面
+        if "home" in url.lower() or "index" in url.lower():
+            return "Home"
+        elif "shop" in url.lower() or "store" in url.lower():
+            return "ShopDetail"
+        elif "search" in url.lower():
+            return "SearchShopList"
+        
+        # 根据页面内容检测
+        if any(keyword in page_source.lower() for keyword in ["首页", "主页", "menu_page"]):
+            return "Home"
+        elif any(keyword in page_source.lower() for keyword in ["店铺", "商店", "商品列表"]):
+            return "ShopDetail"
+        elif any(keyword in page_source.lower() for keyword in ["搜索", "店铺列表"]):
+            return "SearchShopList"
+        
+        return "Unknown"
+        
+    except Exception as e:
+        logging.error(f"Page detection failed: {str(e)}")
+        return "Unknown"
+
 if __name__ == "__main__":
-    connect(ConnectRequest(serial_id="JJGICIN7QOAELNGI"))
-    find_element(FindElementRequest(serial_id="JJGICIN7QOAELNGI",method="css selector",selector=".wx-scroll-view"))
+    serial_id = "4PPFPBOJZH85SGHE"
+
+    connect(ConnectRequest(serial_id=serial_id))
+    # switch to current page
+    device = DevicePool().get(serial_id)
+    driver = device._web_execute._driver
+
+    pages = WebDriverUtils.get_visible_page(driver)
+    driver.switch_to.window(pages[0].handle)
+
+    click(ClickRequest(serial_id=serial_id,method="css selector",selector="wx-view.query.menu-bar--query"))
 
 
 
