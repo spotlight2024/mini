@@ -33,7 +33,7 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 # 使用nohup启动服务
-nohup python main.py > "$LOG_FILE" 2>&1 &
+nohup python3 main.py > "$LOG_FILE" 2>&1 &
 
 # 保存PID
 echo $! > "$PID_FILE"
