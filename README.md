@@ -529,3 +529,116 @@ MIT License
 ---
 
 **注意**: 本项目仅用于学习和研究目的，请遵守相关法律法规和平台使用条款。
+
+# Mini Script 项目
+
+## 环境设置
+
+本项目使用Python虚拟环境来管理依赖包，避免与系统Python环境冲突。
+
+### 首次设置
+
+1. 创建虚拟环境：
+```bash
+python3 -m venv venv
+```
+
+2. 激活虚拟环境：
+```bash
+source venv/bin/activate
+```
+
+3. 安装依赖：
+```bash
+pip install -r requirements.txt
+```
+
+4. 安装项目包（解决模块导入问题）：
+```bash
+cd hybrid_driver
+pip install -e .
+cd ..
+```
+
+### 日常使用
+
+#### 方法1：使用便捷脚本
+```bash
+./activate_venv.sh
+```
+
+#### 方法2：手动激活
+```bash
+source venv/bin/activate
+```
+
+#### 方法3：使用启动脚本（推荐）
+```bash
+./run_server.sh
+```
+
+### 退出虚拟环境
+```bash
+deactivate
+```
+
+## 项目结构
+
+- `venv/` - Python虚拟环境目录
+- `requirements.txt` - 项目依赖包列表
+- `activate_venv.sh` - 虚拟环境激活脚本
+- `run_server.sh` - 服务器启动脚本
+- `hybrid_driver/` - 主要项目模块
+
+## 运行服务器
+
+### 推荐方式（自动设置环境）
+```bash
+./run_server.sh
+```
+
+### 手动方式
+```bash
+# 激活虚拟环境
+source venv/bin/activate
+
+# 设置Python路径
+export PYTHONPATH=/root/script/mini:$PYTHONPATH
+
+# 运行服务器
+python3 hybrid_driver/server.py
+```
+
+## 注意事项
+
+- 每次运行项目前都需要先激活虚拟环境
+- 安装新的Python包时，确保虚拟环境已激活
+- 虚拟环境目录(`venv/`)不应提交到版本控制系统
+- 如果遇到模块导入错误，请确保已安装项目包或设置了正确的PYTHONPATH
+
+## 常见问题
+
+### 遇到"externally-managed-environment"错误
+这是因为系统Python环境被标记为外部管理。解决方法：
+1. 使用虚拟环境（推荐）
+2. 或使用 `--break-system-packages` 参数（不推荐）
+
+### 遇到"ModuleNotFoundError: No module named 'hybrid_driver'"错误
+这是因为Python无法找到项目模块。解决方法：
+1. 安装项目包：`cd hybrid_driver && pip install -e . && cd ..`
+2. 或设置PYTHONPATH：`export PYTHONPATH=/root/script/mini:$PYTHONPATH`
+3. 或使用提供的启动脚本：`./run_server.sh`
+
+### 虚拟环境激活后命令找不到
+确保使用正确的Python和pip路径：
+```bash
+which python
+which pip
+```
+
+### PyCharm中运行正常，命令行运行失败
+这是因为PyCharm自动设置了项目根目录为Python路径。在命令行中需要手动设置：
+```bash
+export PYTHONPATH=/root/script/mini:$PYTHONPATH
+```
+或使用提供的启动脚本。
