@@ -1,13 +1,13 @@
+import time
 import logging
 from dataclasses import dataclass
 from typing import List, Dict, Any
-
-from appium.webdriver.webdriver import WebDriver
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, WebDriverException
-import time
-from selenium.webdriver.common.by import By
+from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
 
 from hybrid_driver.log_config import get_logger
 

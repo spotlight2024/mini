@@ -198,7 +198,22 @@ spot_light/
 
 ## 快速开始
 
-### 1. 环境准备
+### ⚠️ LiveEdit 兼容性说明
+
+在使用 WebCommand 功能时，如果遇到以下错误：
+
+```
+K: LiveEdit: Could not instantiate superclass
+java.lang.reflect.InvocationTargetException
+Caused by: java.lang.IllegalArgumentException: Unhandled superclass: kotlin/coroutines/jvm/internal/ContinuationImpl
+```
+
+**解决方案**：
+1. 在 Android Studio 中禁用 LiveEdit 功能
+2. 使用传统构建方式（Run 而不是 Apply Changes）
+3. 详细说明请参考：[LiveEdit 兼容性文档](aidaemon/execution/src/main/java/ai/guangfan/execution/command/LIVEEDIT_COMPATIBILITY.md)
+
+### 环境准备
 
 #### 系统要求
 ```bash
