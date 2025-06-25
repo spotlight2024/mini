@@ -391,7 +391,7 @@ def detect_current_page(url: str, page_source: str) -> str:
         return "Unknown"
 
 if __name__ == "__main__":
-    serial_id = "4PPFPBOJZH85SGHE"
+    serial_id = "0.0.0.0:6524"
 
     connect(ConnectRequest(serial_id=serial_id))
     # switch to current page

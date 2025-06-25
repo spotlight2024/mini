@@ -1,3 +1,4 @@
+README.md
 setup.py
 demo/__init__.py
 demo/test_app.py
@@ -6,11 +7,6 @@ device/android_device.py
 tests/test_device.py
 tests/test_web_driver.py
 tests/test_websocket.py
-websocket/__init__.py
-websocket/example.py
-websocket/manager.py
-websocket/message_handler.py
-websocket/server.py
 websocket_service.egg-info/PKG-INFO
 websocket_service.egg-info/SOURCES.txt
 websocket_service.egg-info/dependency_links.txt
