@@ -30,7 +30,7 @@ echo "内存使用: $(ps -o rss= -p "$PID" | awk '{print $1/1024 " MB"}')"
 echo "CPU使用: $(ps -o %cpu= -p "$PID")%"
 
 # 检查端口是否在监听
-if netstat -tlnp 2>/dev/null | grep -q ":8000.*$PID"; then
+if lsof -i :8000 2>/dev/null | grep -q "$PID"; then
     echo "端口状态: ✅ 8000端口正在监听"
 else
     echo "端口状态: ⚠️  8000端口未监听"
@@ -44,7 +44,12 @@ if [ -d "$WORK_DIR/logs" ]; then
     if [ -n "$LATEST_LOG" ]; then
         echo "最新日志: $LATEST_LOG"
         echo "日志大小: $(du -h "$LATEST_LOG" | cut -f1)"
-        echo "最后修改: $(stat -c %y "$LATEST_LOG")"
+        # 使用兼容macOS和Linux的stat命令
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            echo "最后修改: $(stat -f "%Sm" "$LATEST_LOG")"
+        else
+            echo "最后修改: $(stat -c %y "$LATEST_LOG")"
+        fi
     else
         echo "未找到日志文件"
     fi
