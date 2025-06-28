@@ -1,68 +1,368 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
-# SpotLight 项目 Cursor 规则总览
+# SpotLight 项目 Cursor 规则文档
 
-## 规则文件列表
+本文档整合了SpotLight项目的所有Cursor规则，为开发者和AI助手提供完整的项目导航和开发指导。
 
-### 1. [项目概览](mdc:.cursor/rules/project-overview.mdc)
-- 项目简介和技术架构
-- 核心流程：用户指令 → APP → Script → Selenium Driver → 小程序WebView
-- 主要入口点和依赖管理
+## 📋 目录
 
-### 2. [编码规范](mdc:.cursor/rules/coding-standards.mdc)
-- Python代码规范和类型注解
-- 日志记录规范（默认启用）
-- 异常处理和API设计规范
-- 测试和文档规范
+- [项目概览](mdc:spot_light/#项目概览)
+- [脚本管理](mdc:spot_light/#脚本管理)
+- [文档结构](mdc:spot_light/#文档结构)
+- [开发工作流](mdc:spot_light/#开发工作流)
+- [代码组织](mdc:spot_light/#代码组织)
+- [测试和质量保证](mdc:spot_light/#测试和质量保证)
 
-### 3. [架构模式](mdc:.cursor/rules/architecture-patterns.mdc)
-- 模块职责分离和设计模式应用
-- 依赖注入原则和资源管理
-- 扩展性设计和错误处理策略
+---
 
-### 4. [开发工作流](mdc:.cursor/rules/development-workflow.mdc)
-- 环境设置和开发流程
-- 测试执行和服务启动命令
-- 调试指南和部署流程
+## 🏗️ 项目概览
 
-### 5. [API接口规范](mdc:.cursor/rules/api-interface.mdc)
-- 统一响应格式和核心接口定义
-- 错误码规范和请求/响应模型
-- 安全考虑
+### 项目结构
+SpotLight 是一个用于Android虚拟机的混合驱动自动化平台，支持微信小程序和WebView应用。
 
-### 6. [测试指南](mdc:.cursor/rules/testing-guidelines.mdc)
-- 测试策略和目录结构
-- 测试执行命令和最佳实践
-- 真实设备测试和持续集成
+### 主要入口点
+- [start.sh](mdc:spot_light/start.sh) - 项目主入口脚本，提供统一命令接口
+- [README.md](mdc:spot_light/README.md) - 项目概览和文档导航
+- [hybrid_driver/main.py](mdc:spot_light/hybrid_driver/main.py) - 服务入口点
 
-## 快速参考
+### 核心组件
+- [hybrid_driver/](mdc:spot_light/hybrid_driver) - 核心服务实现
+  - [hybrid_driver/server.py](mdc:spot_light/hybrid_driver/server.py) - FastAPI服务器
+  - [hybrid_driver/device_pool.py](mdc:spot_light/hybrid_driver/device_pool.py) - 设备池管理
+  - [hybrid_driver/operation.py](mdc:spot_light/hybrid_driver/operation.py) - 操作系统
+  - [hybrid_driver/webdriver/](mdc:spot_light/hybrid_driver/webdriver) - WebDriver实现
+  - [hybrid_driver/device/](mdc:spot_light/hybrid_driver/device) - 设备抽象
 
-### 核心文件
-- 服务入口: [script/main.py](mdc:script/main.py)
-- HTTP服务: [script/server.py](mdc:script/server.py)
-- 设备管理: [script/device_pool.py](mdc:script/device_pool.py)
-- WebDriver: [script/web_driver.py](mdc:script/web_driver.py)
-- 操作执行: [script/operation.py](mdc:script/operation.py)
+### 脚本组织
+- [scripts/](mdc:spot_light/scripts) - 按功能组织的所有项目脚本
+  - [scripts/service/](mdc:spot_light/scripts/service) - 服务管理脚本
+  - [scripts/cli/](mdc:spot_light/scripts/cli) - 命令行工具
+  - [scripts/deployment/](mdc:spot_light/scripts/deployment) - 部署脚本
+  - [scripts/utils/](mdc:spot_light/scripts/utils) - 工具脚本
 
-### 常用命令
+### 文档结构
+- [docs/](mdc:spot_light/docs) - 所有详细文档
+  - [docs/architecture/](mdc:spot_light/docs/architecture) - 架构文档
+  - [docs/api/](mdc:spot_light/docs/api) - API文档
+  - [docs/guides/](mdc:spot_light/docs/guides) - 用户指南和说明
+
+### 配置管理
+- [hybrid_driver/config/](mdc:spot_light/hybrid_driver/config) - 配置管理
+  - [hybrid_driver/config/settings.py](mdc:spot_light/hybrid_driver/config/settings.py) - 应用设置
+- [config/](mdc:spot_light/config) - 项目配置文件
+- [requirements/](mdc:spot_light/requirements) - 依赖管理
+
+### 关键导航模式
+1. 使用 [start.sh](mdc:spot_light/start.sh) 进行所有项目操作
+2. 查看 [README.md](mdc:spot_light/README.md) 获取文档导航
+3. 服务代码位于 [hybrid_driver/](mdc:spot_light/hybrid_driver)
+4. 脚本按功能组织在 [scripts/](mdc:spot_light/scripts)
+5. 详细文档位于 [docs/](mdc:spot_light/docs) 并具有清晰的分类
+
+---
+
+## 🔧 脚本管理
+
+### 脚本组织
+SpotLight中的所有脚本都按功能组织在 [scripts/](mdc:spot_light/scripts) 目录中：
+
+#### 服务管理脚本
+- [scripts/service/start_service.sh](mdc:spot_light/scripts/service/start_service.sh) - 服务启动逻辑
+- [scripts/service/stop_service.sh](mdc:spot_light/scripts/service/stop_service.sh) - 服务关闭
+- [scripts/service/status.sh](mdc:spot_light/scripts/service/status.sh) - 服务状态检查
+- [scripts/service/restart_service.sh](mdc:spot_light/scripts/service/restart_service.sh) - 服务重启
+- [scripts/service/view_logs.sh](mdc:spot_light/scripts/service/view_logs.sh) - 日志查看工具
+
+#### CLI工具
+- [scripts/cli/cli.py](mdc:spot_light/scripts/cli/cli.py) - SpotLight操作的主CLI接口
+
+#### 主入口点
+- [start.sh](mdc:spot_light/start.sh) - 所有项目操作的统一入口点
+
+### 使用模式
+
+#### 服务操作
 ```bash
-# 安装依赖
-pip install -r script/requirements.txt
-
-# 运行测试
-PYTHONPATH=script pytest script/tests/
-
-# 启动服务
-cd script && python main.py
+# 所有服务操作都通过主入口点进行
+./start.sh start      # 启动服务
+./start.sh stop       # 停止服务  
+./start.sh status     # 检查状态
+./start.sh restart    # 重启服务
+./start.sh logs       # 查看日志
 ```
 
-### 关键配置
-- Python依赖: [script/requirements.txt](mdc:script/requirements.txt)
-- 测试配置: [script/pytest.ini](mdc:script/pytest.ini)
-- 项目文档: [README.md](mdc:README.md)
+#### 开发操作
+```bash
+./start.sh cli        # 运行CLI工具
+./start.sh test       # 运行测试
+./start.sh install    # 安装依赖
+./start.sh clean      # 清理缓存
+```
 
-## 使用说明
-这些规则文件将帮助Cursor AI更好地理解您的项目结构、编码规范和开发流程，从而提供更准确的代码建议和自动补全。所有规则都遵循中文文档规范，并特别强调了日志记录的重要性。
+#### 直接脚本访问
+对于高级用户，可以直接调用脚本：
+```bash
+./scripts/service/start_service.sh
+./scripts/cli/cli.py status
+```
+
+### 脚本开发指南
+1. 所有脚本都应放在 [scripts/](mdc:spot_light/scripts) 中，并使用适当的子目录
+2. 使用 [start.sh](mdc:spot_light/start.sh) 作为面向用户操作的主入口点
+3. 遵循命名约定：小写字母加下划线
+4. 在所有脚本中包含帮助信息
+5. 使用emoji图标提供更好的用户体验
+6. 确保适当的错误处理和退出代码
+
+---
+
+## 📚 文档结构
+
+### 文档组织
+SpotLight使用集中式文档结构，具有清晰的分类：
+
+#### 主文档入口
+- [README.md](mdc:spot_light/README.md) - 项目概览和导航中心
+- [docs/README.md](mdc:spot_light/docs/README.md) - 详细文档导航
+
+#### 文档分类
+
+##### 架构文档
+- [docs/architecture/ARCHITECTURE.md](mdc:spot_light/docs/architecture/ARCHITECTURE.md) - 系统架构和设计
+
+##### API文档  
+- [docs/api/API.md](mdc:spot_light/docs/api/API.md) - 完整API参考和示例
+
+##### 用户指南
+- [docs/guides/DEPLOYMENT.md](mdc:spot_light/docs/guides/DEPLOYMENT.md) - 部署和操作指南
+- [docs/guides/DEV_TOOLS_RECOMMEND.md](mdc:spot_light/docs/guides/DEV_TOOLS_RECOMMEND.md) - 开发环境设置
+- [docs/guides/Instruction.MD](mdc:spot_light/docs/guides/Instruction.MD) - 操作指令系统
+- [docs/guides/SERVICE_MANAGEMENT.md](mdc:spot_light/docs/guides/SERVICE_MANAGEMENT.md) - 服务管理指南
+- [docs/guides/LEGACY_TO_NEW_PROTOCOL_MAPPING.md](mdc:spot_light/docs/guides/LEGACY_TO_NEW_PROTOCOL_MAPPING.md) - 协议迁移指南
+- [docs/guides/IMPLEMENTATION_PLAN.md](mdc:spot_light/docs/guides/IMPLEMENTATION_PLAN.md) - 实施计划
+- [docs/guides/README.md](mdc:spot_light/docs/guides/README.md) - 数据收集模块指南
+
+##### 支持文档
+- [docs/guides/faq.md](mdc:spot_light/docs/guides/faq.md) - 常见问题
+- [docs/guides/contact.md](mdc:spot_light/docs/guides/contact.md) - 联系信息
+
+#### 模块文档
+- [hybrid_driver/README.md](mdc:spot_light/hybrid_driver/README.md) - 核心服务模块文档
+- [scripts/README.md](mdc:spot_light/scripts/README.md) - 脚本组织指南
+
+### 文档导航模式
+1. 从 [README.md](mdc:spot_light/README.md) 开始了解项目概览
+2. 使用 [docs/README.md](mdc:spot_light/docs/README.md) 进行详细文档导航
+3. 所有详细内容都在 [docs/](mdc:spot_light/docs) 中，具有清晰的分类
+4. 模块特定文档在其各自的目录中
+5. 主目录只保留必要的导航和入口点
+
+### 文档维护
+- 所有详细文档都放在 [docs/](mdc:spot_light/docs) 中
+- 主目录只保留必要的导航
+- 使用emoji图标提供更好的视觉组织
+- 保持清晰的分类和交叉引用
+
+---
+
+## 🚀 开发工作流
+
+### 项目设置和开发
+
+#### 环境设置
+1. 使用 [start.sh](mdc:spot_light/start.sh) 进行所有项目操作
+2. 安装依赖：`./start.sh install`
+3. 如需要，激活虚拟环境
+4. 检查服务状态：`./start.sh status`
+
+#### 开发工作流
+1. **服务开发**：在 [hybrid_driver/](mdc:spot_light/hybrid_driver) 目录中工作
+2. **配置**：使用 [hybrid_driver/config/settings.py](mdc:spot_light/hybrid_driver/config/settings.py) 进行应用设置
+3. **测试**：使用 `./start.sh test` 运行测试
+4. **服务管理**：使用 `./start.sh start|stop|restart` 进行服务控制
+
+### 核心开发区域
+
+#### 服务实现
+- [hybrid_driver/server.py](mdc:spot_light/hybrid_driver/server.py) - FastAPI服务器实现
+- [hybrid_driver/device_pool.py](mdc:spot_light/hybrid_driver/device_pool.py) - 设备池管理
+- [hybrid_driver/operation.py](mdc:spot_light/hybrid_driver/operation.py) - 操作系统
+
+#### WebDriver实现
+- [hybrid_driver/webdriver/](mdc:spot_light/hybrid_driver/webdriver) - WebDriver实现
+  - [hybrid_driver/webdriver/selenium_executor.py](mdc:spot_light/hybrid_driver/webdriver/selenium_executor.py) - Selenium实现
+  - [hybrid_driver/webdriver/appium_executor.py](mdc:spot_light/hybrid_driver/webdriver/appium_executor.py) - Appium实现
+
+#### 设备管理
+- [hybrid_driver/device/](mdc:spot_light/hybrid_driver/device) - 设备抽象
+  - [hybrid_driver/device/android_device.py](mdc:spot_light/hybrid_driver/device/android_device.py) - Android设备实现
+
+### 测试结构
+- [tests/](mdc:spot_light/tests) - 按类型组织的所有测试文件
+  - [tests/unit/](mdc:spot_light/tests/unit) - 单元测试
+  - [tests/integration/](mdc:spot_light/tests/integration) - 集成测试  
+  - [tests/functional/](mdc:spot_light/tests/functional) - 功能测试
+  - [tests/conftest.py](mdc:spot_light/tests/conftest.py) - 测试配置和夹具
+
+### 配置管理
+- [hybrid_driver/config/settings.py](mdc:spot_light/hybrid_driver/config/settings.py) - 集中配置
+- [config/](mdc:spot_light/config) - 项目配置文件
+- [requirements/](mdc:spot_light/requirements) - 依赖管理
+
+### 开发最佳实践
+1. 使用 [start.sh](mdc:spot_light/start.sh) 作为所有操作的主入口点
+2. 遵循已建立的目录结构
+3. 在适当的测试目录中为新功能添加测试
+4. 在 [hybrid_driver/config/settings.py](mdc:spot_light/hybrid_driver/config/settings.py) 中更新配置
+5. 在适当的 [docs/](mdc:spot_light/docs) 部分中记录更改
+6. 使用CLI工具进行测试：`./start.sh cli`
+
+---
+
+## 🏛️ 代码组织
+
+### 核心架构
+
+#### 服务层
+- [hybrid_driver/server.py](mdc:spot_light/hybrid_driver/server.py) - 支持WebSocket的FastAPI服务器
+- [hybrid_driver/main.py](mdc:spot_light/hybrid_driver/main.py) - 服务入口点和初始化
+
+#### 设备管理
+- [hybrid_driver/device_pool.py](mdc:spot_light/hybrid_driver/device_pool.py) - 设备池管理和生命周期
+- [hybrid_driver/device/](mdc:spot_light/hybrid_driver/device) - 设备抽象
+  - [hybrid_driver/device/device.py](mdc:spot_light/hybrid_driver/device/device.py) - 基础设备接口
+  - [hybrid_driver/device/android_device.py](mdc:spot_light/hybrid_driver/device/android_device.py) - Android实现
+
+#### 操作系统
+- [hybrid_driver/operation.py](mdc:spot_light/hybrid_driver/operation.py) - 操作执行和管理
+- [hybrid_driver/driver.py](mdc:spot_light/hybrid_driver/driver.py) - 驱动抽象层
+
+#### WebDriver实现
+- [hybrid_driver/webdriver/](mdc:spot_light/hybrid_driver/webdriver) - WebDriver实现
+  - [hybrid_driver/webdriver/base.py](mdc:spot_light/hybrid_driver/webdriver/base.py) - 基础WebDriver接口
+  - [hybrid_driver/webdriver/selenium_executor.py](mdc:spot_light/hybrid_driver/webdriver/selenium_executor.py) - Selenium实现
+  - [hybrid_driver/webdriver/appium_executor.py](mdc:spot_light/hybrid_driver/webdriver/appium_executor.py) - Appium实现
+  - [hybrid_driver/webdriver/web_executor.py](mdc:spot_light/hybrid_driver/webdriver/web_executor.py) - Web自动化
+  - [hybrid_driver/webdriver/popup_handler.py](mdc:spot_light/hybrid_driver/webdriver/popup_handler.py) - 弹窗处理
+  - [hybrid_driver/webdriver/wait_utils.py](mdc:spot_light/hybrid_driver/webdriver/wait_utils.py) - 等待工具
+  - [hybrid_driver/webdriver/webdriver_utils.py](mdc:spot_light/hybrid_driver/webdriver/webdriver_utils.py) - WebDriver工具
+
+#### 配置管理
+- [hybrid_driver/config/](mdc:spot_light/hybrid_driver/config) - 配置管理
+  - [hybrid_driver/config/settings.py](mdc:spot_light/hybrid_driver/config/settings.py) - 应用设置
+  - [hybrid_driver/config/log_config.py](mdc:spot_light/hybrid_driver/config/log_config.py) - 日志配置
+- [config/](mdc:spot_light/config) - 项目配置文件
+
+#### 工具和助手
+- [hybrid_driver/utils/](mdc:spot_light/hybrid_driver/utils) - 工具模块
+  - [hybrid_driver/utils/logger.py](mdc:spot_light/hybrid_driver/utils/logger.py) - 日志工具
+- [hybrid_driver/collect/](mdc:spot_light/hybrid_driver/collect) - 数据收集模块
+
+### 代码组织原则
+1. **关注点分离**：每个模块都有特定的职责
+2. **抽象层**：组件之间有清晰的接口
+3. **配置集中化**：所有设置都在 [hybrid_driver/config/](mdc:spot_light/hybrid_driver/config) 中
+4. **工具组织**：通用工具在 [hybrid_driver/utils/](mdc:spot_light/hybrid_driver/utils) 中
+5. **测试组织**：测试在 [tests/](mdc:spot_light/tests) 中镜像源代码结构
+
+### 模块依赖
+- [hybrid_driver/server.py](mdc:spot_light/hybrid_driver/server.py) 依赖于 [hybrid_driver/device_pool.py](mdc:spot_light/hybrid_driver/device_pool.py)
+- [hybrid_driver/device_pool.py](mdc:spot_light/hybrid_driver/device_pool.py) 依赖于 [hybrid_driver/device/](mdc:spot_light/hybrid_driver/device)
+- [hybrid_driver/operation.py](mdc:spot_light/hybrid_driver/operation.py) 依赖于 [hybrid_driver/webdriver/](mdc:spot_light/hybrid_driver/webdriver)
+- 所有模块都使用 [hybrid_driver/config/settings.py](mdc:spot_light/hybrid_driver/config/settings.py) 进行配置
+
+---
+
+## 🧪 测试和质量保证
+
+### 测试结构
+
+#### 测试组织
+所有测试都组织在 [tests/](mdc:spot_light/tests) 目录中，具有清晰的分类：
+
+- [tests/conftest.py](mdc:spot_light/tests/conftest.py) - 测试配置和共享夹具
+- [tests/unit/](mdc:spot_light/tests/unit) - 单个组件的单元测试
+- [tests/integration/](mdc:spot_light/tests/integration) - 组件交互的集成测试
+- [tests/functional/](mdc:spot_light/tests/functional) - 端到端场景的功能测试
+- [tests/fixtures/](mdc:spot_light/tests/fixtures) - 测试数据和夹具
+
+#### 测试文件
+- [tests/unit/test_device.py](mdc:spot_light/tests/unit/test_device.py) - 设备抽象测试
+- [tests/unit/test_web_driver.py](mdc:spot_light/tests/unit/test_web_driver.py) - WebDriver实现测试
+- [tests/unit/test_websocket.py](mdc:spot_light/tests/unit/test_websocket.py) - WebSocket通信测试
+- [tests/functional/test_click_simple.py](mdc:spot_light/tests/functional/test_click_simple.py) - 简单点击操作测试
+- [tests/functional/test_click_modification.py](mdc:spot_light/tests/functional/test_click_modification.py) - 高级点击操作测试
+
+#### 测试配置
+- [hybrid_driver/pytest.ini](mdc:spot_light/hybrid_driver/pytest.ini) - Pytest配置
+- [tests/conftest.py](mdc:spot_light/tests/conftest.py) - 共享测试夹具和配置
+
+### 测试工作流
+
+#### 运行测试
+```bash
+# 运行所有测试
+./start.sh test
+
+# 运行特定测试类别
+pytest tests/unit/           # 仅单元测试
+pytest tests/integration/    # 仅集成测试
+pytest tests/functional/     # 仅功能测试
+
+# 运行特定测试文件
+pytest tests/unit/test_device.py
+
+# 运行覆盖率测试
+pytest --cov=hybrid_driver tests/
+```
+
+#### 测试开发指南
+1. **单元测试**：隔离测试单个函数和类
+2. **集成测试**：测试组件交互和接口
+3. **功能测试**：测试完整的用户工作流和场景
+4. **夹具**：使用 [tests/conftest.py](mdc:spot_light/tests/conftest.py) 进行共享测试设置
+5. **测试数据**：将测试数据存储在 [tests/fixtures/](mdc:spot_light/tests/fixtures) 中
+
+### 质量保证
+
+#### 代码质量工具
+- 使用pytest作为测试框架
+- 遵循PEP 8编码标准
+- 使用类型提示进行更好的代码文档化
+- 实现适当的错误处理和日志记录
+
+#### 测试最佳实践
+1. 为所有新功能编写测试
+2. 保持测试覆盖率在80%以上
+3. 使用描述性测试名称和文档字符串
+4. 在单元测试中模拟外部依赖
+5. 在功能测试中使用真实设备
+6. 保持测试独立和可重复
+
+#### 持续集成
+- 在提交代码前运行测试
+- 使用 [start.sh](mdc:spot_light/start.sh) test命令进行一致的测试执行
+- 监控测试覆盖率和质量指标
+- 在CI/CD管道中自动化测试执行
+
+---
+
+## 📝 文档维护说明
+
+### 更新规则
+1. **统一维护**：所有规则内容都集中在此README.mdc文件中
+2. **同步更新**：当项目结构或规则发生变化时，及时更新此文档
+3. **版本控制**：保持文档与项目代码的同步
+4. **定期审查**：定期检查和更新规则内容
+
+### 使用指南
+- 开发者可以通过此文档快速了解项目结构和开发规范
+- AI助手可以基于此文档提供准确的代码导航和开发建议
+- 新团队成员可以通过此文档快速上手项目
+
+---
+
+*最后更新时间：2024年12月*

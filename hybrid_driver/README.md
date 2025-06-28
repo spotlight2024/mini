@@ -1,109 +1,34 @@
-# Spot Light Hybrid Driver
+# hybrid_driver 子模块说明
 
-Spot Light 混合驱动服务，支持 Web 和移动端自动化操作。
+本目录为 SpotLight 混合驱动服务核心模块，负责 Android 虚拟机自动化的 WebDriver 管理、设备池、操作指令等核心能力。
 
-## 项目结构
+## 功能定位
+- 提供统一的 WebDriver（Selenium/Appium）自动化能力
+- 支持多设备并发、设备池管理
+- 支持智能操作指令、弹窗处理、数据采集
+- 对接主服务 API，支撑云端自动化
 
-```
-hybrid_driver/
-├── shell/                    # 服务管理脚本
-│   ├── start_service.sh      # 启动服务
-│   ├── stop_service.sh       # 停止服务
-│   ├── status.sh            # 查看状态
-│   ├── restart_service.sh    # 重启服务
-│   └── view_logs.sh         # 日志查看
-├── logs/                     # 日志目录
-├── main.py                   # 主程序入口
-├── server.py                 # FastAPI 服务
-├── start.sh                  # 便捷管理脚本
-├── SERVICE_MANAGEMENT.md     # 详细服务管理文档
-└── README.md                 # 本文档
-```
+## 主要接口
+- FastAPI 服务入口：`server.py`
+- 设备池管理：`device_pool.py`
+- 设备抽象：`device/android_device.py`
+- WebDriver 实现：`webdriver/`
+- 操作指令系统：`operation.py`
 
-## 快速开始
-
-### 1. 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. 启动服务
-
-```bash
-# 给脚本添加执行权限
-chmod +x start.sh shell/*.sh
-
-# 启动服务
-./start.sh start
-```
-
-### 3. 查看状态
-
-```bash
-./start.sh status
-```
-
-### 4. 查看日志
-
-```bash
-./start.sh logs          # 实时跟踪日志
-./start.sh logs -e       # 查看错误日志
-```
-
-### 5. 停止服务
-
-```bash
-./start.sh stop
-```
-
-## 便捷命令
-
-```bash
-./start.sh start         # 启动服务
-./start.sh stop          # 停止服务
-./start.sh restart       # 重启服务
-./start.sh status        # 查看状态
-./start.sh logs          # 实时查看日志
-./start.sh logs -e       # 查看错误日志
-./start.sh logs -l       # 查看最新日志
-./start.sh logs -t       # 查看今天的日志
-./start.sh help          # 查看帮助
-```
-
-## API 文档
-
-服务启动后，访问以下地址查看 API 文档：
-
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+## 开发与测试
+- 入口脚本：`main.py`（开发/调试）
+- 服务管理脚本：见 `../scripts/service/`
+- 单元/集成测试：见 `../tests/`
+- 日志与配置：见 `../config/`
 
 ## 详细文档
+- [主项目 README](../README.md)
+- [架构设计](../docs/architecture/ARCHITECTURE.md)
+- [API 文档](../docs/api/API.md)
+- [服务管理指南](../docs/guides/SERVICE_MANAGEMENT.md)
+- [操作指令说明](../docs/guides/Instruction.MD)
+- [部署指南](../docs/guides/DEPLOYMENT.md)
+- [开发工具推荐](../docs/guides/DEV_TOOLS_RECOMMEND.md)
+- [文档导航](../docs/README.md)
 
-更多详细信息请参考：
-- [服务管理指南](SERVICE_MANAGEMENT.md) - 完整的服务管理说明
-- [API 文档](../API.md) - API 接口说明
-- [架构文档](../ARCHITECTURE.md) - 系统架构说明
-
-## 开发
-
-### 调试模式
-
-```bash
-# 前台运行（调试模式）
-python main.py
-
-# 启用详细日志
-export LOG_LEVEL=DEBUG
-python main.py
-```
-
-### 测试
-
-```bash
-# 运行测试
-pytest
-
-# 运行特定测试
-pytest tests/test_device.py
-``` 
+如需详细开发、测试、接口说明，请参考主项目文档。 
