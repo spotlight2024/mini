@@ -506,6 +506,35 @@ class ContextManager:
         pass
 ```
 
+## 项目架构文档
+
+### 核心模块结构
+```
+spot_light/
+├── hybrid_driver/                    # 混合驱动核心
+│   ├── collect/                      # 数据采集模块
+│   │   ├── __init__.py              # 采集模块入口
+│   │   └── collect_items.py         # 元素信息采集实现
+│   ├── operation.py                  # 操作指令系统
+│   ├── server.py                     # HTTP服务接口
+│   ├── device_pool.py               # 设备池管理
+│   ├── webdriver/                    # WebDriver实现
+│   │   ├── selenium_executor.py     # Selenium执行器
+│   │   ├── appium_executor.py       # Appium执行器
+│   │   └── webdriver_utils.py       # WebDriver工具
+│   └── utils/                        # 工具模块
+├── aidaemon/                         # Android虚拟机APP
+└── docs/                             # 项目文档
+```
+
+### 数据采集模块 (collect/)
+- **collect_items.py**: 实现ACTION_COLLECT_ITEM_INFO协议
+- 支持JSON配置和向后兼容参数
+- 模块化设计，便于扩展和维护
+- 通过OperationRegistry统一注册和管理
+
+## 核心功能模块
+
 ## 总结
 
 SpotLight 混合驱动服务采用了分层架构设计，通过抽象接口和模块化组件实现了高内聚、低耦合的系统架构。主要特点包括：

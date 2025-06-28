@@ -1,18 +1,16 @@
 import time
-import logging
 from dataclasses import dataclass
-from typing import List, Dict, Any
-from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
+from typing import Dict, Any
 
-from hybrid_driver.log_config import get_logger
+from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
+from hybrid_driver.log_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
+setup_logging()
 @dataclass
 class Page:
     """页面信息类"""
@@ -166,7 +164,8 @@ class WebDriverUtils:
                         is_hidden=page_state['hidden'],
                         state=page_state
                     )
-                    
+
+                    logger.info(f"<page title>: {page.title}")
                     if ":VISIBLE" in d.title:
                         visible_pages_list.append(page)
                         break

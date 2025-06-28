@@ -1,6 +1,6 @@
 import time
 import logging
-from typing import Optional, Any, Dict, Type
+from typing import Optional, Any, Dict, Type, List
 
 import adbutils
 from selenium.webdriver.common.by import By
@@ -97,7 +97,7 @@ class AndroidDevice:
             return None
         return self._web_execute.find_element(by, value)
 
-    def find_elements(self, by: str, value: str) -> Optional[WebElement]:
+    def find_elements(self, by: str, value: str) -> Optional[List[WebElement]]:
         """查找元素"""
         if not self.is_connected():
             return None
