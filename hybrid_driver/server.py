@@ -4,10 +4,13 @@ import uuid
 
 from fastapi import FastAPI
 from pydantic import BaseModel
+import selenium.webdriver.support.expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.wait import WebDriverWait
 
 from hybrid_driver.device_pool import DevicePool
 from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
-from hybrid_driver.operation import OperationSequence, FindElement, Click, Wait, JS, HandlePopup, build_operations
+from hybrid_driver.operation import OperationSequence, FindElement, Click, Wait, JS, HandlePopup, build_operations, CollectItemsOp
 
 app = FastAPI()
 device_pool = DevicePool()
@@ -79,6 +82,10 @@ def connect(req: ConnectRequest):
     try:
         device = device_pool.connect(req.serial_id)
         if device is not None:
+            driver = device._web_execute._driver
+
+            pages = WebDriverUtils.get_visible_page(driver)
+            driver.switch_to.window(pages[0].handle)
             return APIResponse(code=0, message="success")
         else:
             return APIResponse(code=1001, message="连接失败")
@@ -390,8 +397,152 @@ def detect_current_page(url: str, page_source: str) -> str:
         logging.error(f"Page detection failed: {str(e)}")
         return "Unknown"
 
+@app.post("/find_elements", response_model=APIResponse)
+def find_elements(req: FindElementRequest):
+    """
+    查找多个元素接口
+    """
+    trace_id = gen_trace_id()
+    try:
+        device = device_pool.get(req.serial_id)
+        if device is None:
+            return APIResponse(
+                code=1002, 
+                message="设备未找到", 
+                error=f"Device {req.serial_id} not found",
+                trace_id=trace_id
+            )
+        
+        elements = device.find_elements(req.method, req.selector)
+        if elements is None or len(elements) == 0:
+            logging.info("no elements found")
+            return APIResponse(
+                code=1003, 
+                message="elements not found", 
+                error=f"No elements found with selector: {req.selector}",
+                trace_id=trace_id
+            )
+        
+        # 提取元素信息
+        element_data = []
+        for i, element in enumerate(elements):
+            try:
+                element_info = {
+                    "index": i,
+                    "tag_name": element.tag_name,
+                    "text": element.text,
+                    "attributes": {
+                        "id": element.get_attribute("id"),
+                        "class": element.get_attribute("class"),
+                        "name": element.get_attribute("name"),
+                        "href": element.get_attribute("href"),
+                        "src": element.get_attribute("src")
+                    }
+                }
+                element_data.append(element_info)
+            except Exception as e:
+                logging.warning(f"Failed to extract element {i} info: {e}")
+                continue
+        
+        logging.info(f"found {len(element_data)} elements")
+        return APIResponse(
+            code=0, 
+            message="success", 
+            data={
+                "elements": element_data,
+                "count": len(element_data)
+            },
+            trace_id=trace_id
+        )
+    except Exception as e:
+        return APIResponse(
+            code=2000, 
+            message="系统异常", 
+            error=str(e),
+            trace_id=trace_id
+        )
+
+
+class CollectItemsRequest(BaseModel):
+    serial_id: str
+    container_selector: Optional[str] = None
+    item_selectors: Optional[dict] = None
+    options: Optional[dict] = {}
+    filters: Optional[dict] = {}
+    dialog_views: Optional[list] = []
+    loading_view: Optional[str] = None
+    close_dialog: Optional[bool] = True
+    package_name: Optional[str] = None
+    # 新增：支持新协议JSON配置
+    config_json: Optional[str] = None
+    config_file: Optional[str] = None
+
+
+@app.post("/collect_items", response_model=APIResponse)
+def collect_items(req: CollectItemsRequest):
+    """
+    收集元素信息接口 - Web端ACTION_COLLECT_ITEM_INFO实现
+    支持新协议JSON配置和老协议参数
+    """
+    trace_id = gen_trace_id()
+    try:
+        device = device_pool.get(req.serial_id)
+        if device is None:
+            return APIResponse(
+                code=1002, 
+                message="设备未找到", 
+                error=f"Device {req.serial_id} not found",
+                trace_id=trace_id
+            )
+        
+        # 创建收集操作，支持新协议和老协议
+        if req.config_json or req.config_file:
+            # 使用新协议JSON配置
+            collect_op = CollectItemsOp(
+                config_json=req.config_json,
+                config_file=req.config_file
+            )
+        else:
+            # 使用老协议参数（向后兼容）
+            collect_op = CollectItemsOp(
+                container_selector=req.container_selector,
+                item_selectors=req.item_selectors or {},
+                options=req.options or {},
+                filters=req.filters or {},
+                dialog_views=req.dialog_views or [],
+                loading_view=req.loading_view,
+                close_dialog=req.close_dialog if req.close_dialog is not None else True,
+                package_name=req.package_name
+            )
+        
+        # 执行收集操作
+        result = collect_op.execute(device)
+        
+        if result:
+            return APIResponse(
+                code=0, 
+                message="收集成功", 
+                data=result,
+                trace_id=trace_id
+            )
+        else:
+            return APIResponse(
+                code=1003, 
+                message="收集失败", 
+                error="No items collected",
+                trace_id=trace_id
+            )
+            
+    except Exception as e:
+        return APIResponse(
+            code=2000, 
+            message="系统异常", 
+            error=str(e),
+            trace_id=trace_id
+        )
+
 if __name__ == "__main__":
-    serial_id = "0.0.0.0:6524"
+    serial_id = "172.16.1.125:6524"
 
     connect(ConnectRequest(serial_id=serial_id))
     # switch to current page
@@ -401,7 +552,32 @@ if __name__ == "__main__":
     pages = WebDriverUtils.get_visible_page(driver)
     driver.switch_to.window(pages[0].handle)
 
-    click(ClickRequest(serial_id=serial_id,method="css selector",selector="wx-view.query.menu-bar--query"))
+    # click(ClickRequest(serial_id=serial_id,method="css selector",selector="wx-view.query.menu-bar--query"))
+    # 1. 等待所有可见的菜单项加载完成
+    wait = WebDriverWait(driver, 10)
 
+    products = wait.until(EC.presence_of_all_elements_located(
+        (By.CSS_SELECTOR,
+        "wx-view.pos-r.list--pos-r.kind_100000.list--kind_100000.two-kind.list--two-kind")  # 每个产品的根容器 :contentReference[oaicite:7]{index=7}
+    ))
+
+    # 2. 逐个提取名称和首杯价
+    menu_data = []
+    for prod in products:
+        # 名称：<wx-view class="menu-product_name product--menu-product_name ellipsis product--ellipsis">...</wx-view>
+        name_el = prod.find_element(By.CSS_SELECTOR,
+            "wx-view.menu-product_name.product--menu-product_name")
+        name = name_el.text  # 如 "生椰拿铁（首创）" :contentReference[oaicite:8]{index=8}
+
+        # 首杯价：<wx-view class="discountPrice bar--discountPrice">8.8</wx-view>
+        price_el = prod.find_element(By.CSS_SELECTOR,
+            "wx-view.discountPrice.bar--discountPrice")
+        price = price_el.text  # 如 "8.8" :contentReference[oaicite:9]{index=9}
+
+        menu_data.append((name, price))
+
+    # 3. 输出结果
+    for name, price in menu_data:
+        print(f"{name} —— ¥{price}")
 
 

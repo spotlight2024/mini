@@ -144,6 +144,9 @@ spot_light/
 │   │   ├── popup_handler.py          # 弹窗处理器
 │   │   └── pool.py                   # WebDriver连接池
 │   ├── operation.py                  # 操作指令系统
+│   ├── collect/                      # 数据采集模块
+│   │   ├── __init__.py              # 采集模块入口
+│   │   └── collect_items.py         # 元素信息采集实现
 │   ├── utils/                        # 工具模块
 │   │   └── logger.py                 # 日志工具
 │   ├── tests/                        # 测试用例

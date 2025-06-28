@@ -2,6 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from hybrid_driver.log_config import get_logger
 from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
+from hybrid_driver.collect import CollectItems
 
 logger = get_logger(__name__)
 
@@ -79,6 +80,50 @@ class FindElement(Operation):
         except:
             return False
 
+@OperationRegistry.register("finds")
+class FindElements(Operation):
+    def __init__(self, method, selector, timeout=10):
+        self.method = method
+        self.selector = selector
+        self.timeout = timeout
+
+    def execute(self, device, context=None):
+        logger.info(f"[{FindElements}], method={self.method}, selector={self.selector}, timeout={self.timeout}")
+        try:
+            # 如果上下文中已有元素，且选择器匹配，则直接返回
+            if context and 'element' in context:
+                element = context['element']
+                if self._element_matches(element):
+                    logger.info(f"[{FindElements}], Using cached element: {self.selector}")
+                    return element
+
+            # 查找元素
+            elem = device.wait_for_element(self.method, self.selector, self.timeout)
+            if elem:
+                logger.info(f"[{FindElements}], Element found: {elem}")
+                # 更新上下文
+                if context:
+                    context['element'] = elem
+                return elem
+            else:
+                logger.warning(f"[{FindElements}], Element not found: {self.selector}")
+                return None
+        except Exception as e:
+            logger.error(f"Exception: {e}")
+            return None
+
+    def _element_matches(self, element):
+        """检查元素是否匹配当前选择器"""
+        try:
+            if self.method == "css selector":
+                return element.get_attribute("css") == self.selector
+            elif self.method == "xpath":
+                return element.get_attribute("xpath") == self.selector
+            elif self.method == "id":
+                return element.get_attribute("id") == self.selector
+            return False
+        except:
+            return False
 
 @OperationRegistry.register("click")
 class Click(Operation):
@@ -567,3 +612,13 @@ class OperationItem:
         if not operation_class:
             raise ValueError(f"Unknown operation type: {self.type}")
         return operation_class(**self.params)
+
+
+# ================= Web元素收集指令 =================
+
+@OperationRegistry.register("collect_items")
+class CollectItemsOp(Operation):
+    def __init__(self, *args, **kwargs):
+        self._impl = CollectItems(*args, **kwargs)
+    def execute(self, device, context=None):
+        return self._impl.execute(device, context)

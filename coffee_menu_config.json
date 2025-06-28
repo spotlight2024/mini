@@ -1,0 +1,46 @@
+{
+  "action": "ACTION_COLLECT_ITEM_INFO",
+  "config": {
+    "container": {
+      "selector": "body"
+    },
+    "options": {
+      "item_selector": ".wx-menu-product",
+      "close_dialog": true,
+      "package": "com.lucky.luckyclient",
+      "loading_view": "com.lucky.luckyclient:id/v_lottie",
+      "dialog_views": [
+        "com.lucky.luckyclient:id/customPanel",
+        "com.lucky.luckyclient:id/webview_dialog"
+      ],
+      "singleton": false,
+      "max_items": 20,
+      "scroll_enabled": false,
+      "timeout": 30
+    }
+  },
+  "fields": {
+    "name": {
+      "selector": ".product--menu-product_name",
+      "type": "text",
+      "required": true,
+      "description": "咖啡商品名称"
+    },
+    "price": {
+      "selector": ".bar--discountPrice",
+      "type": "text",
+      "required": true,
+      "description": "咖啡折扣价格"
+    },
+    "original_price": {
+      "selector": ".bar--original",
+      "type": "text",
+      "description": "咖啡原价"
+    },
+    "description": {
+      "selector": ".product--color-gray3",
+      "type": "text",
+      "description": "咖啡描述信息"
+    }
+  }
+} 
