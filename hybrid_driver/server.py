@@ -567,9 +567,9 @@ def scale_nodes(request: dict):
         target_nodes = request.get("target_nodes")
         current_nodes = request.get("current_nodes")
         reason = request.get("reason", "自动扩容")
-        
+
         logger.info(f"收到扩缩容请求: {action}, 目标节点数: {target_nodes}, 原因: {reason}")
-        
+
         if action == "scale_up":
             # 计算需要增加的节点数
             nodes_to_add = target_nodes - current_nodes
@@ -577,17 +577,17 @@ def scale_nodes(request: dict):
                 success = scale_manager.scale_up(nodes_to_add)
                 if success:
                     return APIResponse(
-                        code=0, 
+                        code=0,
                         message=f"扩容成功: {current_nodes} -> {target_nodes} 节点",
                         data={"action": action, "target_nodes": target_nodes}
                     )
                 else:
                     return APIResponse(
-                        code=500, 
+                        code=500,
                         message="扩容失败",
                         error="Docker操作失败"
                     )
-        
+
         elif action == "scale_down":
             # 计算需要减少的节点数
             nodes_to_remove = current_nodes - target_nodes
@@ -595,27 +595,27 @@ def scale_nodes(request: dict):
                 success = scale_manager.scale_down(nodes_to_remove)
                 if success:
                     return APIResponse(
-                        code=0, 
+                        code=0,
                         message=f"缩容成功: {current_nodes} -> {target_nodes} 节点",
                         data={"action": action, "target_nodes": target_nodes}
                     )
                 else:
                     return APIResponse(
-                        code=500, 
+                        code=500,
                         message="缩容失败",
                         error="Docker操作失败"
                     )
-        
+
         return APIResponse(
-            code=400, 
+            code=400,
             message="无效的扩缩容操作",
             error=f"不支持的操作: {action}"
         )
-        
+
     except Exception as e:
         logger.error(f"扩缩容API异常: {e}")
         return APIResponse(
-            code=500, 
+            code=500,
             message="扩缩容操作异常",
             error=str(e)
         )
@@ -626,14 +626,14 @@ def get_scale_status():
     try:
         status = scale_manager.get_scale_status()
         return APIResponse(
-            code=0, 
-            message="success", 
+            code=0,
+            message="success",
             data=status
         )
     except Exception as e:
         logger.error(f"获取扩缩容状态失败: {e}")
         return APIResponse(
-            code=500, 
+            code=500,
             message="获取状态失败",
             error=str(e)
         )
@@ -644,14 +644,14 @@ def cleanup_nodes():
     try:
         cleaned_count = scale_manager.cleanup_failed_nodes()
         return APIResponse(
-            code=0, 
+            code=0,
             message=f"清理完成",
             data={"cleaned_count": cleaned_count}
         )
     except Exception as e:
         logger.error(f"清理节点失败: {e}")
         return APIResponse(
-            code=500, 
+            code=500,
             message="清理失败",
             error=str(e)
         )
@@ -662,6 +662,7 @@ def health_check():
     return {"status": "healthy", "timestamp": time.time()}
 
 if __name__ == "__main__"
+if __name__ == "__main__":
     serial_id = "172.16.1.125:6524"
 
     connect(ConnectRequest(serial_id=serial_id))
