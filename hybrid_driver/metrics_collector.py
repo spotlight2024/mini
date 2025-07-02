@@ -283,6 +283,36 @@ class SpotLightMetrics:
         self.response_time_stats.clear()
         logger.info("指标历史记录已清空")
     
+    def collect_grid_metrics(self) -> Dict:
+        """收集Grid指标"""
+        try:
+            import requests
+            
+            # 尝试获取Grid状态
+            grid_status = {}
+            try:
+                response = requests.get("http://selenium-hub:4444/wd/hub/status", timeout=5)
+                if response.status_code == 200:
+                    grid_status = response.json()
+            except Exception as e:
+                logger.warning(f"无法获取Grid状态: {e}")
+            
+            # 获取系统指标
+            system_metrics = self.get_metrics()
+            
+            return {
+                'grid_status': grid_status,
+                'system_metrics': system_metrics,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"收集Grid指标失败: {e}")
+            return {
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }
+    
     def get_health_status(self) -> Dict:
         """获取健康状态"""
         try:

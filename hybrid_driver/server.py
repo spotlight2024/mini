@@ -661,7 +661,6 @@ def health_check():
     """健康检查接口"""
     return {"status": "healthy", "timestamp": time.time()}
 
-if __name__ == "__main__"
 if __name__ == "__main__":
     serial_id = "172.16.1.125:6524"
 

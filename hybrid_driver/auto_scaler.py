@@ -47,7 +47,7 @@ class SpotLightAutoScaler:
         self.is_monitoring = False
         self.last_scale_time = None
         self.metrics_history: List[ScalingMetrics] = []
-        self.hub_url = "http://localhost:4444"
+        self.hub_url = "http://selenium-hub:4444"
         self.api_url = "http://localhost:8002"
         
         # 扩容历史记录

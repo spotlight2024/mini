@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   # SpotLight API服务
   spotlight-api:
@@ -36,11 +35,13 @@ services:
       - spotlight-network
     restart: unless-stopped
 
-  # Selenium Chrome节点 - 支持自动扩容
+  # Selenium Chrome节点 - 支持Chrome Driver版本管理和证书安装
   selenium-node-chrome:
-    image: selenium/node-chrome:4.33.0-20250606
-    container_name: selenium-node-chrome
+    build:
+      context: .
+      dockerfile: Dockerfile.selenium-node-chrome
     environment:
+      # Selenium Grid配置
       - SE_EVENT_BUS_HOST=selenium-hub
       - SE_EVENT_BUS_PUBLISH_PORT=4442
       - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
@@ -49,10 +50,19 @@ services:
       - SE_NODE_SESSION_TIMEOUT=300
       - SE_NODE_REGISTER_CYCLE=10000
       - SE_NODE_REGISTER_PERIOD=10000
-      - SE_NODE_HOST=selenium-node-chrome
       - SE_NODE_PORT=5555
+      # Chrome Driver版本配置
+      - CHROME_DRIVER_VERSION=${CHROME_DRIVER_VERSION:-""}
+      - CHROME_DRIVER_DOWNLOAD_URL=${CHROME_DRIVER_DOWNLOAD_URL:-""}
+      # 证书配置
+      - SE_INSTALL_CERTIFICATES=${SE_INSTALL_CERTIFICATES:-"false"}
+      # 其他Chrome配置
+      - SE_START_XVFB=true
+      - SE_VNC_NO_PASSWORD=true
+      - SE_VNC_VIEW_ONLY=true
     volumes:
       - /dev/shm:/dev/shm  # 共享内存优化
+      - ./certs:/opt/certs:ro  # 证书文件挂载
     depends_on:
       - selenium-hub
     networks:
