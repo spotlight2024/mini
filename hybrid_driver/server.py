@@ -2,6 +2,8 @@ import logging
 import time
 from typing import Optional, Any, List
 import uuid
+import asyncio
+import random
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -15,6 +17,10 @@ from hybrid_driver.operation import OperationSequence, FindElement, Click, Wait,
 from hybrid_driver.auto_scaler import SpotLightAutoScaler
 from hybrid_driver.metrics_collector import SpotLightMetrics
 from hybrid_driver.scale_manager import DockerScaleManager
+from hybrid_driver.utils.async_utils import run_sync
+
+from hybrid_driver.log_config import get_logger
+
 
 app = FastAPI()
 device_pool = DevicePool()
@@ -25,6 +31,8 @@ auto_scaler.start_monitoring()
 
 metrics_collector = SpotLightMetrics()
 scale_manager = DockerScaleManager()
+
+logger = get_logger(__name__)
 
 
 class ConnectRequest(BaseModel):
@@ -89,14 +97,13 @@ class SetTextRequest(BaseModel):
 
 
 @app.post("/connect", response_model=APIResponse)
-def connect(req: ConnectRequest):
+async def connect(req: ConnectRequest):
     try:
-        device = device_pool.connect(req.serial_id)
+        device = await run_sync(device_pool.connect, req.serial_id)
         if device is not None:
             driver = device._web_execute._driver
-
-            pages = WebDriverUtils.get_visible_page(driver)
-            driver.switch_to.window(pages[0].handle)
+            pages = await run_sync(WebDriverUtils.get_visible_page, driver)
+            await run_sync(driver.switch_to.window, pages[0].handle)
             return APIResponse(code=0, message="success")
         else:
             return APIResponse(code=1001, message="连接失败")
@@ -105,27 +112,26 @@ def connect(req: ConnectRequest):
 
 
 @app.post("/disconnect", response_model=APIResponse)
-def disconnect(req: DisconnectRequest):
-    device = device_pool.get(req.serial_id)
+async def disconnect(req: DisconnectRequest):
+    device = await run_sync(device_pool.get, req.serial_id)
     if device is None:
         return APIResponse(code=1002, message="device not found")
     else:
-        device.disconnect()
+        await run_sync(device.disconnect)
         return APIResponse(code=0, message="success")
 
 
 @app.post("/action", response_model=APIResponse)
-def action(req: ActionRequest):
-    device = device_pool.get(req.serial_id)
+async def action(req: ActionRequest):
+    device = await run_sync(device_pool.get, req.serial_id)
     if device is None:
         return APIResponse(code=1002, message="device not found")
-
     # TODO: 实现具体的action逻辑
     return APIResponse(code=0, message="success")
 
 
 @app.post("/find_element", response_model=APIResponse)
-def find_element(req: FindElementRequest):
+async def find_element(req: FindElementRequest):
     """
     查找元素接口。
     参数 method 必须为以下字符串之一（与 Selenium By 枚举一一对应）：
@@ -143,10 +149,10 @@ def find_element(req: FindElementRequest):
         method="xpath", selector="//div[@id='main']"
     """
     try:
-        device = device_pool.get(req.serial_id)
+        device = await run_sync(device_pool.get, req.serial_id)
         if device is None:
             return APIResponse(code=1002, message="device not found")
-        element = device.wait_for_element(req.method, req.selector,timeout=3)
+        element = await run_sync(device.wait_for_element, req.method, req.selector, 3)
         if element is None:
             logging.info("not found element")
             return APIResponse(code=1003, message="element not found")
@@ -161,17 +167,15 @@ def gen_trace_id():
 
 
 @app.post("/click", response_model=APIResponse)
-def click(req: ClickRequest):
+async def click(req: ClickRequest):
     """
     点击元素接口
     """
     trace_id = gen_trace_id()
     try:
-        # 1. 检查设备连接状态
-        device = device_pool.get(req.serial_id)
+        device = await run_sync(device_pool.get, req.serial_id)
         if device is None:
-            # 尝试自动连接设备
-            device = device_pool.connect(req.serial_id)
+            device = await run_sync(device_pool.connect, req.serial_id)
             if device is None:
                 return APIResponse(
                     code=1002, 
@@ -179,8 +183,6 @@ def click(req: ClickRequest):
                     error=f"Device {req.serial_id} not found or connection failed",
                     trace_id=trace_id
                 )
-
-        # 2. 检查WebDriver状态
         if not hasattr(device, '_web_execute') or device._web_execute is None:
             return APIResponse(
                 code=1004, 
@@ -188,7 +190,6 @@ def click(req: ClickRequest):
                 error="WebDriver not initialized",
                 trace_id=trace_id
             )
-
         driver = device._web_execute._driver
         if driver is None:
             return APIResponse(
@@ -197,10 +198,8 @@ def click(req: ClickRequest):
                 error="WebDriver instance is null",
                 trace_id=trace_id
             )
-
-        # 3. 检查页面状态
         try:
-            pages = WebDriverUtils.get_visible_page(driver)
+            pages = await run_sync(WebDriverUtils.get_visible_page, driver)
             if not pages:
                 return APIResponse(
                     code=1006, 
@@ -208,7 +207,7 @@ def click(req: ClickRequest):
                     error="No available pages found",
                     trace_id=trace_id
                 )
-            driver.switch_to.window(pages[0].handle)
+            await run_sync(driver.switch_to.window, pages[0].handle)
         except Exception as e:
             return APIResponse(
                 code=1007, 
@@ -216,8 +215,6 @@ def click(req: ClickRequest):
                 error=f"Failed to switch to page: {str(e)}",
                 trace_id=trace_id
             )
-
-        # 4. 创建并执行Click操作
         try:
             click_op = Click(
                 method=req.method,
@@ -226,10 +223,7 @@ def click(req: ClickRequest):
                 wait_for_new_window=req.wait_for_new_window or False,
                 context_type="WEB"
             )
-            
-            # 执行点击操作
-            result = click_op.execute(device)
-            
+            result = await run_sync(click_op.execute, device)
             if result:
                 return APIResponse(
                     code=0, 
@@ -244,7 +238,6 @@ def click(req: ClickRequest):
                     error="Click operation returned false",
                     trace_id=trace_id
                 )
-                
         except Exception as e:
             error_msg = str(e)
             if "element not found" in error_msg.lower() or "no such element" in error_msg.lower():
@@ -279,7 +272,6 @@ def click(req: ClickRequest):
                     data={"method": req.method, "selector": req.selector},
                     trace_id=trace_id
                 )
-            
     except Exception as e:
         return APIResponse(
             code=2000, 
@@ -289,14 +281,14 @@ def click(req: ClickRequest):
         )
 
 @app.post("/run_operations", response_model=APIResponse)
-def run_operations(req: OperationRequest):
+async def run_operations(req: OperationRequest):
     trace_id = gen_trace_id()
-    device = device_pool.get(req.serial_id)
+    device = await run_sync(device_pool.get, req.serial_id)
     if not device:
         return APIResponse(code=400101, message="device not found", trace_id=trace_id)
     ops = build_operations([op.model_dump() for op in req.operations])
     seq = OperationSequence(ops)
-    results = seq.execute(device)
+    results = await run_sync(seq.execute, device)
     return APIResponse(code=0, message="success", data={"results": results}, trace_id=trace_id)
 
 
@@ -314,14 +306,14 @@ async def check_page(request: dict):
             return {"code": 1, "message": "required_page is required"}
         
         # 获取设备
-        device = device_pool.get(serial_id)
+        device = await run_sync(device_pool.get, serial_id)
         if device is None:
             return {"code": 2, "message": f"Device {serial_id} not found"}
         
         try:
             # 获取当前页面信息
-            current_url = device.get_current_url()
-            page_source = device.get_page_source()
+            current_url = await run_sync(device.get_current_url)
+            page_source = await run_sync(device.get_page_source)
             
             # 简单的页面检测逻辑，可以根据需要扩展
             is_current_page = check_page_type(current_url, page_source, required_page)
@@ -409,13 +401,13 @@ def detect_current_page(url: str, page_source: str) -> str:
         return "Unknown"
 
 @app.post("/find_elements", response_model=APIResponse)
-def find_elements(req: FindElementRequest):
+async def find_elements(req: FindElementRequest):
     """
     查找多个元素接口
     """
     trace_id = gen_trace_id()
     try:
-        device = device_pool.get(req.serial_id)
+        device = await run_sync(device_pool.get, req.serial_id)
         if device is None:
             return APIResponse(
                 code=1002, 
@@ -424,7 +416,7 @@ def find_elements(req: FindElementRequest):
                 trace_id=trace_id
             )
         
-        elements = device.find_elements(req.method, req.selector)
+        elements = await run_sync(device.find_elements, req.method, req.selector)
         if elements is None or len(elements) == 0:
             logging.info("no elements found")
             return APIResponse(
@@ -490,14 +482,14 @@ class CollectItemsRequest(BaseModel):
 
 
 @app.post("/collect_items", response_model=APIResponse)
-def collect_items(req: CollectItemsRequest):
+async def collect_items(req: CollectItemsRequest):
     """
     收集元素信息接口 - Web端ACTION_COLLECT_ITEM_INFO实现
     支持新协议JSON配置和老协议参数
     """
     trace_id = gen_trace_id()
     try:
-        device = device_pool.get(req.serial_id)
+        device = await run_sync(device_pool.get, req.serial_id)
         if device is None:
             return APIResponse(
                 code=1002, 
@@ -508,13 +500,11 @@ def collect_items(req: CollectItemsRequest):
         
         # 创建收集操作，支持新协议和老协议
         if req.config_json or req.config_file:
-            # 使用新协议JSON配置
             collect_op = CollectItemsOp(
                 config_json=req.config_json,
                 config_file=req.config_file
             )
         else:
-            # 使用老协议参数（向后兼容）
             collect_op = CollectItemsOp(
                 container_selector=req.container_selector,
                 item_selectors=req.item_selectors or {},
@@ -527,7 +517,7 @@ def collect_items(req: CollectItemsRequest):
             )
         
         # 执行收集操作
-        result = collect_op.execute(device)
+        result = await run_sync(collect_op.execute, device)
         
         if result:
             return APIResponse(
@@ -660,6 +650,45 @@ def cleanup_nodes():
 def health_check():
     """健康检查接口"""
     return {"status": "healthy", "timestamp": time.time()}
+
+@app.post("/mock_click", response_model=APIResponse)
+async def mock_click(req: ClickRequest):
+    delay = random.uniform(5, 30)
+    start = time.time()
+    logging.info(f"收到 mock_click 请求: {req.dict()}，模拟耗时 {delay:.2f} 秒")
+    await asyncio.sleep(delay)
+    end = time.time()
+    process_time = end - start
+    logging.info(f"mock_click 处理完成，delay={delay:.2f}，process_time={process_time:.2f}")
+    return APIResponse(
+        code=0,
+        message=f"模拟点击成功，耗时{delay:.2f}秒",
+        data={
+            "method": req.method,
+            "selector": req.selector,
+            "mock_delay": delay,
+            "process_time": process_time
+        }
+    )
+
+@app.post("/mock_find_element", response_model=APIResponse)
+async def mock_find_element(req: FindElementRequest):
+    delay = random.uniform(5, 30)
+    start = time.time()
+    logging.info(f"收到 mock_find_element 请求: {req.dict()}，模拟耗时 {delay:.2f} 秒")
+    await asyncio.sleep(delay)
+    end = time.time()
+    process_time = end - start
+    logging.info(f"mock_find_element 处理完成，delay={delay:.2f}，process_time={process_time:.2f}")
+    return APIResponse(
+        code=0,
+        message=f"模拟查找元素成功，耗时{delay:.2f}秒",
+        data={
+            "element": f"mock_element_{req.selector}",
+            "mock_delay": delay,
+            "process_time": process_time
+        }
+    )
 
 if __name__ == "__main__":
     serial_id = "172.16.1.125:6524"

@@ -13,7 +13,7 @@ if __name__ == "__main__":
     print(f"📍 调试模式: {settings.API_RELOAD}")
     
     uvicorn.run(
-        "server:app", 
+        "hybrid_driver.server:app", 
         host=settings.API_HOST, 
         port=settings.API_PORT, 
         reload=settings.API_RELOAD

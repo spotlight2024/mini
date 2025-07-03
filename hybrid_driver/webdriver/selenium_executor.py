@@ -24,6 +24,7 @@ from hybrid_driver.log_config import get_logger
 from hybrid_driver.operation import OperationItem, OperationSequence
 from hybrid_driver.webdriver.web_executor import WebExecutor
 from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
+from hybrid_driver.config.settings import settings
 
 # 获取logger实例
 logger = get_logger(__name__)
@@ -115,20 +116,31 @@ def connect_webdriver(serial_id: str) -> WebDriver:
 
     logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
 
-    path = ChromeDriverManager(driver_version=TEST_CONFIG["chrome_version"]).install()
-    logger.info(f"ChromeDriver 路径: {path}")
-
-    # 新版本chromedriver的文件名是THIRD_PARTY_NOTICES.chromedriver，需要替换为chromedriver
-    if 'THIRD_PARTY_NOTICES.chromedriver' in path:
-        path = path.replace('THIRD_PARTY_NOTICES.chromedriver', 'chromedriver')
-        logger.info(f"更新后的 ChromeDriver 路径: {path}")
-
-    service = ChromeService(executable_path=path)
-    driver = webdriver.Chrome(options=options, service=service)
-    driver.implicitly_wait(3)
-    logger.info(f"WebDriver 创建成功 serial_id={serial_id}")
-
-    return driver
+    if settings.WEBDRIVER_MODE == "remote":
+        # 远程 WebDriver
+        remote_url = settings.REMOTE_WEBDRIVER_URL
+        if not remote_url:
+            raise ValueError("REMOTE_WEBDRIVER_URL 未配置")
+        logger.info(f"使用 RemoteWebDriver: {remote_url}")
+        driver = webdriver.Remote(
+            command_executor=remote_url,
+            options=options
+        )
+        driver.implicitly_wait(3)
+        logger.info(f"RemoteWebDriver 创建成功 serial_id={serial_id}")
+        return driver
+    else:
+        # 本地 WebDriver
+        path = ChromeDriverManager(driver_version=TEST_CONFIG["chrome_version"]).install()
+        logger.info(f"ChromeDriver 路径: {path}")
+        if 'THIRD_PARTY_NOTICES.chromedriver' in path:
+            path = path.replace('THIRD_PARTY_NOTICES.chromedriver', 'chromedriver')
+            logger.info(f"更新后的 ChromeDriver 路径: {path}")
+        service = ChromeService(executable_path=path)
+        driver = webdriver.Chrome(options=options, service=service)
+        driver.implicitly_wait(3)
+        logger.info(f"WebDriver 创建成功 serial_id={serial_id}")
+        return driver
 
 
 class SeleniumWebExecutor(WebExecutor):
