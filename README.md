@@ -223,3 +223,75 @@ asyncio.get_event_loop().set_default_executor(executor)
    ```
 
 ---
+
+# Selenium Grid 4 Relay + Appium + Android WebView 自动化集群方案
+
+## 目录结构
+
+```
+mini/
+├── docker-compose.yml
+├── node-android-relay/
+│   ├── Dockerfile
+│   ├── entrypoint.sh
+│   └── .dockerignore
+```
+
+## 一、快速启动
+
+1. 构建 node-android-relay 镜像
+
+```bash
+cd node-android-relay
+sudo docker build -t node-android-relay:latest .
+```
+
+2. 启动集群（可通过 --scale 动态扩容 node-android）
+
+```bash
+cd ..
+sudo docker-compose up -d --scale node-android=2
+```
+
+3. 环境变量说明（每个 node-android 可单独指定）
+- `SERIAL_ID`：目标 Android 设备的 adb 地址（如 192.168.1.100:5555）
+- `BROWSER_VERSION`：WebView/Chrome 版本（如 128.0.6613.88）
+- `DEVICE_NAME`：设备名（如 Pixel_5）
+- `APPIUM_LOG_LEVEL`：Appium 日志级别（默认 debug）
+
+4. 业务端 capabilities 示例
+
+```python
+capabilities = {
+    "platformName": "Android",
+    "appium:automationName": "UiAutomator2",
+    "appium:deviceName": "Pixel_5",
+    "appium:udid": "192.168.1.100:5555",
+    "browserName": "chrome",
+    "browserVersion": "128.0.6613.88"
+}
+```
+
+- 连接 Hub 地址：`http://<宿主机IP>:4444/wd/hub`
+- Hub 会根据能力自动分配到合适的 node-android 容器
+
+5. 扩容/缩容/复用
+- 通过 `docker-compose up -d --scale node-android=N` 动态扩容/缩容
+- 每个 node-android 容器 session 结束后自动释放，可复用
+
+## 二、注意事项
+- 每个 node-android 容器建议只连一个设备，能力参数需与实际设备/浏览器版本一致
+- chromedriver 版本需与 WebView/Chrome 严格匹配（可在 Dockerfile 或运行时自动下载/覆盖）
+- 容器需有权限访问 /dev/bus/usb（物理设备）或 adb 端口（远程设备）
+
+## 三、能力声明与调度
+- node-android 容器通过 node.toml 动态声明能力，Hub 能力调度精准
+- 支持多种能力参数扩展，如 platformVersion、automationName 等
+
+## 四、常见问题排查
+- node 未注册到 Hub：检查网络、端口、环境变量、Appium/adb 启动日志
+- 设备未连接：检查 adb devices、物理连接或远程端口
+- chromedriver 版本不匹配：需与 WebView/Chrome 版本严格一致
+
+---
+如需多版本 chromedriver 自动管理、K8s 部署、CI/CD 集成等高级方案，请联系维护者。

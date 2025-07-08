@@ -292,7 +292,7 @@ class SpotLightMetrics:
             grid_status = {}
             try:
                 response = requests.get("http://selenium-hub:4444/wd/hub/status", timeout=5)
-                if response.status_code == 200:
+            if response.status_code == 200:
                     grid_status = response.json()
             except Exception as e:
                 logger.warning(f"无法获取Grid状态: {e}")
