@@ -5,9 +5,9 @@ port = 5555
 detect-drivers = false
 max-sessions = 1
 
-[events]
-publish = "tcp://selenium-hub:4442"
-subscribe = "tcp://selenium-hub:4443"
+# [events]
+# publish = "tcp://selenium-hub:4442"
+# subscribe = "tcp://selenium-hub:4443"
 
 [[node.driver-configuration]]
 display-name = "ChromeDriver"

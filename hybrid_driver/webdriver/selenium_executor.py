@@ -449,7 +449,7 @@ def connect_remote_local():
     logger.info(f"page : {driver.page_source}")
 
 def connect_remote():
-    serial_id = "123.57.217.143:6569"
+    serial_id = "123.57.217.143:6568"
     logger.info(f"开始创建 WebDriver serial_id={serial_id}")
     options = ChromeOptions()
 

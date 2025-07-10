@@ -1,0 +1,6 @@
+[sessions]
+# 会话配置
+map = [
+  # 动态映射: se:serial_id -> TARGET_SERIAL_ID 环境变量
+  "se:serial_id=TARGET_SERIAL_ID"
+] 

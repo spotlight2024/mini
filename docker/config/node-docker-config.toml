@@ -1,0 +1,21 @@
+[node]
+# Node配置 - 控制会话数量
+detect-drivers = false
+max-sessions = 1
+
+[[node.driver-configuration]]
+display-name = "ChromeDriver"
+stereotype = "{\"browserName\": \"firefox\", \"browserVersion\": \"128.0.6613.88\", \"platformName\": \"Linux\"}"
+webdriver-executable = "/opt/chromedriver/chromedriver"
+
+[docker]
+# Docker镜像和capability映射配置
+configs = [
+    "selenium-chrome-node-128", '{"browserName": "chrome","browserVersion": "128.0.6613.88","platformName": "android"}'
+]
+
+# 共享配置选项
+host-config-keys = ["Dns", "DnsOptions", "DnsSearch", "ExtraHosts", "Binds"]
+
+# Docker daemon连接地址 - 容器内部通过socat转发
+url = "http://127.0.0.1:2375"
