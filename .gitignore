@@ -45,3 +45,14 @@ logs/
 
 # 覆盖性强的忽略项
 # 请根据实际需要增删 
+
+# Docker镜像文件
+*.tar
+*.tar.gz
+*.tar.bz2
+*.zip
+
+# 大文件
+*.tar
+selenium-hub-*.tar
+python-*.tar 

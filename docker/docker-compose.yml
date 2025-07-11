@@ -1,0 +1,59 @@
+services:
+  selenium-hub:
+    image: selenium/hub:4.33.0-20250606
+    container_name: selenium-hub
+    ports:
+      - "4444:4444"
+    environment:
+      - GRID_BROWSER_TIMEOUT=300
+      - GRID_TIMEOUT=300
+    networks:
+      - selenium-grid
+  chromedriver-node:
+    build:
+      context: .
+      dockerfile: node/Dockerfile.chromedriver-node
+    container_name: chromedriver-node
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SELENIUM_HUB_HOST=selenium-hub
+      - SELENIUM_HUB_PORT=4444
+      - NODE_PORT=5555
+      - MAX_SESSIONS=1
+      # - ANDROID_DEVICES=192.168.1.100:5555,192.168.1.101:5555
+      # - REMOTE_ADB_POLLING_SEC=60
+    volumes:
+      # 如果需要共享 Android 设备授权
+      # - ~/.android:/home/seluser/.android:ro
+      # 如果需要访问本地 USB 设备
+      - /dev/bus/usb:/dev/bus/usb
+      # - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    networks:
+      - selenium-grid
+    restart: unless-stopped
+    # 如果需要访问 USB 设备，取消注释以下行
+    # privileged: true  
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: always
+    ports:
+      - "9000:9443"
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - selenium-grid
+
+networks:
+  selenium-grid:
+    driver: bridge 
+
+volumes:
+  portainer_data: 

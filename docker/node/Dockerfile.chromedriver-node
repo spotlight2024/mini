@@ -1,0 +1,84 @@
+FROM selenium/node-base:4.33.0-20250606
+
+USER root
+
+#==================
+# 安装基础依赖包
+#------------------
+# ca-certificates - SSL 客户端
+# curl - 数据传输工具
+# wget - 网络下载工具
+# unzip - 解压工具
+# adb - Android Debug Bridge
+# xvfb - X virtual framebuffer
+# fonts-liberation - 字体库
+#==================
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    wget \
+    unzip \
+    android-tools-adb \
+    xvfb \
+    fonts-liberation \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+#==================
+# 注意：此节点仅安装 ChromeDriver，不安装 Chrome 浏览器
+# 主要用于 Android WebView 和远程 Chrome 实例的自动化测试
+#==================
+
+#==================
+# 使用本地 ChromeDriver 文件
+#==================
+ENV CHROMEDRIVER_VERSION=128.0.6613.0
+RUN mkdir -p /opt/chromedriver
+COPY node/chromedriver-128/chromedriver /opt/chromedriver/chromedriver
+RUN chmod +x /opt/chromedriver/chromedriver
+
+#==================
+# 设置环境变量
+#==================
+ENV PATH="/opt/chromedriver:${PATH}"
+ENV DISPLAY=:99
+ENV CHROMEDRIVER_BIN=/opt/chromedriver/chromedriver
+
+#==================
+# 创建必要的目录和权限
+#==================
+RUN mkdir -p /tmp/.X11-unix \
+    && chmod 1777 /tmp/.X11-unix \
+    && mkdir -p /home/seluser/.android \
+    && chown -R seluser:seluser /home/seluser/.android
+
+#==================
+# 复制配置文件
+#==================
+COPY node/node_config/chromedriver-node.toml /opt/selenium/chromedriver-node.toml
+
+#==================
+# 切换到 selenium 用户
+#==================
+USER seluser
+
+#==================
+# 设置工作目录
+#==================
+WORKDIR /home/seluser
+
+#==================
+# 健康检查
+#==================
+HEALTHCHECK --interval=15s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -sSL http://localhost:5555/status || exit 1
+
+#==================
+# 启动脚本
+#==================
+COPY node/chromedriver-entrypoint.sh /opt/bin/chromedriver-entrypoint.sh
+USER root
+RUN chmod +x /opt/bin/chromedriver-entrypoint.sh
+USER seluser
+
+ENTRYPOINT ["/opt/bin/chromedriver-entrypoint.sh"] 

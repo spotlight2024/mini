@@ -57,22 +57,30 @@ class AppiumExecutor:
         self.driver.quit()
 
 if __name__ == "__main__":
+    # 这些是您希望在哪个节点上运行测试的“要求”。
+    # Selenium Grid 会将这些要求与注册上来节点（在 appium-node.toml 中定义）的
+    # 能力(stereotype)进行匹配。
     capabilities = {
         "platformName": "Android",
-        "deviceName": "172.16.1.125:6556",
-        "appPackage": "com.tencent.mm",
-        "appActivity": "com.tencent.mm/.plugin.appbrand.ui.AppBrandUI00",
-        "noReset": True,
-        "unicodeKeyboard": True,
-        "resetKeyboard": True,
-        "killUiAutomatorOnDevice": True,
-        "chromeOptions": {
+        # 以下为 Appium 特有的 capabilities，推荐使用 'appium:' 前缀
+        "appium:automationName": "UiAutomator2",
+        "appium:deviceName": "172.16.1.125:6556",
+        "appium:appPackage": "com.tencent.mm",
+        "appium:appActivity": "com.tencent.mm/.plugin.appbrand.ui.AppBrandUI00",
+        "appium:noReset": True,
+        "appium:unicodeKeyboard": True,
+        "appium:resetKeyboard": True,
+        "appium:autoGrantPermissions": True,
+        "appium:chromeOptions": {
             "androidProcess": "com.tencent.mm:appbrand0"
-        },
-        "autoGrantPermissions": True,
-        "chromedriverExecutable": "/Users/gongcong/.wdm/drivers/chromedriver/mac64/134.0.6998.136/chromedriver-mac-arm64/chromedriver"
+        }
+        # 不再需要硬编码 chromedriver 的路径
+        # "chromedriverExecutable": "..."
     }
-    appium_server_url = "http://localhost:4723"
+
+    # 将 command_executor 指向 Selenium Grid Hub 的地址
+    # 您的所有请求都将发送到这里，由 Hub 负责分发
+    appium_server_url = "http://localhost:4444"
 
     executor = AppiumExecutor(appium_server_url, capabilities)
     try:

@@ -27,6 +27,8 @@ class Settings:
     APPIUM_TIMEOUT: int = int(os.getenv("APPIUM_TIMEOUT", "30"))
     CHROME_DRIVER_PATH: Optional[str] = os.getenv("CHROME_DRIVER_PATH")
     APPIUM_SERVER_URL: str = os.getenv("APPIUM_SERVER_URL", "http://localhost:4723")
+    WEBDRIVER_MODE: str = os.getenv("WEBDRIVER_MODE", "local")  # 可选值：'local' 或 'remote'
+    REMOTE_WEBDRIVER_URL: Optional[str] = os.getenv("REMOTE_WEBDRIVER_URL")
     
     # 设备池配置
     MAX_DEVICES: int = int(os.getenv("MAX_DEVICES", "10"))

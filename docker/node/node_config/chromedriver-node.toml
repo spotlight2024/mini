@@ -1,0 +1,15 @@
+[server]
+port = 5555
+
+[node]
+detect-drivers = false
+max-sessions = 1
+
+[events]
+publish = "tcp://selenium-hub:4442"
+subscribe = "tcp://selenium-hub:4443"
+
+[[node.driver-configuration]]
+display-name = "ChromeDriver"
+stereotype = "{\"browserName\": \"chrome\", \"browserVersion\": \"128.0.6613.88\", \"platformName\": \"android\"}"
+webdriver-executable = "/opt/chromedriver/chromedriver"
