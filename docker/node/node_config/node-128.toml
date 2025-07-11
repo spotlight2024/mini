@@ -1,8 +1,0 @@
-[node]
-detect-drivers = false
-
-[[node.driver-configuration]]
-max-sessions = 1
-display-name = "ChromeDriver 128"
-stereotype = "{\"browserName\": \"android webdriver\", \"browserVersion\": \"128.0.6613.88\", \"platformName\": \"android\"}"
-webdriver-executable = "/opt/chromedriver/chromedriver" 

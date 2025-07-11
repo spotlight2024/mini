@@ -449,7 +449,7 @@ def connect_remote_local():
     logger.info(f"page : {driver.page_source}")
 
 def connect_remote():
-    serial_id = "123.57.217.143:6568"
+    serial_id = "172.16.1.128:6570"
     logger.info(f"开始创建 WebDriver serial_id={serial_id}")
     options = ChromeOptions()
 
@@ -464,9 +464,9 @@ def connect_remote():
     options.add_experimental_option("androidUseRunningApp", True)
     # options.add_experimental_option('androidDeviceSerial', serial_id)
     options.add_experimental_option("androidProcess", "mark.via")
-    options.set_capability("browserVersion", "128.0.6613.88")
+    options.set_capability("browserVersion", "128.0.6613.00")
     options.set_capability("platformName", "android")
-    options.set_capability("se:serial_id", serial_id)
+    # options.set_capability("se:serial_id", serial_id)
 
     logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
 

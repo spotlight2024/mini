@@ -1,3 +1,8 @@
+# [logging]
+# # 在 Hub 的配置文件中明确启用 tracing，
+# # 这将覆盖程序的默认行为，并解决与环境变量的冲突。
+# tracing = true
+
 [sessions]
 # 会话配置
 map = [

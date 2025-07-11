@@ -3,7 +3,7 @@ services:
   # Selenium Hub
   #==================
   selenium-hub:
-    image: selenium/hub:4.33.0-20250606
+    image: selenium/hub:latest
     container_name: selenium-hub
     ports:
       - "4442:4442"
@@ -11,46 +11,38 @@ services:
       - "4444:4444"
     environment:
       # - SE_LOG_LEVEL=DEBUG
-      - SE_NODE_SESSION_TIMEOUT=10
+      - SE_NODE_SESSION_TIMEOUT=100
       - SE_SESSION_REQUEST_TIMEOUT=30
       - SE_ENABLE_TRACING=true
-    volumes:
-      # 挂载Hub配置文件
-      - ./config/grid-config.toml:/opt/selenium/config.toml:ro
+      - SE_LOG_LEVEL=DEBUG
+    # volumes:
+    #   # 挂载Hub配置文件
+    #   - ./config/grid-config.toml:/opt/selenium/config.toml:ro
     networks:
       - selenium-grid
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4444/status"]
-      interval: 15s
-      timeout: 10s
-      retries: 3
 
   #==================
   # Node-Docker (直接使用宿主机Docker)
   #==================
   node-docker:
-    image: selenium/node-docker:4.33.0-20250606
+    image: selenium/node-docker:latest
     container_name: selenium-node-docker
     environment:
       - SE_EVENT_BUS_HOST=selenium-hub
       - SE_EVENT_BUS_PUBLISH_PORT=4442
       - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
-      - SE_ENABLE_TRACING=true
+      - SE_NODE_DOCKER_CONFIG_FILENAME=docker.toml 
+      # - SE_ENABLE_TRACING=true
       # - SE_LOG_LEVEL=DEBUG
     volumes:
+      - ./assets:/opt/selenium/assets
       - /var/run/docker.sock:/var/run/docker.sock
-      # 挂载Node-Docker配置文件，覆盖默认的docker.toml
-      - ./config/node-docker-config.toml:/opt/selenium/docker.toml:ro
+      - ./config/node-docker-config.toml:/opt/selenium/docker.toml
     privileged: true
     depends_on:
       - selenium-hub
     networks:
       - selenium-grid
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4444/status"]
-      interval: 15s
-      timeout: 10s
-      retries: 3
 
   #==================
   # Portainer (可选 - Docker管理界面)
@@ -73,9 +65,6 @@ services:
 networks:
   selenium-grid:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
 
 #==================
 # 数据卷

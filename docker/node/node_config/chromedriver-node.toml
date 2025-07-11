@@ -5,11 +5,15 @@ port = 5555
 detect-drivers = false
 max-sessions = 1
 
-# [events]
-# publish = "tcp://selenium-hub:4442"
-# subscribe = "tcp://selenium-hub:4443"
-
 [[node.driver-configuration]]
 display-name = "ChromeDriver"
 stereotype = "{\"browserName\": \"chrome\", \"browserVersion\": \"128.0.6613.88\", \"platformName\": \"android\"}"
 webdriver-executable = "/opt/chromedriver/chromedriver"
+
+# 根据 Selenium 官方文档，Event Bus 的配置应在此 section 中
+[events]
+# 节点作为客户端，连接到 Hub 的 Event Bus，因此必须指定 Hub 的主机名
+publish-events = "tcp://selenium-hub:4442"
+subscribe-events = "tcp://selenium-hub:4443"
+# 明确告知此组件是连接到 Bus，而不是自己启动一个 Bus
+bind-bus = false
