@@ -449,23 +449,24 @@ def connect_remote_local():
     logger.info(f"page : {driver.page_source}")
 
 def connect_remote():
-    serial_id = "172.16.1.128:6570"
+    serial_id = "123.56.152.41:6529"
     logger.info(f"开始创建 WebDriver serial_id={serial_id}")
     options = ChromeOptions()
 
     # # WebView专用配置
     options.enable_mobile(
-        android_package="mark.via",
+        android_package="com.tencent.mm",
         device_serial=serial_id,
-        android_activity="mark.via.Shell"
+        android_activity="com.tencent.mm"
     )
     #
     # 添加WebView专用选项
     options.add_experimental_option("androidUseRunningApp", True)
     # options.add_experimental_option('androidDeviceSerial', serial_id)
-    options.add_experimental_option("androidProcess", "mark.via")
-    options.set_capability("browserVersion", "128.0.6613.00")
-    options.set_capability("platformName", "android")
+    options.add_experimental_option("androidProcess", "com.tencent.mm:appbrand0")
+    options.set_capability("browserVersion", "128")
+    options.set_capability("platformName", "Android")
+    options.set_capability("browserName","chrome")
     # options.set_capability("se:serial_id", serial_id)
 
     logger.info(f"Chrome 选项配置: {options.to_capabilities()}")

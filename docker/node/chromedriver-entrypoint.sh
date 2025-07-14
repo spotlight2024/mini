@@ -40,7 +40,7 @@ if [ "$ENABLE_ADB" = "true" ] || [ "$REMOTE_ADB" = "true" ]; then
     
     # 创建 ADB 配置目录
     mkdir -p ~/.android
-    adb connect "172.16.1.128:6570"
+    adb connect "123.56.152.41:6529"
     log "已连接的设备列表1111:"
     adb devices
     # if [ "$REMOTE_ADB" = "true" ] && [ -n "$ANDROID_DEVICES" ]; then
@@ -128,6 +128,6 @@ log "最大会话数: $MAX_SESSIONS"
 # =========================================================================
 exec java -jar /opt/selenium/selenium-server.jar node \
   --config "$NODE_CONFIG_PATH" \
-  --publish-events "tcp://selenium-hub:4442" \
-  --subscribe-events "tcp://selenium-hub:4443" \
+  --publish-events "tcp://172.16.1.129:4442" \
+  --subscribe-events "tcp://172.16.1.129:4443" \
   --bind-bus false
