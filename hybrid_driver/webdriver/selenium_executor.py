@@ -462,10 +462,10 @@ def connect_remote():
     #
     # 添加WebView专用选项
     options.add_experimental_option("androidUseRunningApp", True)
-    # options.add_experimental_option('androidDeviceSerial', serial_id)
+    options.add_experimental_option('androidDeviceSerial', serial_id)
     options.add_experimental_option("androidProcess", "com.tencent.mm:appbrand0")
-    options.set_capability("browserVersion", "128")
-    options.set_capability("platformName", "Android")
+    options.set_capability("browserVersion", "137")
+    options.set_capability("platformName", "linux")
     options.set_capability("browserName","chrome")
     # options.set_capability("se:serial_id", serial_id)
 

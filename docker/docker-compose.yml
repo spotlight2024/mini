@@ -38,6 +38,8 @@ services:
       - ./assets:/opt/selenium/assets
       - /var/run/docker.sock:/var/run/docker.sock
       - ./config/node-docker-config.toml:/opt/selenium/docker.toml
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
     privileged: true
     depends_on:
       - selenium-hub

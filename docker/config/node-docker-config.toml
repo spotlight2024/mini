@@ -11,7 +11,9 @@ max-sessions = 3
 [docker]
 # Docker镜像和capability映射配置
 configs = [
-    "selenium-chrome-node-128", '{"browserName": "chrome","browserVersion": "128","platformName": "android"}'
+    # "selenium/standalone-chrome:137.0-chromedriver-137.0-grid-4.34.0-20250707", '{"browserName": "chrome","browserVersion": "137","platformName": "linux"}'
+    "custom-selenium-chrome", '{"browserName": "chrome","browserVersion": "137","platformName": "linux"}'
+
 ]
 
 # 容器环境变量 - 优化启动和端口配置
