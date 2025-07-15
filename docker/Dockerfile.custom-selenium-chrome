@@ -1,0 +1,65 @@
+FROM selenium/standalone-chrome:134.0-chromedriver-134.0-grid-4.34.0-20250707
+
+# 设置工作目录
+WORKDIR /opt/scripts
+
+# 切换到root用户进行安装和配置
+USER root
+
+# 安装必要的工具
+RUN apt-get update && apt-get install -y \
+    wget \
+    curl \
+    unzip \
+    ca-certificates \
+    vim \
+    adb \
+    android-tools-adb \
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建脚本目录
+RUN mkdir -p /opt/scripts /opt/custom-scripts /opt/adb
+
+# 创建 ADB 配置目录
+RUN mkdir -p /root/.android
+
+# 复制自定义脚本到镜像
+COPY ./scripts/custom_startup.sh /opt/custom-scripts/
+COPY ./scripts/adb_init.sh /opt/custom-scripts/
+RUN chmod +x /opt/custom-scripts/custom_startup.sh /opt/custom-scripts/adb_init.sh
+
+# 创建启动脚本包装器
+RUN echo '#!/bin/bash' > /opt/bin/custom-entrypoint.sh && \
+    echo 'set -e' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'echo "=== 自定义 Selenium Chrome 容器启动 ==="' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'echo "容器启动时间: $(date)"' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'echo "当前进程ID: $$"' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'echo "传入的参数: $@"' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'echo "执行阶段: 1. 自定义启动脚本包装器开始"' >> /opt/bin/custom-entrypoint.sh && \
+    echo '' >> /opt/bin/custom-entrypoint.sh && \
+    echo '# 执行自定义启动脚本，并传递所有参数' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'if [ -f /opt/custom-scripts/custom_startup.sh ]; then' >> /opt/bin/custom-entrypoint.sh && \
+    echo '    echo "执行阶段: 2. 调用自定义启动脚本..."' >> /opt/bin/custom-entrypoint.sh && \
+    echo '    /opt/custom-scripts/custom_startup.sh "$@"' >> /opt/bin/custom-entrypoint.sh && \
+    echo '    echo "执行阶段: 3. 自定义启动脚本执行完成"' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'else' >> /opt/bin/custom-entrypoint.sh && \
+    echo '    echo "警告: 自定义启动脚本不存在: /opt/custom-scripts/custom_startup.sh"' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'fi' >> /opt/bin/custom-entrypoint.sh && \
+    echo '' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'echo "执行阶段: 4. 启动原始 Selenium Chrome 服务..."' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'echo "即将执行: exec /opt/bin/entry_point.sh $@"' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'echo "注意: exec 将替换当前进程，后续日志将由 Selenium 服务输出"' >> /opt/bin/custom-entrypoint.sh && \
+    echo 'exec /opt/bin/entry_point.sh "$@"' >> /opt/bin/custom-entrypoint.sh
+
+# 设置脚本权限
+RUN chmod +x /opt/bin/custom-entrypoint.sh
+
+# 切换回selenium用户
+USER 1200
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:4444/status || exit 1
+
+# 使用自定义启动脚本
+ENTRYPOINT ["/opt/bin/custom-entrypoint.sh"] 

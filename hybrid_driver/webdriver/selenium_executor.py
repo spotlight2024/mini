@@ -417,7 +417,7 @@ def lucky_login():
     ]
 
 def connect_remote_local():
-    serial_id = "172.16.1.125:6524"
+    serial_id = "172.16.1.125:6569"
     logger.info(f"开始创建 WebDriver serial_id={serial_id}")
     options = ChromeOptions()
 
@@ -449,46 +449,30 @@ def connect_remote_local():
     logger.info(f"page : {driver.page_source}")
 
 def connect_remote():
-    serial_id = "123.57.217.143:6528"
+    serial_id = "123.56.152.41:6529"
     logger.info(f"开始创建 WebDriver serial_id={serial_id}")
     options = ChromeOptions()
 
     # # WebView专用配置
     options.enable_mobile(
-        android_package="mark.via",
+        android_package="com.tencent.mm",
         device_serial=serial_id,
-        android_activity="mark.via.Shell"
+        android_activity="com.tencent.mm"
     )
     #
     # 添加WebView专用选项
     options.add_experimental_option("androidUseRunningApp", True)
-    # options.add_experimental_option('androidDeviceSerial', serial_id)
-    options.add_experimental_option("androidProcess", "mark.via")
-    options.set_capability("browserVersion", "128.0.6613.88")
-
-    # adbutils.adb.device().shell("")
-
-    # options.debugger_address = "localhost:9221"
-    # options.add_experimental_option("mobileEmulation", "mobile_emulation")
-
-    # Chrome选项
-    # options.add_argument("--no-sandbox")
-    # options.add_argument("--disable-dev-shm-usage")
-    # options.add_argument("--disable-web-security")
-    # options.add_argument("--allow-running-insecure-content")
-    
-    # 调试选项（可选）
-    # options.debugger_address = "localhost:9222"
-
-    # 设置浏览器版本
-    # capabilities = options.to_capabilities()
-    # capabilities["browserVersion"] = "128.0.6613.88"
-    # capabilities["platformName"] = "android"
+    options.add_experimental_option('androidDeviceSerial', serial_id)
+    options.add_experimental_option("androidProcess", "com.tencent.mm:appbrand0")
+    options.set_capability("browserVersion", "134")
+    options.set_capability("platformName", "linux")
+    options.set_capability("browserName","chrome")
+    # options.set_capability("se:serial_id", serial_id)
 
     logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
 
     # 连接到WebView节点
-    remote_url = "http://localhost:9222/wd/hub"
+    remote_url = "http://172.16.1.129:4444/wd/hub"
     if not remote_url:
         raise ValueError("REMOTE_WEBDRIVER_URL 未配置")
     
@@ -502,24 +486,6 @@ def connect_remote():
         )
         driver.implicitly_wait(3)
         logger.info(f"RemoteWebDriver 创建成功 serial_id={serial_id}")
-
-
-        # pid = read_chromedriver_log_and_extract_port()
-        # logger.info(f"<UNK> WebDriver <UNK> pid ={pid}")
-
-        # local = f"tcp:${pid}"
-        # remote = "localabstract:webview_devtools_remote_9560"
-
-        # for forward in adbutils.adb.forward_list():
-        #     logger.info(f"<UNK> <UNK> before forward {forward}")
-
-        # time.sleep(10)
-
-        logger.info(f"<UNK> wake up")
-        # result =  adbutils.device().forward(local, remote, norebind=True)
-        # logger.info(f"<UNK> WebDriver <UNK> result ={result}")
-        # for forward in adbutils.adb.forward_list():
-        #     logger.info(f"<UNK> <UNK> after forward {forward}")
         
         # 获取页面信息
         current_url = driver.current_url
@@ -546,6 +512,6 @@ def connect_remote():
 
 
 if __name__ == "__main__":
-    #main()
+    # main()
     connect_remote()
     

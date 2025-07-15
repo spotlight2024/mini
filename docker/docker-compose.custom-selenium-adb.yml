@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  custom-selenium-chrome-adb:
+    build:
+      context: .
+      dockerfile: Dockerfile.custom-selenium-chrome
+    container_name: custom-selenium-chrome-adb
+    ports:
+      - "4444:4444"  # Selenium WebDriver 端口
+      - "7900:7900"  # VNC 端口（如果需要远程桌面访问）
+      - "5037:5037"  # ADB 端口
+    environment:
+      # Selenium 环境变量
+      - SE_NODE_MAX_SESSIONS=4
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      - SE_NODE_SESSION_TIMEOUT=300
+      - SE_NODE_REGISTER_CYCLE=10000
+      - SE_NODE_REGISTER_PERIOD=10000
+      
+      # 自定义环境变量
+      - CUSTOM_MODE=production
+      - CUSTOM_TIMEOUT=60
+      - CUSTOM_LOG_LEVEL=INFO
+      
+      # ADB 相关环境变量
+      - ADB_DEVICE_IP=  # 可以设置为具体的设备 IP
+      
+      # Chrome 相关环境变量
+      - CHROME_ARGS=--no-sandbox,--disable-dev-shm-usage,--disable-gpu
+      - SE_CHROME_ARGS=--no-sandbox,--disable-dev-shm-usage,--disable-gpu
+    volumes:
+      # 挂载日志目录到宿主机
+      - ./logs:/opt/scripts/logs
+      # 挂载 ADB 配置目录
+      - ./adb_config:/root/.android
+    devices:
+      # 如果需要访问 USB 设备，可以挂载 USB 设备
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true  # 需要特权模式来访问 USB 设备
+    shm_size: 2gb
+    restart: unless-stopped
+    
+    # 启动时传递参数给自定义脚本
+    command: 
+      - "--mode"
+      - "production"
+      - "--timeout"
+      - "60"
+      - "--log-level"
+      - "INFO"
+
+  # 调试模式实例
+  custom-selenium-chrome-adb-debug:
+    build:
+      context: .
+      dockerfile: Dockerfile.custom-selenium-chrome
+    container_name: custom-selenium-chrome-adb-debug
+    ports:
+      - "4445:4444"  # 使用不同的端口
+      - "7901:7900"  # VNC 端口
+      - "5038:5037"  # ADB 端口（调试实例）
+    environment:
+      - SE_NODE_MAX_SESSIONS=2
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      - SE_NODE_SESSION_TIMEOUT=600
+      - CUSTOM_MODE=debug
+      - CUSTOM_TIMEOUT=120
+      - CUSTOM_LOG_LEVEL=DEBUG
+      - ADB_DEVICE_IP=  # 可以设置为具体的设备 IP
+    volumes:
+      - ./logs:/opt/scripts/logs
+      - ./adb_config:/root/.android
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true
+    shm_size: 2gb
+    restart: unless-stopped
+    
+    # 调试模式参数
+    command: 
+      - "--mode"
+      - "debug"
+      - "--timeout"
+      - "120"
+      - "--log-level"
+      - "DEBUG"
+
+networks:
+  default:
+    name: custom-selenium-adb-network 

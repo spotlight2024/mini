@@ -1,0 +1,44 @@
+[node]
+# Node配置 - 控制会话数量
+detect-drivers = false
+max-sessions = 3
+
+# [[node.driver-configuration]]
+# display-name = "ChromeDriver"
+# stereotype = "{\"browserName\": \"chrome\", \"browserVersion\": \"128.0.6613.00\", \"platformName\": \"android\"}"
+# webdriver-executable = "/opt/chromedriver/chromedriver"
+
+[docker]
+# Docker镜像和capability映射配置
+configs = [
+    # "selenium/standalone-chrome:137.0-chromedriver-137.0-grid-4.34.0-20250707", '{"browserName": "chrome","browserVersion": "137","platformName": "linux"}'
+    "custom-selenium-chrome", '{"browserName": "chrome","browserVersion": "134","platformName": "linux"}'
+
+]
+
+# 容器环境变量 - 优化启动和端口配置
+# 我们已经将 Event Bus 配置内置到 chromedriver-node 镜像中，
+# 因此不再需要从这里注入，以避免配置冲突。
+# environment = [
+#     "SE_START_XVFB=false",
+#     "SE_START_VNC=false",
+#     "SE_START_NO_VNC=false",
+#     "SE_EVENT_BUS_HOST=172.16.1.129",
+#     "SE_EVENT_BUS_PUBLISH_PORT=4442",
+#     "SE_EVENT_BUS_SUBSCRIBE_PORT=4443"
+# ]
+
+network = "selenium-grid"
+
+# 容器生命周期管理 - 自动清理配置
+video = false
+assets-path = "/tmp/assets"
+
+# 容器终止配置 - 延长清理时间以便调试
+terminate-duration = "PT30S"
+
+# 共享配置选项
+host-config-keys = ["Dns", "DnsOptions", "DnsSearch", "ExtraHosts", "Binds"]
+
+# Docker daemon连接地址 - 容器内部通过socat转发
+url = "http://127.0.0.1:2375"
