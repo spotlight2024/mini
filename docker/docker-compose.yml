@@ -12,7 +12,7 @@ services:
     environment:
       # - SE_LOG_LEVEL=DEBUG
       - SE_NODE_SESSION_TIMEOUT=100
-      - SE_SESSION_REQUEST_TIMEOUT=300
+      - SE_SESSION_REQUEST_TIMEOUT=30
       - SE_ENABLE_TRACING=true
       - SE_LOG_LEVEL=DEBUG
     # volumes:
