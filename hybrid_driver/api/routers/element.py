@@ -2,8 +2,8 @@ import logging
 from fastapi import APIRouter
 
 from hybrid_driver.api.models import (
-    FindElementRequest, ClickRequest, APIResponse, 
-    OperationRequest, OperationItem
+    FindElementRequest, ClickRequest, APIResponse,
+    OperationRequest, OperationItem, RunScript
 )
 from hybrid_driver.device_pool import DevicePool
 from hybrid_driver.operation import OperationSequence, build_operations
@@ -236,4 +236,9 @@ async def run_operations(req: OperationRequest):
     ops = build_operations([op.model_dump() for op in req.operations])
     seq = OperationSequence(ops)
     results = await run_sync(seq.execute, device)
-    return APIResponse(code=0, message="success", data={"results": results}, trace_id=trace_id) 
+    return APIResponse(code=0, message="success", data={"results": results}, trace_id=trace_id)
+
+
+@router.post("/run_script",response_model=APIResponse)
+async def run_script(req: RunScript):
+    pass

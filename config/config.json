@@ -1,0 +1,81 @@
+{
+  "api": {
+    "host": "0.0.0.0",
+    "port": 8002,
+    "reload": true,
+    "workers": 1,
+    "title": "SpotLight Hybrid Driver API",
+    "description": "混合驱动自动化测试API服务",
+    "version": "1.0.0"
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "logs/hybrid_driver.log",
+    "max_size": "10MB",
+    "backup_count": 5,
+    "enable_console": true,
+    "enable_file": true
+  },
+  "webdriver": {
+    "selenium_timeout": 30,
+    "appium_timeout": 30,
+    "chrome_driver_path": null,
+    "chrome_driver_version": null,
+    "chrome_driver_download_url": null,
+    "appium_server_url": "http://localhost:4723",
+    "webdriver_mode": "local",
+    "remote_webdriver_url": null,
+    "selenium_hub_host": "selenium-hub",
+    "selenium_hub_publish_port": 4442,
+    "selenium_hub_subscribe_port": 4443,
+    "selenium_node_count": 2,
+    "selenium_node_max_sessions": 4,
+    "selenium_node_session_timeout": 300
+  },
+  "device_pool": {
+    "max_devices": 10,
+    "cleanup_interval": 300,
+    "device_timeout": 60,
+    "device_connection_retry": 3,
+    "device_connection_retry_delay": 5
+  },
+  "operation": {
+    "default_timeout": 10,
+    "default_wait": 5,
+    "element_wait_timeout": 10,
+    "page_load_timeout": 30,
+    "script_timeout": 30
+  },
+  "thread_pool": {
+    "max_workers": 100,
+    "min_workers": 10
+  },
+  "connection_pool": {
+    "max_connections": 3,
+    "max_idle_time": 300
+  },
+  "network": {
+    "name": "spotlight-network",
+    "timeout": 30
+  },
+  "certificates": {
+    "install_certificates": false
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 300,
+    "max_size": 1000
+  },
+  "monitoring": {
+    "metrics_enabled": true,
+    "metrics_interval": 60,
+    "auto_scale_enabled": false
+  },
+  "security": {
+    "cors_enabled": true,
+    "cors_origins": ["*"],
+    "api_key_enabled": false,
+    "api_key_header": "X-API-Key"
+  }
+} 

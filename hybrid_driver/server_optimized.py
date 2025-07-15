@@ -23,7 +23,6 @@ auto_scaler.start_monitoring()
 
 logger = get_logger(__name__)
 
-
 # 注册路由
 app.include_router(device.router)
 app.include_router(element.router)
@@ -56,10 +55,9 @@ if __name__ == "__main__":
         # 等待连接操作完成
         from hybrid_driver.api.models import ConnectRequest
         from hybrid_driver.api.routers.device import connect
-        
-        await connect(ConnectRequest(serial_id=serial_id))
-        logger.debug("test")
-        
+
+        await connect(ConnectRequest(serial_id=serial_id, user_id="10"))
+
         # switch to current page
         device = await asyncio.get_event_loop().run_in_executor(
             None, device_pool.get, serial_id
@@ -67,7 +65,7 @@ if __name__ == "__main__":
         if device is None:
             logger.error("设备未找到")
             return
-            
+
         # 获取可见页面并切换
         driver = device.driver
         if driver is None:
@@ -83,6 +81,7 @@ if __name__ == "__main__":
             logger.info(f"成功切换到页面: {pages[0].handle}")
         else:
             logger.warning("没有找到可见页面")
-    
+
+
     # 运行异步主函数
-    asyncio.run(main()) 
+    asyncio.run(main())

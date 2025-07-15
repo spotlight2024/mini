@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 class ConnectRequest(BaseModel):
     serial_id: str
+    user_id: str
 
 
 class DisconnectRequest(BaseModel):
@@ -75,4 +76,17 @@ class CollectItemsRequest(BaseModel):
     package_name: Optional[str] = None
     # 新增：支持新协议JSON配置
     config_json: Optional[str] = None
-    config_file: Optional[str] = None 
+    config_file: Optional[str] = None
+
+class RunScript(BaseModel):
+    serial_id: str
+    script: str
+    timeout: Optional[int] = 10
+    wait_for_new_window: Optional[bool] = False
+
+
+class GetTextRequest(BaseModel):
+    serial_id: str
+    method: str
+    selector: str
+    timeout: Optional[int] = 10

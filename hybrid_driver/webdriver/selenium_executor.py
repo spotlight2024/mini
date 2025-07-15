@@ -116,6 +116,10 @@ def connect_webdriver(serial_id: str) -> WebDriver:
     options.add_experimental_option("androidUseRunningApp", True)
     options.add_experimental_option("androidProcess", TEST_CONFIG["android_process"])
 
+    options.set_capability("browserVersion", "134")
+    options.set_capability("platformName", "linux")
+    options.set_capability("browserName","chrome")
+
     logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
 
     if settings.WEBDRIVER_MODE == "remote":
