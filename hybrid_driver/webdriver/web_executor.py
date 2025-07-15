@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
@@ -27,7 +27,7 @@ class WebExecutor(ABC):
         pass
 
     @abstractmethod
-    def find_elements(self, by: str, value: str) -> Optional[list[WebElement]]:
+    def find_elements(self, by: str, value: str) -> Optional[List[WebElement]]:
         """查找元素"""
         pass
 
@@ -73,4 +73,9 @@ class WebExecutor(ABC):
 
     @abstractmethod
     def switch_to_new_window(self) -> None:
+        pass
+
+    @abstractmethod
+    def get_visible_pages(self, timeout: int = 10) -> list:
+        """获取可见页面列表"""
         pass

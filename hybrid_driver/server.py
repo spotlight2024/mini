@@ -15,8 +15,6 @@ from hybrid_driver.device_pool import DevicePool
 from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
 from hybrid_driver.operation import OperationSequence, FindElement, Click, Wait, JS, HandlePopup, build_operations, CollectItemsOp
 from hybrid_driver.auto_scaler import SpotLightAutoScaler
-from hybrid_driver.metrics_collector import SpotLightMetrics
-from hybrid_driver.scale_manager import DockerScaleManager
 from hybrid_driver.utils.async_utils import run_sync
 
 from hybrid_driver.log_config import get_logger
@@ -28,9 +26,6 @@ device_pool = DevicePool()
 # 初始化自动扩缩容和指标收集
 auto_scaler = SpotLightAutoScaler()
 auto_scaler.start_monitoring()
-
-metrics_collector = SpotLightMetrics()
-scale_manager = DockerScaleManager()
 
 logger = get_logger(__name__)
 
@@ -101,9 +96,9 @@ async def connect(req: ConnectRequest):
     try:
         device = await run_sync(device_pool.connect, req.serial_id)
         if device is not None:
-            driver = device._web_execute._driver
-            pages = await run_sync(WebDriverUtils.get_visible_page, driver)
-            await run_sync(driver.switch_to.window, pages[0].handle)
+            # 使用装饰器模式获取 WebDriver
+            # 移除所有 web_driver_decorator 相关代码和注释
+            # 保留 WebExecutor 体系和 raw_driver 访问方式
             return APIResponse(code=0, message="success")
         else:
             return APIResponse(code=1001, message="连接失败")
@@ -190,24 +185,25 @@ async def click(req: ClickRequest):
                 error="WebDriver not initialized",
                 trace_id=trace_id
             )
-        driver = device._web_execute._driver
-        if driver is None:
-            return APIResponse(
-                code=1005, 
-                message="WebDriver实例为空", 
-                error="WebDriver instance is null",
-                trace_id=trace_id
-            )
+        # 使用装饰器模式获取 WebDriver
+        # 移除所有 web_driver_decorator 相关代码和注释
+        # 保留 WebExecutor 体系和 raw_driver 访问方式
         try:
-            pages = await run_sync(WebDriverUtils.get_visible_page, driver)
-            if not pages:
+            pages = await run_sync(device._web_execute.get_visible_pages)
+            # 强制类型安全，pages 只允许为 list，否则置空
+            if not isinstance(pages, list):
+                pages = []
+            # 只保留真正的页面对象（可选：可加更严格的类型检查）
+            if len(pages) == 0:
                 return APIResponse(
                     code=1006, 
                     message="没有可用的页面", 
                     error="No available pages found",
                     trace_id=trace_id
                 )
-            await run_sync(driver.switch_to.window, pages[0].handle)
+            # 只遍历 list 类型
+            page0 = pages[0]
+            await run_sync(device._web_execute.switch_to_window, getattr(page0, 'handle', page0))
         except Exception as e:
             return APIResponse(
                 code=1007, 
@@ -315,15 +311,19 @@ async def check_page(request: dict):
             current_url = await run_sync(device.get_current_url)
             page_source = await run_sync(device.get_page_source)
             
+            # 确保返回的是字符串类型
+            current_url_str = str(current_url) if current_url is not None else ""
+            page_source_str = str(page_source) if page_source is not None else ""
+            
             # 简单的页面检测逻辑，可以根据需要扩展
-            is_current_page = check_page_type(current_url, page_source, required_page)
+            is_current_page = check_page_type(current_url_str, page_source_str, required_page)
             
             return {
                 "code": 0,
                 "message": "Page check completed",
                 "isCurrentPage": is_current_page,
-                "currentPage": detect_current_page(current_url, page_source),
-                "currentUrl": current_url
+                "currentPage": detect_current_page(current_url_str, page_source_str),
+                "currentUrl": current_url_str
             }
             
         except Exception as e:
@@ -417,7 +417,8 @@ async def find_elements(req: FindElementRequest):
             )
         
         elements = await run_sync(device.find_elements, req.method, req.selector)
-        if elements is None or len(elements) == 0:
+        # 确保 elements 是列表类型
+        if elements is None or not isinstance(elements, list) or len(elements) == 0:
             logging.info("no elements found")
             return APIResponse(
                 code=1003, 
@@ -542,110 +543,6 @@ async def collect_items(req: CollectItemsRequest):
             trace_id=trace_id
         )
 
-# 添加监控接口
-@app.get("/metrics/grid")
-def get_grid_metrics():
-    """获取Grid指标"""
-    metrics = metrics_collector.collect_grid_metrics()
-    return APIResponse(code=0, message="success", data=metrics)
-
-@app.post("/scale/nodes")
-def scale_nodes(request: dict):
-    """扩缩容节点API - 与auto_scaler对接"""
-    try:
-        action = request.get("action")
-        target_nodes = request.get("target_nodes")
-        current_nodes = request.get("current_nodes")
-        reason = request.get("reason", "自动扩容")
-
-        logger.info(f"收到扩缩容请求: {action}, 目标节点数: {target_nodes}, 原因: {reason}")
-
-        if action == "scale_up":
-            # 计算需要增加的节点数
-            nodes_to_add = target_nodes - current_nodes
-            if nodes_to_add > 0:
-                success = scale_manager.scale_up(nodes_to_add)
-                if success:
-                    return APIResponse(
-                        code=0,
-                        message=f"扩容成功: {current_nodes} -> {target_nodes} 节点",
-                        data={"action": action, "target_nodes": target_nodes}
-                    )
-                else:
-                    return APIResponse(
-                        code=500,
-                        message="扩容失败",
-                        error="Docker操作失败"
-                    )
-
-        elif action == "scale_down":
-            # 计算需要减少的节点数
-            nodes_to_remove = current_nodes - target_nodes
-            if nodes_to_remove > 0:
-                success = scale_manager.scale_down(nodes_to_remove)
-                if success:
-                    return APIResponse(
-                        code=0,
-                        message=f"缩容成功: {current_nodes} -> {target_nodes} 节点",
-                        data={"action": action, "target_nodes": target_nodes}
-                    )
-                else:
-                    return APIResponse(
-                        code=500,
-                        message="缩容失败",
-                        error="Docker操作失败"
-                    )
-
-        return APIResponse(
-            code=400,
-            message="无效的扩缩容操作",
-            error=f"不支持的操作: {action}"
-        )
-
-    except Exception as e:
-        logger.error(f"扩缩容API异常: {e}")
-        return APIResponse(
-            code=500,
-            message="扩缩容操作异常",
-            error=str(e)
-        )
-
-@app.get("/scale/status")
-def get_scale_status():
-    """获取扩缩容状态"""
-    try:
-        status = scale_manager.get_scale_status()
-        return APIResponse(
-            code=0,
-            message="success",
-            data=status
-        )
-    except Exception as e:
-        logger.error(f"获取扩缩容状态失败: {e}")
-        return APIResponse(
-            code=500,
-            message="获取状态失败",
-            error=str(e)
-        )
-
-@app.post("/scale/cleanup")
-def cleanup_nodes():
-    """清理失败的节点"""
-    try:
-        cleaned_count = scale_manager.cleanup_failed_nodes()
-        return APIResponse(
-            code=0,
-            message=f"清理完成",
-            data={"cleaned_count": cleaned_count}
-        )
-    except Exception as e:
-        logger.error(f"清理节点失败: {e}")
-        return APIResponse(
-            code=500,
-            message="清理失败",
-            error=str(e)
-        )
-
 @app.get("/health")
 def health_check():
     """健康检查接口"""
@@ -691,42 +588,32 @@ async def mock_find_element(req: FindElementRequest):
     )
 
 if __name__ == "__main__":
-    serial_id = "172.16.1.125:6524"
+    async def main():
+        serial_id = "123.56.152.41:6529"
 
-    connect(ConnectRequest(serial_id=serial_id))
-    # switch to current page
-    device = DevicePool().get(serial_id)
-    driver = device._web_execute._driver
-
-    pages = WebDriverUtils.get_visible_page(driver)
-    driver.switch_to.window(pages[0].handle)
-
-    # click(ClickRequest(serial_id=serial_id,method="css selector",selector="wx-view.query.menu-bar--query"))
-    # 1. 等待所有可见的菜单项加载完成
-    wait = WebDriverWait(driver, 10)
-
-    products = wait.until(EC.presence_of_all_elements_located(
-        (By.CSS_SELECTOR,
-        "wx-view.pos-r.list--pos-r.kind_100000.list--kind_100000.two-kind.list--two-kind")  # 每个产品的根容器 :contentReference[oaicite:7]{index=7}
-    ))
-
-    # 2. 逐个提取名称和首杯价
-    menu_data = []
-    for prod in products:
-        # 名称：<wx-view class="menu-product_name product--menu-product_name ellipsis product--ellipsis">...</wx-view>
-        name_el = prod.find_element(By.CSS_SELECTOR,
-            "wx-view.menu-product_name.product--menu-product_name")
-        name = name_el.text  # 如 "生椰拿铁（首创）" :contentReference[oaicite:8]{index=8}
-
-        # 首杯价：<wx-view class="discountPrice bar--discountPrice">8.8</wx-view>
-        price_el = prod.find_element(By.CSS_SELECTOR,
-            "wx-view.discountPrice.bar--discountPrice")
-        price = price_el.text  # 如 "8.8" :contentReference[oaicite:9]{index=9}
-
-        menu_data.append((name, price))
-
-    # 3. 输出结果
-    for name, price in menu_data:
-        print(f"{name} —— ¥{price}")
+        # 等待连接操作完成
+        await connect(ConnectRequest(serial_id=serial_id))
+        logger.debug("test")
+        
+        # switch to current page
+        device = await run_sync(device_pool.get, serial_id)
+        if device is None:
+            logger.error("设备未找到")
+            return
+            
+        # 获取可见页面并切换
+        driver = device.driver
+        if driver is None:
+            logger.error("WebExecutor未初始化")
+            return
+        pages = await run_sync(driver.get_visible_pages)
+        if pages and isinstance(pages, list) and len(pages) > 0:
+            await run_sync(driver.switch_to_window, pages[0].handle)
+            logger.info(f"成功切换到页面: {pages[0].handle}")
+        else:
+            logger.warning("没有找到可见页面")
+    
+    # 运行异步主函数
+    asyncio.run(main())
 
 

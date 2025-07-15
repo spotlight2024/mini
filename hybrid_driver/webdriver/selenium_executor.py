@@ -351,6 +351,13 @@ class SeleniumWebExecutor(WebExecutor):
             logger.error(f"获取当前窗口句柄失败: {e}")
             return ""
 
+    def get_visible_pages(self, timeout: int = 10) -> list:
+        """获取可见页面列表"""
+        if self._driver is None:
+            return []
+        from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
+        return WebDriverUtils.get_visible_page(self._driver, timeout)
+
 
 """
 search btn:

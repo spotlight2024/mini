@@ -11,6 +11,13 @@ SpotLight 是面向 Android 虚拟机自动化的云端混合驱动平台，支�
 ```
 用户指令 → Android虚拟机APP → 云服务器Script服务 → 混合WebDriver → 微信小程序/WebView
 ```
+
+### 核心架构特点
+- **混合驱动支持**: 统一支持 Selenium 和 Appium 两种 WebDriver 实现
+- **工厂模式**: 通过 `ExecutorFactory` 动态选择执行器类型
+- **类型安全**: 统一的 `WebExecutor` 接口，确保类型安全
+- **向后兼容**: 保持现有 API 兼容性，支持渐进式升级
+
 > 详细请见 [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md)
 
 ---
@@ -50,6 +57,20 @@ pip install -r requirements/requirements.txt
 
 # 5. 运行测试
 ./start.sh test
+```
+
+### 执行器选择
+系统支持两种执行器类型，可通过参数选择：
+- **Selenium**: 适用于 WebView 操作（默认）
+- **Appium**: 适用于原生应用和混合应用
+
+```python
+# 使用 Selenium 执行器（默认）
+device = AndroidDevice(serial_id, executor_type="selenium")
+
+# 使用 Appium 执行器
+device = AndroidDevice(serial_id, executor_type="appium", 
+                      appium_server_url="http://localhost:4723")
 ```
 
 ---
@@ -168,6 +189,26 @@ asyncio.get_event_loop().set_default_executor(executor)
 如需进一步分析、可视化或性能调优建议，请参考本 README 或联系开发者。
 
 > 📖 **文档说明**：所有详细文档已统一整理到 `docs/` 目录，主目录只保留项目入口和导航。如需查看详细内容，请访问对应的文档链接。
+
+## 最新更新 (2024年)
+
+### 架构优化
+- ✅ **执行器工厂模式**: 引入 `ExecutorFactory` 统一管理执行器
+- ✅ **类型安全**: 统一 `WebExecutor` 接口，修复类型注解
+- ✅ **代码清理**: 移除冗余的 `web_driver_decorator` 代码
+- ✅ **向后兼容**: 保持现有 API 兼容性
+
+### 使用方式
+```python
+# 推荐：使用工厂模式
+device = AndroidDevice(serial_id, executor_type="selenium")
+device = AndroidDevice(serial_id, executor_type="appium")
+
+# 直接使用工厂
+executor = executor_factory.get_executor("selenium")
+```
+
+详细变更请参考 [架构文档](docs/architecture/ARCHITECTURE.md#最新架构改进-2024年)。
 
 ## 异步接口及异步方法编写规范
 

@@ -29,6 +29,7 @@ class DevicePool:
     """
     单例模式的设备池管理器
     负责管理多个Android设备的连接和生命周期
+    使用ExecutorFactory统一创建执行器
     """
     
     核心功能:
@@ -37,6 +38,7 @@ class DevicePool:
     - 自动清理机制 (cleanup_task)
     - 线程安全操作 (threading.Lock)
     - 资源回收 (LRU策略)
+    - 执行器工厂集成 (ExecutorFactory)
 ```
 
 **设计特点:**
@@ -44,6 +46,15 @@ class DevicePool:
 - 线程安全的多设备并发管理
 - 自动清理机制防止资源泄漏
 - 支持设备连接状态监控
+- 通过ExecutorFactory统一管理执行器创建
+
+**设备创建流程:**
+```python
+# 使用ExecutorFactory创建设备，默认使用selenium执行器
+device = AndroidDevice(serial_id, executor_type="selenium")
+if device.connect(ip=ip, port=port):
+    self.pool[serial_id] = device
+```
 
 #### 1.2 AndroidDevice (设备抽象)
 ```python
@@ -51,14 +62,16 @@ class AndroidDevice:
     """
     Android设备的抽象封装
     提供统一的设备操作接口
+    支持多种执行器类型选择
     """
     
     核心功能:
     - ADB设备连接管理
-    - 混合WebDriver实例管理
+    - 混合WebDriver实例管理（通过ExecutorFactory）
     - 元素查找和操作
     - 页面状态管理
     - 上下文管理器支持
+    - 执行器类型选择（selenium/appium）
 ```
 
 **设计特点:**
@@ -66,6 +79,22 @@ class AndroidDevice:
 - 提供统一的设备操作接口
 - 支持连接状态检查
 - 实现上下文管理器模式
+- 通过工厂模式选择执行器类型
+- 保持向后兼容性
+
+**执行器选择机制:**
+```python
+# 使用工厂模式创建执行器
+if self._web_execute_cls is not None:
+    # 向后兼容：直接使用传入的类
+    self._web_execute = self._web_execute_cls()
+else:
+    # 使用工厂模式
+    self._web_execute = executor_factory.get_executor(
+        self._executor_type,
+        **self._executor_kwargs
+    )
+```
 
 ### 2. 混合WebDriver执行层 (Hybrid WebDriver Execution Layer)
 
@@ -81,16 +110,56 @@ class WebExecutor(ABC):
     - connect(device_id: str) -> bool
     - quit() -> None
     - find_element(by: str, value: str) -> Optional[WebElement]
+    - find_elements(by: str, value: str) -> Optional[List[WebElement]]
     - wait_for_element(by: str, value: str, timeout: int) -> Optional[WebElement]
     - execute_script(script: str, *args) -> Any
+    - get_visible_pages(timeout: int) -> list
 ```
 
 **设计特点:**
 - 抽象基类定义统一接口
 - 支持多种WebDriver实现
 - 便于扩展和替换实现
+- 类型安全的返回类型定义
 
-#### 2.2 SeleniumWebExecutor (Selenium实现)
+#### 2.2 ExecutorFactory (执行器工厂)
+```python
+class ExecutorFactory:
+    """
+    执行器工厂类，统一管理不同类型的自动化执行器
+    支持动态注册和获取执行器实例
+    """
+    
+    核心功能:
+    - 执行器注册 (register_executor)
+    - 执行器获取 (get_executor)
+    - 可用执行器查询 (get_available_executors)
+    - 参数化执行器创建
+```
+
+**设计特点:**
+- 工厂模式统一管理执行器
+- 支持动态注册新的执行器类型
+- 参数化创建，支持不同配置
+- 类型安全的执行器选择
+
+**使用示例:**
+```python
+# 获取 Selenium 执行器
+selenium_executor = executor_factory.get_executor("selenium")
+
+# 获取 Appium 执行器（带参数）
+appium_executor = executor_factory.get_executor(
+    "appium", 
+    appium_server_url="http://localhost:4723",
+    capabilities={"platformName": "Android"}
+)
+
+# 注册新的执行器类型
+executor_factory.register_executor("custom", CustomExecutor)
+```
+
+#### 2.3 SeleniumWebExecutor (Selenium实现)
 ```python
 class SeleniumWebExecutor(WebExecutor):
     """
@@ -112,7 +181,7 @@ class SeleniumWebExecutor(WebExecutor):
 - 自动处理ChromeDriver管理
 - 集成弹窗处理机制
 
-#### 2.3 AppiumExecutor (Appium实现)
+#### 2.4 AppiumExecutor (Appium实现)
 ```python
 class AppiumExecutor:
     """
@@ -546,4 +615,31 @@ SpotLight 混合驱动服务采用了分层架构设计，通过抽象接口和�
 5. **高可用**: 异常处理和自动恢复机制
 6. **混合驱动**: 支持Selenium和Appium两种WebDriver实现
 
-这种架构设计为系统的长期维护和功能扩展提供了良好的基础，特别是在支持不同类型的Android应用操作方面具有很大的灵活性。 
+### 最新架构改进 (2024年)
+
+#### 执行器工厂模式
+- **统一管理**: 通过 `ExecutorFactory` 统一管理所有执行器类型
+- **动态选择**: 支持运行时动态选择执行器类型（selenium/appium）
+- **类型安全**: 统一的 `WebExecutor` 接口，确保类型安全
+- **向后兼容**: 保持现有 API 兼容性，支持渐进式升级
+
+#### 代码清理和优化
+- **移除冗余**: 清理了 `web_driver_decorator` 相关代码
+- **统一接口**: 所有业务代码统一通过 `WebExecutor` 接口调用
+- **类型修复**: 修复了类型注解不一致的问题
+- **架构简化**: 简化了执行器创建和管理流程
+
+#### 使用示例
+```python
+# 使用工厂模式创建设备（推荐）
+device = AndroidDevice(serial_id, executor_type="selenium")
+device = AndroidDevice(serial_id, executor_type="appium", 
+                      appium_server_url="http://localhost:4723")
+
+# 直接使用工厂创建执行器
+executor = executor_factory.get_executor("selenium")
+executor = executor_factory.get_executor("appium", 
+                                       appium_server_url="http://localhost:4723")
+```
+
+这种架构设计为系统的长期维护和功能扩展提供了良好的基础，特别是在支持不同类型的Android应用操作方面具有很大的灵活性。通过工厂模式的引入，系统变得更加模块化和可扩展。 

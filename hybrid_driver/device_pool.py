@@ -5,7 +5,7 @@ import logging
 import time
 
 from hybrid_driver.device.android_device import AndroidDevice
-from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
+from hybrid_driver.webdriver.executor_factory import executor_factory
 
 from hybrid_driver.log_config import setup_logging
 
@@ -40,7 +40,8 @@ class DevicePool:
             # 如果设备不存在或已断开，创建新设备
             if device is None or not device.is_connected():
                 try:
-                    device = AndroidDevice(serial_id, web_execute_cls=SeleniumWebExecutor)
+                    # 使用 ExecutorFactory 创建设备，默认使用 selenium 执行器
+                    device = AndroidDevice(serial_id, executor_type="selenium")
                     if device.connect(ip=ip, port=port):
                         self.pool[serial_id] = device
                         logging.info(f"[DevicePool] 设备连接成功 serial_id={serial_id}")

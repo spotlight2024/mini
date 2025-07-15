@@ -5,56 +5,112 @@ from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from hybrid_driver.webdriver.web_executor import WebExecutor
+from selenium.webdriver.remote.webelement import WebElement
+from typing import Optional, Any, List
 
-class AppiumExecutor:
-    def __init__(self, appium_server_url, capabilities):
+class AppiumExecutor(WebExecutor):
+    def __init__(self, appium_server_url=None, capabilities=None):
+        self.driver = None
+        self._appium_server_url = appium_server_url
+        self._capabilities = capabilities or {}
+
+    def connect(self, device_id: str, **kwargs) -> bool:
+        from appium import webdriver
+        from appium.options.android import UiAutomator2Options
         options = UiAutomator2Options()
-        for k, v in capabilities.items():
+        for k, v in self._capabilities.items():
             options.set_capability(k, v)
+        options.set_capability('deviceName', device_id)
         self.driver = webdriver.Remote(
-            command_executor=appium_server_url,
+            command_executor=self._appium_server_url,
             options=options
         )
+        return True
 
-    def test(self):
-        contexts = self.driver.contexts
-        element = self.driver.find_element(AppiumBy.ANDROID_UIAUTOMATOR, 'new UiSelector().text("菜单")')
-        print(element.text)
-        element.click()
-        print(contexts)
+    def quit(self) -> None:
+        if self.driver:
+            self.driver.quit()
+            self.driver = None
 
-    def wait_for_context(self, context_name_part, timeout=20):
-        for _ in range(timeout * 2):
-            contexts = self.driver.contexts
-            element = self.driver.find_element(AppiumBy.ANDROID_UIAUTOMATOR,'new UiSelector().text("菜单")')
-            print(element.text)
-            print(contexts)
-            for ctx in contexts:
-                if context_name_part in ctx:
-                    self.driver.switch_to.context(ctx)
-                    for handle in self.driver.window_handles:
-                        self.driver.switch_to.window(handle)
-                        print(handle,self.driver.title)
-                    print(f"[AppiumExecutor] 切换到 context: {ctx}")
-                    return ctx
-            time.sleep(0.5)
+    def is_alive(self) -> bool:
+        return self.driver is not None
 
-        raise Exception(f"未找到 context 包含: {context_name_part}")
+    def find_element(self, by: str, value: str) -> Optional[WebElement]:
+        try:
+            return self.driver.find_element(by, value)
+        except Exception:
+            return None
 
-    def find_element(self, by, value, timeout=10):
-        return WebDriverWait(self.driver, timeout).until(
-            EC.presence_of_element_located((by, value))
-        )
+    def find_elements(self, by: str, value: str) -> Optional[List[WebElement]]:
+        try:
+            return self.driver.find_elements(by, value)
+        except Exception:
+            return None
 
-    def input_text(self, by, value, text, timeout=10):
-        el = self.find_element(by, value, timeout)
-        el.click()
-        el.clear()
-        el.send_keys(text)
-        print(f"[AppiumExecutor] 输入文本: {text}")
+    def wait_for_element(self, by: str, value: str, timeout: int = 10) -> Optional[WebElement]:
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        try:
+            return WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located((by, value))
+            )
+        except Exception:
+            return None
 
-    def quit(self):
-        self.driver.quit()
+    def execute_script(self, script: str, *args) -> Any:
+        try:
+            return self.driver.execute_script(script, *args)
+        except Exception:
+            return None
+
+    def get_current_url(self) -> str:
+        try:
+            return self.driver.current_url
+        except Exception:
+            return ""
+
+    def get_page_source(self) -> str:
+        try:
+            return self.driver.page_source
+        except Exception:
+            return ""
+
+    def handle_common_popups(self) -> None:
+        # 可根据实际业务实现
+        pass
+
+    def get_window_handles(self) -> list:
+        try:
+            return self.driver.window_handles
+        except Exception:
+            return []
+
+    def switch_to_window(self, handle: str) -> None:
+        try:
+            self.driver.switch_to.window(handle)
+        except Exception:
+            pass
+
+    def get_current_window_handle(self) -> str:
+        try:
+            return self.driver.current_window_handle
+        except Exception:
+            return ""
+
+    def switch_to_new_window(self) -> None:
+        # 可根据实际业务实现
+        pass
+
+    def get_visible_pages(self, timeout: int = 10) -> list:
+        """获取可见页面列表（Appium场景下可自定义扩展）"""
+        if self.driver is None:
+            return []
+        # Appium场景下暂时返回所有window_handles
+        try:
+            return self.driver.window_handles
+        except Exception:
+            return []
 
 if __name__ == "__main__":
     # 这些是您希望在哪个节点上运行测试的“要求”。

@@ -7,12 +7,18 @@
 - 支持多设备并发、设备池管理
 - 支持智能操作指令、弹窗处理、数据采集
 - 对接主服务 API，支撑云端自动化
+- **执行器工厂模式**: 统一管理多种执行器类型
+- **类型安全**: 统一的 WebExecutor 接口设计
 
 ## 主要接口
 - FastAPI 服务入口：`server.py`
 - 设备池管理：`device_pool.py`
 - 设备抽象：`device/android_device.py`
 - WebDriver 实现：`webdriver/`
+  - 执行器工厂：`webdriver/executor_factory.py`
+  - Selenium 执行器：`webdriver/selenium_executor.py`
+  - Appium 执行器：`webdriver/appium_executor.py`
+  - 统一接口：`webdriver/web_executor.py`
 - 操作指令系统：`operation.py`
 
 ## 开发与测试
@@ -20,6 +26,21 @@
 - 服务管理脚本：见 `../scripts/service/`
 - 单元/集成测试：见 `../tests/`
 - 日志与配置：见 `../config/`
+
+## 执行器使用示例
+```python
+# 使用 Selenium 执行器（默认）
+from hybrid_driver.device.android_device import AndroidDevice
+device = AndroidDevice(serial_id, executor_type="selenium")
+
+# 使用 Appium 执行器
+device = AndroidDevice(serial_id, executor_type="appium", 
+                      appium_server_url="http://localhost:4723")
+
+# 直接使用工厂创建执行器
+from hybrid_driver.webdriver.executor_factory import executor_factory
+executor = executor_factory.get_executor("selenium")
+```
 
 ## 详细文档
 - [主项目 README](../README.md)
