@@ -99,7 +99,7 @@ if __name__ == "__main__":
                 print(f"Error: {result['error']}")
             print(f"Time: {result['elapsed']:.2f}s")
 
-        driver.quit()
+        device.disconnect()
 
 
     # 运行异步主函数
