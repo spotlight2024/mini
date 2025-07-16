@@ -116,8 +116,6 @@ def connect_webdriver(serial_id: str) -> WebDriver:
     options.add_experimental_option("androidUseRunningApp", True)
     options.add_experimental_option("androidProcess", TEST_CONFIG["android_process"])
 
-    options.set_capability("browserVersion", "134")
-    options.set_capability("platformName", "linux")
     options.set_capability("browserName","chrome")
 
     logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
@@ -128,6 +126,9 @@ def connect_webdriver(serial_id: str) -> WebDriver:
         if not remote_url:
             raise ValueError("REMOTE_WEBDRIVER_URL 未配置")
         logger.info(f"使用 RemoteWebDriver: {remote_url}")
+        options.set_capability("browserVersion", "134")
+        options.set_capability("platformName", "linux")
+
         driver = webdriver.Remote(
             command_executor=remote_url,
             options=options
@@ -137,6 +138,8 @@ def connect_webdriver(serial_id: str) -> WebDriver:
         return driver
     else:
         # 本地 WebDriver
+        options.set_capability("browserVersion", TEST_CONFIG["chrome_version"])
+        options.set_capability("platformName", "android")
         path = ChromeDriverManager(driver_version=TEST_CONFIG["chrome_version"]).install()
         logger.info(f"ChromeDriver 路径: {path}")
         if 'THIRD_PARTY_NOTICES.chromedriver' in path:

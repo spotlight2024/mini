@@ -8,6 +8,7 @@ from hybrid_driver.log_config import get_logger
 
 # 导入路由模块
 from hybrid_driver.api.routers import device, element, page, collect, mock
+from hybrid_driver.operation import OperationItem, OperationSequence
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -81,6 +82,24 @@ if __name__ == "__main__":
             logger.info(f"成功切换到页面: {pages[0].handle}")
         else:
             logger.warning("没有找到可见页面")
+
+        operations = [
+            # 查找搜索按钮
+            OperationItem("click", method="css selector", selector="wx-view.marketingPopup-index--button-close", timeout=2),
+            OperationItem("click", method="css selector", selector="wx-view.search-box.searchBox--search-box",timeout=2),
+
+        ]
+
+        sequence = OperationSequence(operations)
+        results = sequence.execute(device)
+
+        for i, result in enumerate(results):
+            print(f"Step {i + 1}: {'Success' if result['success'] else 'Failed'}")
+            if not result['success']:
+                print(f"Error: {result['error']}")
+            print(f"Time: {result['elapsed']:.2f}s")
+
+        driver.quit()
 
 
     # 运行异步主函数
