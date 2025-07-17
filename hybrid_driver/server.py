@@ -602,7 +602,7 @@ if __name__ == "__main__":
             return
             
         # 获取可见页面并切换
-        driver = device.driver
+        driver = device.web_executor
         if driver is None:
             logger.error("WebExecutor未初始化")
             return

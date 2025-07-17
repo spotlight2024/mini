@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Any, Dict, List
-from selenium.webdriver.common.by import By
+from typing import Optional, Any, List
+
+import selenium
 from selenium.webdriver.remote.webelement import WebElement
+
 
 class WebExecutor(ABC):
     """Web 操作执行器基类"""
@@ -79,3 +81,7 @@ class WebExecutor(ABC):
     def get_visible_pages(self, timeout: int = 10) -> list:
         """获取可见页面列表"""
         pass
+
+    def get_raw_remote_webdriver(self) -> selenium.webdriver.remote.webdriver.WebDriver:
+        pass
+

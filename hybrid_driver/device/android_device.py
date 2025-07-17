@@ -191,7 +191,7 @@ class AndroidDevice:
         return self._web_execute
 
     @property
-    def driver(self) -> Optional[WebExecutor]:
+    def web_executor(self) -> Optional[WebExecutor]:
         """获取 WebExecutor 实例（只读属性）"""
         return self._web_execute
 

@@ -1,6 +1,8 @@
 import time
 import logging
 from typing import Optional, List, Dict, Any, Union
+
+import selenium
 from selenium import webdriver
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
@@ -156,7 +158,7 @@ class SeleniumWebExecutor(WebExecutor):
     """Selenium WebDriver 实现"""
 
     def __init__(self):
-        self._driver = None
+        self._driver: WebDriver = None
         self._device_id = None
         logger.info("初始化完成")
 
@@ -358,13 +360,15 @@ class SeleniumWebExecutor(WebExecutor):
             logger.error(f"获取当前窗口句柄失败: {e}")
             return ""
 
-    def get_visible_pages(self, timeout: int = 10) -> list:
+    def get_visible_pages(self, timeout: int = 10) -> list[Any] | str:
         """获取可见页面列表"""
         if self._driver is None:
             return []
         from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
         return WebDriverUtils.get_visible_page(self._driver, timeout)
 
+    def get_raw_remote_webdriver(self) -> selenium.webdriver.remote.webdriver.WebDriver:
+        return self._driver
 
 """
 search btn:

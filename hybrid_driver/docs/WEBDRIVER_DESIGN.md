@@ -116,13 +116,14 @@ from hybrid_driver.webdriver.webdriver_decorator import WebDriverDecorator
 ```
 
 ### 2. 替换直接访问
+
 ```python
 # 旧代码
 driver = device._web_execute._driver
 
 # 新代码
 web_driver_decorator = device.web_driver_decorator
-driver = web_driver_decorator.driver if web_driver_decorator else None
+driver = web_driver_decorator.web_executor if web_driver_decorator else None
 ```
 
 ### 3. 使用装饰器方法

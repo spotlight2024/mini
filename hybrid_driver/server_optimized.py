@@ -9,6 +9,7 @@ from hybrid_driver.log_config import get_logger
 # 导入路由模块
 from hybrid_driver.api.routers import device, element, page, collect, mock
 from hybrid_driver.operation import OperationItem, OperationSequence
+from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -68,20 +69,16 @@ if __name__ == "__main__":
             return
 
         # 获取可见页面并切换
-        driver = device.driver
+        executor: SeleniumWebExecutor = device.web_executor
+        driver = executor.get_raw_remote_webdriver()
         if driver is None:
             logger.error("WebExecutor未初始化")
             return
         pages = await asyncio.get_event_loop().run_in_executor(
-            None, driver.get_visible_pages
+            None, device.web_executor.get_visible_pages
         )
-        if pages and isinstance(pages, list) and len(pages) > 0:
-            await asyncio.get_event_loop().run_in_executor(
-                None, driver.switch_to_window, pages[0].handle
-            )
-            logger.info(f"成功切换到页面: {pages[0].handle}")
-        else:
-            logger.warning("没有找到可见页面")
+
+        logger.info(f"pages : ${pages}")
 
         operations = [
             # 查找搜索按钮
