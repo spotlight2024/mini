@@ -1,5 +1,6 @@
-from typing import Optional, Any, List
-from pydantic import BaseModel
+from typing import Optional, Any, List, Dict
+from pydantic import BaseModel, Field
+from datetime import datetime
 
 
 class ConnectRequest(BaseModel):
@@ -21,6 +22,57 @@ class FindElementRequest(BaseModel):
     serial_id: str
     method: str
     selector: str
+
+
+# 响应数据模型
+class DeviceInfo(BaseModel):
+    """设备信息"""
+    platform: str = Field(default="android", description="平台类型")
+    webdriver_type: str = Field(default="selenium", description="WebDriver类型")
+    connection_time: Optional[datetime] = Field(default=None, description="连接时间")
+
+
+class DeviceCapabilities(BaseModel):
+    """设备能力信息"""
+    browser_name: str = Field(default="chrome", description="浏览器名称")
+    platform_name: str = Field(default="android", description="平台名称")
+    browser_version: Optional[str] = Field(default=None, description="浏览器版本")
+
+
+class ConnectionData(BaseModel):
+    """连接成功返回的数据"""
+    session_id: str = Field(description="WebDriver会话ID")
+    serial_id: str = Field(description="设备序列号")
+    user_id: str = Field(description="用户ID")
+    status: str = Field(default="connected", description="连接状态")
+    device_info: DeviceInfo = Field(description="设备信息")
+    capabilities: DeviceCapabilities = Field(description="设备能力")
+
+
+class ErrorData(BaseModel):
+    """错误信息数据"""
+    serial_id: str = Field(description="设备序列号")
+    error_reason: str = Field(description="错误原因")
+    suggestions: List[str] = Field(default=[], description="解决建议")
+    exception_type: Optional[str] = Field(default=None, description="异常类型")
+    error_details: Optional[str] = Field(default=None, description="详细错误信息")
+
+
+class DisconnectData(BaseModel):
+    """断开连接返回的数据"""
+    serial_id: str = Field(description="设备序列号")
+    status: str = Field(description="断开状态")
+    disconnect_time: Optional[datetime] = Field(default=None, description="断开时间")
+
+
+class ActionData(BaseModel):
+    """操作执行返回的数据"""
+    serial_id: str = Field(description="设备序列号")
+    action_type: str = Field(description="操作类型")
+    params: Optional[Dict[str, Any]] = Field(default=None, description="操作参数")
+    status: str = Field(description="执行状态")
+    result: str = Field(description="执行结果")
+    execution_time: Optional[datetime] = Field(default=None, description="执行时间")
 
 
 class APIResponse(BaseModel):

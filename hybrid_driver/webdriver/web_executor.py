@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Any, List
 
 import selenium
+from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 
 
@@ -82,6 +83,6 @@ class WebExecutor(ABC):
         """获取可见页面列表"""
         pass
 
-    def get_raw_remote_webdriver(self) -> selenium.webdriver.remote.webdriver.WebDriver:
+    def get_raw_remote_webdriver(self) -> WebDriver:
         pass
 
