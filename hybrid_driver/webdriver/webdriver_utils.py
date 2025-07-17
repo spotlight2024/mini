@@ -1,39 +1,19 @@
 import time
+from cgitb import handler
 from dataclasses import dataclass
 from typing import Dict, Any
 
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.remote.webdriver import WebDriver
 
 from hybrid_driver.log_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
 setup_logging()
-@dataclass
-class Page:
-    """页面信息类"""
-    handle: str
-    url: str
-    title: str
-    is_visible: bool
-    is_foreground: bool
-    viewport_width: int
-    viewport_height: int
-    is_active: bool
-    is_hidden: bool
-    state: Dict[str, Any]
 
-    @property
-    def is_actually_visible(self) -> bool:
-        """判断页面是否真正可见"""
-        return (
-                self.is_visible and
-                not self.is_hidden and
-                self.viewport_width > 0 and
-                self.viewport_height > 0
-        )
 
 class WebDriverUtils:
     @staticmethod
@@ -99,7 +79,7 @@ class WebDriverUtils:
             logger.info(f"等待新窗口: timeout={timeout}")
             if old_handles is None:
                 old_handles = set(driver.window_handles)
-            
+
             start_time = time.time()
             while time.time() - start_time < timeout:
                 new_handles = set(driver.window_handles)
@@ -108,7 +88,6 @@ class WebDriverUtils:
                     driver.switch_to.window(new_handle)
                     logger.info(f"切换到新窗口: {new_handle} , title : {driver.title}")
                     return new_handle
-                time.sleep(0.5)
             logger.warning(f"等待新窗口超时: timeout={timeout}")
             return None
         except Exception as e:
@@ -116,7 +95,7 @@ class WebDriverUtils:
             return None
 
     @staticmethod
-    def get_visible_page(driver, timeout=10) -> list[Page]:
+    def get_visible_page(driver: WebDriver, timeout=10) -> list[Any] | Any:
         """
         获取可见页面，使用 Selenium 的等待机制
         :param driver: WebDriver实例
@@ -125,58 +104,25 @@ class WebDriverUtils:
         """
         start_time = time.time()
         try:
-            wait = WebDriverWait(driver, timeout)
-            
-            def find_visible_pages(d):
-                visible_pages_list = []
-                # 先切换到第一个窗口，确保 handle 列表更新
-                if d.window_handles:
-                    d.switch_to.window(d.window_handles[0])
-                    time.sleep(0.1)  # 给一点时间让 handle 列表更新
-                
-                for handle in d.window_handles:
-                    d.switch_to.window(handle)
-                    
-                    # 获取页面状态
-                    page_state = d.execute_script("""
-                        return {
-                            visibilityState: document.visibilityState,
-                            hidden: document.hidden,
-                            displayState: document.webkitVisibilityState,
-                            isActive: document.hasFocus(),
-                            viewportWidth: window.innerWidth,
-                            viewportHeight: window.innerHeight,
-                            scrollX: window.scrollX,
-                            scrollY: window.scrollY
-                        }
-                    """)
-                    
-                    # 创建页面对象
-                    page = Page(
-                        handle=handle,
-                        url=d.current_url,
-                        title=d.title,
-                        is_visible=page_state['visibilityState'] == 'visible',
-                        is_foreground=False,
-                        viewport_width=page_state['viewportWidth'],
-                        viewport_height=page_state['viewportHeight'],
-                        is_active=page_state['isActive'],
-                        is_hidden=page_state['hidden'],
-                        state=page_state
-                    )
+            visible_pages_list = []
+            # # 先切换到第一个窗口，确保 handle 列表更新
+            # if d.window_handles:
+            #     d.switch_to.window(d.window_handles[0])
 
-                    logger.info(f"<page title>: {page.title}")
-                    if ":VISIBLE" in d.title:
-                        visible_pages_list.append(page)
-                        break
-                
-                return visible_pages_list if visible_pages_list else None
-            
+            logger.info(f"current handle : handle : ${driver.current_window_handle}")
+            for handle in driver.window_handles:
+                logger.info(f"handle id : ${handle}")
+                driver.switch_to.window(handle)
+                title = driver.title
+                logger.info(f"<page title>: {title} , d : ${driver}")
+                if ":VISIBLE" in title:
+                    visible_pages_list.append(handle)
+                    break
+
             # 使用 WebDriverWait 等待可见页面出现
-            visible_pages = wait.until(find_visible_pages)
-            logger.info(f"找到可见页面 : {visible_pages}")
-            return visible_pages
-            
+            logger.info(f"找到可见页面 : {visible_pages_list}")
+            return visible_pages_list[0]
+
         except TimeoutException:
             logger.warning(f"获取可见页面超时: {timeout}秒")
             return []
@@ -187,4 +133,3 @@ class WebDriverUtils:
             end_time = time.time()
             execution_time_ms = (end_time - start_time) * 1000
             logger.info(f"Method get_visible_page executed in {execution_time_ms:.2f}ms")
-        

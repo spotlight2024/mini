@@ -24,7 +24,7 @@ def test_real_connect():
         logging.info(f"device info: ${device.app_current()}")
         result = driver.connect(device.serial)
         logging.info(f"connect result: ${result}")
-        chrome_driver = driver.driver
+        chrome_driver = driver.web_executor
         chrome_driver.implicitly_wait(3)
 
         # wait = WebDriverWait(chrome_driver, 10)  # 最长等待 10 秒
