@@ -11,6 +11,8 @@ services:
       - selenium-hub
     networks:
       - selenium-grid
+    volumes:
+      - ../hybrid_driver:/app/hybrid_driver
 
   #==================
   # Selenium Hub

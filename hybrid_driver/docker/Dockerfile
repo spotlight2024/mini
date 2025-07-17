@@ -4,9 +4,7 @@ FROM python:3.10-slim
 # 设置工作目录
 WORKDIR /app
 
-# 复制 hybrid_driver 目录到容器
-COPY hybrid_driver /app/hybrid_driver
-# 复制 requirements.txt 到容器
+# 只复制 requirements.txt
 COPY requirements.txt /app/requirements.txt
 
 # 安装依赖

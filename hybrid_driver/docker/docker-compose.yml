@@ -21,14 +21,14 @@ services:
   # SpotLight API 服务
   #==================
   spotlight-api:
-    build:
-      context: ../../
-      dockerfile: hybrid_driver/docker/Dockerfile
+    image: docker-spotlight-api:latest
     container_name: spotlight-api
     ports:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+    volumes:
+      - ../../hybrid_driver:/app/hybrid_driver
     depends_on:
       - selenium-hub
     networks:

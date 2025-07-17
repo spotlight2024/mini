@@ -5,16 +5,24 @@ from hybrid_driver.api.models import ConnectRequest, DisconnectRequest, ActionRe
 from hybrid_driver.device_pool import DevicePool
 from hybrid_driver.utils.async_utils import run_sync
 from hybrid_driver.log_config import get_logger
+from hybrid_driver.device.android_device import AndroidDevice
+from typing import TypeVar, Callable, Awaitable, cast
 
 router = APIRouter(prefix="/device", tags=["设备管理"])
 logger = get_logger(__name__)
+
+T = TypeVar('T')
+async def run_sync_typed(func: Callable[..., T], *args, **kwargs) -> T:
+    from hybrid_driver.utils.async_utils import run_sync
+    result = await run_sync(func, *args, **kwargs)
+    return cast(T, result)
 
 
 @router.post("/connect", response_model=APIResponse)
 async def connect(req: ConnectRequest):
     """连接设备"""
     try:
-        device = await run_sync(DevicePool().connect, req.serial_id)
+        device = await run_sync_typed(DevicePool().connect, req.serial_id)  # 类型安全
         if device is not None:
             return APIResponse(code=0, message="success")
         else:
