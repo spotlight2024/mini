@@ -1,0 +1,39 @@
+services:
+  #==================
+  # Selenium Hub
+  #==================
+  selenium-hub:
+    image: selenium/hub:latest
+    container_name: selenium-hub
+    ports:
+      - "4442:4442"
+      - "4443:4443"
+      - "4444:4444"
+    environment:
+      - SE_NODE_SESSION_TIMEOUT=100
+      - SE_SESSION_REQUEST_TIMEOUT=30
+      - SE_ENABLE_TRACING=true
+      - SE_LOG_LEVEL=DEBUG
+    networks:
+      - selenium-grid
+
+  #==================
+  # SpotLight API 服务
+  #==================
+  spotlight-api:
+    build:
+      context: ../../
+      dockerfile: hybrid_driver/docker/Dockerfile
+    container_name: spotlight-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - selenium-hub
+    networks:
+      - selenium-grid
+
+networks:
+  selenium-grid:
+    driver: bridge 
