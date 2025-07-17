@@ -1,4 +1,17 @@
 services:
+
+  spotlight-api:
+    image: docker-spotlight-api:latest
+    container_name: spotlight-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - selenium-hub
+    networks:
+      - selenium-grid
+
   #==================
   # Selenium Hub
   #==================

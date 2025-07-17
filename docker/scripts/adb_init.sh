@@ -20,9 +20,6 @@ echo "✓ ADB 已安装: $(adb version | head -n1)"
 echo "启动 ADB 服务器..."
 adb start-server
 
-# 等待 ADB 服务器启动
-sleep 2
-
 # 检查 ADB 服务器状态
 if adb devices &> /dev/null; then
     echo "✓ ADB 服务器启动成功"
@@ -63,6 +60,6 @@ fi
 
 echo "=== ADB 初始化脚本执行完成 ===" 
 
-adb connect "123.56.152.41:6529"
+adb connect "47.94.130.125:6521"
 
 adb devices

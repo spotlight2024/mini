@@ -128,7 +128,7 @@ def connect_webdriver(serial_id: str) -> WebDriver:
         if not remote_url:
             raise ValueError("REMOTE_WEBDRIVER_URL 未配置")
         logger.info(f"使用 RemoteWebDriver: {remote_url}")
-        options.set_capability("browserVersion", "134")
+        options.set_capability("browserVersion", "138")
         options.set_capability("platformName", "linux")
 
         driver = webdriver.Remote(
