@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from hybrid_driver.api.models import (
-    ConnectRequest, DisconnectRequest, ActionRequest, APIResponse,
+    ConnectRequest, ConnectConfig, DisconnectRequest, ActionRequest, APIResponse,
     ConnectionData, ErrorData, DisconnectData, ActionData,
     DeviceInfo, DeviceCapabilities
 )
@@ -29,7 +29,13 @@ async def run_sync_typed(func: Callable[..., T], *args, **kwargs) -> T:
 async def connect(req: ConnectRequest):
     """连接设备"""
     try:
-        device = await run_sync_typed(DevicePool().connect, req.serial_id)  # 类型安全
+        # 将 ConnectRequest 转换为 ConnectConfig
+        config = ConnectConfig(
+            serial_id=req.serial_id,
+            user_id=req.user_id,
+            android_process=req.android_process
+        )
+        device = await run_sync_typed(DevicePool().connect, config)  # 类型安全
         if device is not None:
             web_executor = device.get_web_driver()
             if web_executor and hasattr(web_executor, 'get_raw_remote_webdriver'):

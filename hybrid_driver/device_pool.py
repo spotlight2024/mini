@@ -6,6 +6,7 @@ import time
 
 from hybrid_driver.device.android_device import AndroidDevice
 from hybrid_driver.webdriver.executor_factory import executor_factory
+from hybrid_driver.api.models import ConnectConfig
 
 from hybrid_driver.log_config import setup_logging
 
@@ -31,30 +32,43 @@ class DevicePool:
             self._start_cleanup_task()
             self._initialized = True
 
-    def connect(self, serial_id, ip=None, port=None) -> AndroidDevice:
+    def connect(self, config: ConnectConfig) -> AndroidDevice:
         """连接设备并返回设备实例"""
         with self.lock:
-            logging.info(f"[DevicePool] 尝试连接 serial_id={serial_id}, ip={ip}, port={port}")
-            device = self.pool.get(serial_id)
+            logging.info(f"[DevicePool] 尝试连接 config={config.model_dump()}")
+            device = self.pool.get(config.serial_id)
 
             # 如果设备不存在或已断开，创建新设备
             if device is None or not device.is_connected():
                 try:
-                    # 使用 ExecutorFactory 创建设备，默认使用 selenium 执行器
-                    device = AndroidDevice(serial_id, executor_type="selenium")
-                    if device.connect(ip=ip, port=port):
-                        self.pool[serial_id] = device
-                        logging.info(f"[DevicePool] 设备连接成功 serial_id={serial_id}")
+                    # 使用 ExecutorFactory 创建设备
+                    device = AndroidDevice(
+                        serial_id=config.serial_id, 
+                        executor_type=config.executor_type
+                    )
+                    if device.connect(config):
+                        self.pool[config.serial_id] = device
+                        logging.info(f"[DevicePool] 设备连接成功 serial_id={config.serial_id}")
                     else:
-                        logging.error(f"[DevicePool] 设备连接失败 serial_id={serial_id}")
-                        raise RuntimeError(f"Failed to connect device: {serial_id}")
+                        logging.error(f"[DevicePool] 设备连接失败 serial_id={config.serial_id}")
+                        raise RuntimeError(f"Failed to connect device: {config.serial_id}")
                 except Exception as e:
-                    logging.error(f"[DevicePool] 设备连接失败 serial_id={serial_id}: {e}")
+                    logging.error(f"[DevicePool] 设备连接失败 serial_id={config.serial_id}: {e}")
                     raise
             else:
-                logging.info(f"[DevicePool] 设备已存在且存活 serial_id={serial_id}")
+                logging.info(f"[DevicePool] 设备已存在且存活 serial_id={config.serial_id}")
 
             return device
+
+    def connect_legacy(self, serial_id, ip=None, port=None) -> AndroidDevice:
+        """向后兼容的连接方法"""
+        config = ConnectConfig(
+            serial_id=serial_id,
+            user_id="legacy_user",  # 默认用户ID
+            ip=ip,
+            port=port
+        )
+        return self.connect(config)
 
     def get(self, serial_id) -> Optional[AndroidDevice]:
         """获取设备实例，如果不存在返回 None"""
@@ -104,4 +118,8 @@ class DevicePool:
 
 
 if __name__ == "__main__":
-    DevicePool().connect("JJGICIN7QOAELNGI")
+    config = ConnectConfig(
+        serial_id="JJGICIN7QOAELNGI",
+        user_id="test_user"
+    )
+    DevicePool().connect(config)

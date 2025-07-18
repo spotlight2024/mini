@@ -6,6 +6,23 @@ from datetime import datetime
 class ConnectRequest(BaseModel):
     serial_id: str
     user_id: str
+    android_process: str
+
+
+class ConnectConfig(BaseModel):
+    """设备连接配置"""
+    serial_id: str = Field(description="设备序列号")
+    user_id: str = Field(description="用户ID")
+    ip: Optional[str] = Field(default=None, description="设备IP地址")
+    port: Optional[int] = Field(default=None, description="设备端口")
+    executor_type: str = Field(default="selenium", description="执行器类型")
+    timeout: int = Field(default=30, description="连接超时时间")
+    webdriver_mode: str = Field(default="remote", description="WebDriver模式")
+    remote_url: Optional[str] = Field(default=None, description="远程WebDriver地址")
+    browser_version: Optional[str] = Field(default="138", description="浏览器版本")
+    platform_name: Optional[str] = Field(default="android", description="平台名称")
+    android_package: Optional[str] = Field(default="com.tencent.mm", description="Android包名")
+    android_process: Optional[str] = Field(default="com.tencent.mm:appbrand0", description="Android进程名")
 
 
 class DisconnectRequest(BaseModel):

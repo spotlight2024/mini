@@ -6,6 +6,7 @@ from selenium.webdriver.remote.webelement import WebElement
 
 from hybrid_driver.log_config import get_logger
 from hybrid_driver.webdriver.executor_factory import executor_factory
+from hybrid_driver.api.models import ConnectConfig
 from hybrid_driver.webdriver.web_executor import WebExecutor
 
 # 获取logger实例
@@ -31,7 +32,7 @@ class AndroidDevice:
         self._status = "disconnected"  # connected/disconnected
         self.adb_device = adbutils.adb.device(serial=self._serial_id)
 
-    def connect(self, **kwargs) -> bool:
+    def connect(self, config: Optional[ConnectConfig] = None, **kwargs) -> bool:
         """连接设备"""
         try:
             logger.info(f"尝试通过 adb 查找设备 serial_id={self._serial_id}")
@@ -55,10 +56,17 @@ class AndroidDevice:
                     **self._executor_kwargs
                 )
 
-            if not self._web_execute.connect(self._serial_id, **kwargs):
-                logger.error(f"WebExecutor 初始化失败 serial_id={self._serial_id}")
-                self._status = "disconnected"
-                return False
+            # 如果提供了 ConnectConfig，使用它；否则使用 kwargs
+            if config:
+                if not self._web_execute.connect(config):
+                    logger.error(f"WebExecutor 初始化失败 serial_id={self._serial_id}")
+                    self._status = "disconnected"
+                    return False
+            else:
+                if not self._web_execute.connect(self._serial_id, **kwargs):
+                    logger.error(f"WebExecutor 初始化失败 serial_id={self._serial_id}")
+                    self._status = "disconnected"
+                    return False
 
             logger.info(f"WebExecutor 初始化成功 serial_id={self._serial_id}")
             self._status = "connected"

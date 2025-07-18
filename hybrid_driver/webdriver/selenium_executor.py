@@ -27,6 +27,7 @@ from hybrid_driver.operation import OperationItem, OperationSequence
 from hybrid_driver.webdriver.web_executor import WebExecutor
 from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
 from hybrid_driver.config.settings import settings
+from hybrid_driver.api.models import ConnectConfig
 
 # 获取logger实例
 logger = get_logger(__name__)
@@ -154,6 +155,58 @@ def connect_webdriver(serial_id: str) -> WebDriver:
         return driver
 
 
+def connect_webdriver_with_config(config: ConnectConfig) -> WebDriver:
+    """使用 ConnectConfig 创建 WebDriver"""
+    logger.info(f"开始创建 WebDriver config={config.model_dump()}")
+    options = ChromeOptions()
+
+    # 使用配置中的参数
+    options.enable_mobile(
+        android_package=config.android_package,
+        device_serial=config.serial_id,
+    )
+    options.add_experimental_option("androidUseRunningApp", True)
+    if config.android_process:
+        options.add_experimental_option("androidProcess", config.android_process)
+
+    options.set_capability("browserName", "chrome")
+    
+    # 设置浏览器版本和平台
+    if config.browser_version:
+        options.set_capability("browserVersion", config.browser_version)
+    if config.platform_name:
+        options.set_capability("platformName", config.platform_name)
+
+    logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
+
+    if config.webdriver_mode == "remote":
+        # 远程 WebDriver
+        remote_url = config.remote_url or settings.REMOTE_WEBDRIVER_URL
+        if not remote_url:
+            raise ValueError("REMOTE_WEBDRIVER_URL 未配置")
+        logger.info(f"使用 RemoteWebDriver: {remote_url}")
+
+        driver = webdriver.Remote(
+            command_executor=remote_url,
+            options=options
+        )
+        driver.implicitly_wait(3)
+        logger.info(f"RemoteWebDriver 创建成功 serial_id={config.serial_id}")
+        return driver
+    else:
+        # 本地 WebDriver
+        path = ChromeDriverManager(driver_version=config.browser_version or TEST_CONFIG["chrome_version"]).install()
+        logger.info(f"ChromeDriver 路径: {path}")
+        if 'THIRD_PARTY_NOTICES.chromedriver' in path:
+            path = path.replace('THIRD_PARTY_NOTICES.chromedriver', 'chromedriver')
+            logger.info(f"更新后的 ChromeDriver 路径: {path}")
+        service = ChromeService(executable_path=path)
+        driver = webdriver.Chrome(options=options, service=service)
+        driver.implicitly_wait(3)
+        logger.info(f"WebDriver 创建成功 serial_id={config.serial_id}")
+        return driver
+
+
 class SeleniumWebExecutor(WebExecutor):
     """Selenium WebDriver 实现"""
 
@@ -162,17 +215,26 @@ class SeleniumWebExecutor(WebExecutor):
         self._device_id = None
         logger.info("初始化完成")
 
-    def connect(self, serial_id: str, **kwargs) -> bool:
+    def connect(self, device_id_or_config: Union[str, ConnectConfig], **kwargs) -> bool:
         """
         连接到设备
-        :param serial_id: 设备序列号
+        :param device_id_or_config: 设备序列号或连接配置
         :param kwargs: 其他参数
         :return: 是否连接成功
         """
         try:
-            self._driver = connect_webdriver(serial_id)
-            self._device_id = serial_id
-            logger.info(f"设备连接成功 serial_id={serial_id}")
+            if isinstance(device_id_or_config, ConnectConfig):
+                # 使用 ConnectConfig
+                config = device_id_or_config
+                self._driver = connect_webdriver_with_config(config)
+                self._device_id = config.serial_id
+                logger.info(f"设备连接成功 serial_id={config.serial_id}")
+            else:
+                # 向后兼容：使用字符串
+                serial_id = device_id_or_config
+                self._driver = connect_webdriver(serial_id)
+                self._device_id = serial_id
+                logger.info(f"设备连接成功 serial_id={serial_id}")
             return True
         except Exception as e:
             logger.error(f"设备连接失败: {e}")

@@ -1,16 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Union
 
 import selenium
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
+from hybrid_driver.api.models import ConnectConfig
 
 
 class WebExecutor(ABC):
     """Web 操作执行器基类"""
     
     @abstractmethod
-    def connect(self, device_id: str, **kwargs) -> bool:
+    def connect(self, device_id_or_config: Union[str, ConnectConfig], **kwargs) -> bool:
         """连接设备"""
         pass
     
@@ -83,6 +84,6 @@ class WebExecutor(ABC):
         """获取可见页面列表"""
         pass
 
-    def get_raw_remote_webdriver(self) -> WebDriver:
+    def get_raw_remote_webdriver(self) -> Optional[WebDriver]:
         pass
 
