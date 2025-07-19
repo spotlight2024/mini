@@ -4,7 +4,8 @@
 source venv/bin/activate
 
 # 设置Python路径
-export PYTHONPATH=/root/script/mini:$PYTHONPATH
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+export PYTHONPATH=$SCRIPT_DIR:$PYTHONPATH
 
 echo "启动 hybrid_driver 服务器..."
 echo "Python路径: $PYTHONPATH"
