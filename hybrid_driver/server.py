@@ -11,6 +11,7 @@ import selenium.webdriver.support.expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 
+from hybrid_driver.native import script_executor
 from hybrid_driver.device_pool import DevicePool
 from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
 from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
@@ -23,6 +24,7 @@ from hybrid_driver.log_config import get_logger
 
 app = FastAPI()
 device_pool = DevicePool()
+app.include_router(script_executor.commandRouter)
 
 # 初始化自动扩缩容和指标收集
 auto_scaler = SpotLightAutoScaler()
@@ -188,15 +190,15 @@ async def click(req: ClickRequest):
             device = await run_sync(device_pool.connect, config)
             if device is None:
                 return APIResponse(
-                    code=1002, 
-                    message="设备未找到或连接失败", 
+                    code=1002,
+                    message="设备未找到或连接失败",
                     error=f"Device {req.serial_id} not found or connection failed",
                     trace_id=trace_id
                 )
         if not hasattr(device, '_web_execute') or device._web_execute is None:
             return APIResponse(
-                code=1004, 
-                message="WebDriver未初始化", 
+                code=1004,
+                message="WebDriver未初始化",
                 error="WebDriver not initialized",
                 trace_id=trace_id
             )
@@ -211,8 +213,8 @@ async def click(req: ClickRequest):
             # 只保留真正的页面对象（可选：可加更严格的类型检查）
             if len(pages) == 0:
                 return APIResponse(
-                    code=1006, 
-                    message="没有可用的页面", 
+                    code=1006,
+                    message="没有可用的页面",
                     error="No available pages found",
                     trace_id=trace_id
                 )
@@ -221,8 +223,8 @@ async def click(req: ClickRequest):
             await run_sync(device._web_execute.switch_to_window, getattr(page0, 'handle', page0))
         except Exception as e:
             return APIResponse(
-                code=1007, 
-                message="页面切换失败", 
+                code=1007,
+                message="页面切换失败",
                 error=f"Failed to switch to page: {str(e)}",
                 trace_id=trace_id
             )
@@ -237,15 +239,15 @@ async def click(req: ClickRequest):
             result = await run_sync(click_op.execute, device)
             if result:
                 return APIResponse(
-                    code=0, 
-                    message="点击操作成功", 
+                    code=0,
+                    message="点击操作成功",
                     data={"method": req.method, "selector": req.selector},
                     trace_id=trace_id
                 )
             else:
                 return APIResponse(
-                    code=1003, 
-                    message="点击操作失败", 
+                    code=1003,
+                    message="点击操作失败",
                     error="Click operation returned false",
                     trace_id=trace_id
                 )
@@ -253,40 +255,40 @@ async def click(req: ClickRequest):
             error_msg = str(e)
             if "element not found" in error_msg.lower() or "no such element" in error_msg.lower():
                 return APIResponse(
-                    code=1008, 
-                    message="元素未找到", 
+                    code=1008,
+                    message="元素未找到",
                     error=f"Element not found: {error_msg}",
                     data={"method": req.method, "selector": req.selector},
                     trace_id=trace_id
                 )
             elif "element not interactable" in error_msg.lower() or "element click intercepted" in error_msg.lower():
                 return APIResponse(
-                    code=1009, 
-                    message="元素不可交互", 
+                    code=1009,
+                    message="元素不可交互",
                     error=f"Element not interactable: {error_msg}",
                     data={"method": req.method, "selector": req.selector},
                     trace_id=trace_id
                 )
             elif "timeout" in error_msg.lower():
                 return APIResponse(
-                    code=1010, 
-                    message="操作超时", 
+                    code=1010,
+                    message="操作超时",
                     error=f"Operation timeout: {error_msg}",
                     data={"method": req.method, "selector": req.selector, "timeout": req.timeout},
                     trace_id=trace_id
                 )
             else:
                 return APIResponse(
-                    code=1011, 
-                    message="点击操作异常", 
+                    code=1011,
+                    message="点击操作异常",
                     error=f"Click operation exception: {error_msg}",
                     data={"method": req.method, "selector": req.selector},
                     trace_id=trace_id
                 )
     except Exception as e:
         return APIResponse(
-            code=2000, 
-            message="系统异常", 
+            code=2000,
+            message="系统异常",
             error=f"System exception: {str(e)}",
             trace_id=trace_id
         )
@@ -312,8 +314,8 @@ async def run_operations(req: OperationRequest):
             except Exception as e2:
                 logging.error(f"无法转换操作对象: {op}, 错误: {e2}")
                 return APIResponse(
-                    code=2000, 
-                    message="系统异常", 
+                    code=2000,
+                    message="系统异常",
                     error=f"无法处理操作对象: {str(e2)}",
                     trace_id=trace_id
                 )
@@ -329,30 +331,30 @@ async def check_page(request: dict):
     try:
         serial_id = request.get("serial_id")
         required_page = request.get("required_page")
-        
+
         if not serial_id:
             return {"code": 1, "message": "serial_id is required"}
-        
+
         if not required_page:
             return {"code": 1, "message": "required_page is required"}
-        
+
         # 获取设备
         device = await run_sync(device_pool.get, serial_id)
         if device is None:
             return {"code": 2, "message": f"Device {serial_id} not found"}
-        
+
         try:
             # 获取当前页面信息
             current_url = await run_sync(device.get_current_url)
             page_source = await run_sync(device.get_page_source)
-            
+
             # 确保返回的是字符串类型
             current_url_str = str(current_url) if current_url is not None else ""
             page_source_str = str(page_source) if page_source is not None else ""
-            
+
             # 简单的页面检测逻辑，可以根据需要扩展
             is_current_page = check_page_type(current_url_str, page_source_str, required_page)
-            
+
             return {
                 "code": 0,
                 "message": "Page check completed",
@@ -360,14 +362,14 @@ async def check_page(request: dict):
                 "currentPage": detect_current_page(current_url_str, page_source_str),
                 "currentUrl": current_url_str
             }
-            
+
         except Exception as e:
             logging.error(f"Page check failed: {str(e)}")
             return {
                 "code": 3,
                 "message": f"Page check error: {str(e)}"
             }
-    
+
     except Exception as e:
         logging.error(f"Check page request failed: {str(e)}")
         return {
@@ -386,7 +388,7 @@ def check_page_type(url: str, page_source: str, required_page: str) -> bool:
             # 检查页面源码中是否包含首页特征
             if any(keyword in page_source.lower() for keyword in ["首页", "主页", "home", "menu_page"]):
                 return True
-        
+
         elif required_page == "ShopDetail":
             # 检查是否为店铺详情页
             if "shop" in url.lower() or "store" in url.lower():
@@ -394,18 +396,18 @@ def check_page_type(url: str, page_source: str, required_page: str) -> bool:
             # 检查页面源码中是否包含店铺详情页特征
             if any(keyword in page_source.lower() for keyword in ["店铺", "商店", "shop", "store", "商品"]):
                 return True
-        
+
         elif required_page == "SearchShopList":
             # 检查是否为店铺搜索页
             if "search" in url.lower():
                 return True
             if any(keyword in page_source.lower() for keyword in ["搜索", "search", "店铺列表"]):
                 return True
-        
+
         # 更多页面类型可以在此扩展
-        
+
         return False
-        
+
     except Exception as e:
         logging.error(f"Page type check failed: {str(e)}")
         return False
@@ -420,7 +422,7 @@ def detect_current_page(url: str, page_source: str) -> str:
             return "ShopDetail"
         elif "search" in url.lower():
             return "SearchShopList"
-        
+
         # 根据页面内容检测
         if any(keyword in page_source.lower() for keyword in ["首页", "主页", "menu_page"]):
             return "Home"
@@ -428,9 +430,9 @@ def detect_current_page(url: str, page_source: str) -> str:
             return "ShopDetail"
         elif any(keyword in page_source.lower() for keyword in ["搜索", "店铺列表"]):
             return "SearchShopList"
-        
+
         return "Unknown"
-        
+
     except Exception as e:
         logging.error(f"Page detection failed: {str(e)}")
         return "Unknown"
@@ -445,23 +447,23 @@ async def find_elements(req: FindElementRequest):
         device = await run_sync(device_pool.get, req.serial_id)
         if device is None:
             return APIResponse(
-                code=1002, 
-                message="设备未找到", 
+                code=1002,
+                message="设备未找到",
                 error=f"Device {req.serial_id} not found",
                 trace_id=trace_id
             )
-        
+
         elements = await run_sync(device.find_elements, req.method, req.selector)
         # 确保 elements 是列表类型
         if elements is None or not isinstance(elements, list) or len(elements) == 0:
             logging.info("no elements found")
             return APIResponse(
-                code=1003, 
-                message="elements not found", 
+                code=1003,
+                message="elements not found",
                 error=f"No elements found with selector: {req.selector}",
                 trace_id=trace_id
             )
-        
+
         # 提取元素信息
         element_data = []
         for i, element in enumerate(elements):
@@ -482,11 +484,11 @@ async def find_elements(req: FindElementRequest):
             except Exception as e:
                 logging.warning(f"Failed to extract element {i} info: {e}")
                 continue
-        
+
         logging.info(f"found {len(element_data)} elements")
         return APIResponse(
-            code=0, 
-            message="success", 
+            code=0,
+            message="success",
             data={
                 "elements": element_data,
                 "count": len(element_data)
@@ -495,8 +497,8 @@ async def find_elements(req: FindElementRequest):
         )
     except Exception as e:
         return APIResponse(
-            code=2000, 
-            message="系统异常", 
+            code=2000,
+            message="系统异常",
             error=str(e),
             trace_id=trace_id
         )
@@ -528,12 +530,12 @@ async def collect_items(req: CollectItemsRequest):
         device = await run_sync(device_pool.get, req.serial_id)
         if device is None:
             return APIResponse(
-                code=1002, 
-                message="设备未找到", 
+                code=1002,
+                message="设备未找到",
                 error=f"Device {req.serial_id} not found",
                 trace_id=trace_id
             )
-        
+
         # 创建收集操作，支持新协议和老协议
         if req.config_json or req.config_file:
             collect_op = CollectItemsOp(
@@ -551,29 +553,29 @@ async def collect_items(req: CollectItemsRequest):
                 close_dialog=req.close_dialog if req.close_dialog is not None else True,
                 package_name=req.package_name
             )
-        
+
         # 执行收集操作
         result = await run_sync(collect_op.execute, device)
-        
+
         if result:
             return APIResponse(
-                code=0, 
-                message="收集成功", 
+                code=0,
+                message="收集成功",
                 data=result,
                 trace_id=trace_id
             )
         else:
             return APIResponse(
-                code=1003, 
-                message="收集失败", 
+                code=1003,
+                message="收集失败",
                 error="No items collected",
                 trace_id=trace_id
             )
-            
+
     except Exception as e:
         return APIResponse(
-            code=2000, 
-            message="系统异常", 
+            code=2000,
+            message="系统异常",
             error=str(e),
             trace_id=trace_id
         )
@@ -629,13 +631,13 @@ if __name__ == "__main__":
         # 等待连接操作完成
         await connect(ConnectRequest(serial_id=serial_id))
         logger.debug("test")
-        
+
         # switch to current page
         device = await run_sync(device_pool.get, serial_id)
         if device is None:
             logger.error("设备未找到")
             return
-            
+
         # 获取可见页面并切换
         driver: SeleniumWebExecutor = device.web_executor
         if driver is None:
