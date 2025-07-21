@@ -20,7 +20,7 @@ class ConnectConfig(BaseModel):
     webdriver_mode: str = Field(default="remote", description="WebDriver模式")
     remote_url: Optional[str] = Field(default=None, description="远程WebDriver地址")
     browser_version: Optional[str] = Field(default="138", description="浏览器版本")
-    platform_name: Optional[str] = Field(default="android", description="平台名称")
+    platform_name: Optional[str] = Field(default="linux", description="平台名称")
     android_package: Optional[str] = Field(default="com.tencent.mm", description="Android包名")
     android_process: Optional[str] = Field(default="com.tencent.mm:appbrand0", description="Android进程名")
 

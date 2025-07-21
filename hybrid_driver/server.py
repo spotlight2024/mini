@@ -12,6 +12,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 
 from hybrid_driver.device_pool import DevicePool
+from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
 from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
 from hybrid_driver.operation import OperationSequence, FindElement, Click, Wait, JS, HandlePopup, build_operations, CollectItemsOp
 from hybrid_driver.auto_scaler import SpotLightAutoScaler
@@ -94,7 +95,14 @@ class SetTextRequest(BaseModel):
 @app.post("/connect", response_model=APIResponse)
 async def connect(req: ConnectRequest):
     try:
-        device = await run_sync(device_pool.connect, req.serial_id)
+        # 创建 ConnectConfig 对象
+        from hybrid_driver.api.models import ConnectConfig
+        config = ConnectConfig(
+            serial_id=req.serial_id,
+            user_id="connect_user",  # 默认用户ID
+            android_process="com.tencent.mm:appbrand0"
+        )
+        device = await run_sync(device_pool.connect, config)
         if device is not None:
             # 使用装饰器模式获取 WebDriver
             # 移除所有 web_driver_decorator 相关代码和注释
@@ -170,7 +178,14 @@ async def click(req: ClickRequest):
     try:
         device = await run_sync(device_pool.get, req.serial_id)
         if device is None:
-            device = await run_sync(device_pool.connect, req.serial_id)
+            # 创建 ConnectConfig 对象
+            from hybrid_driver.api.models import ConnectConfig
+            config = ConnectConfig(
+                serial_id=req.serial_id,
+                user_id="click_user",  # 默认用户ID
+                android_process="com.tencent.mm:appbrand0"
+            )
+            device = await run_sync(device_pool.connect, config)
             if device is None:
                 return APIResponse(
                     code=1002, 
@@ -282,7 +297,27 @@ async def run_operations(req: OperationRequest):
     device = await run_sync(device_pool.get, req.serial_id)
     if not device:
         return APIResponse(code=400101, message="device not found", trace_id=trace_id)
-    ops = build_operations([op.model_dump() for op in req.operations])
+    try:
+        ops = build_operations([op.model_dump() for op in req.operations])
+    except AttributeError as e:
+        # 如果 operations 中的某些项不是 Pydantic 模型，尝试转换为字典
+        operation_dicts = []
+        for op in req.operations:
+            try:
+                if hasattr(op, 'model_dump'):
+                    operation_dicts.append(op.model_dump())
+                else:
+                    # 尝试将对象转换为字典
+                    operation_dicts.append(dict(op))
+            except Exception as e2:
+                logging.error(f"无法转换操作对象: {op}, 错误: {e2}")
+                return APIResponse(
+                    code=2000, 
+                    message="系统异常", 
+                    error=f"无法处理操作对象: {str(e2)}",
+                    trace_id=trace_id
+                )
+        ops = build_operations(operation_dicts)
     seq = OperationSequence(ops)
     results = await run_sync(seq.execute, device)
     return APIResponse(code=0, message="success", data={"results": results}, trace_id=trace_id)
@@ -589,7 +624,7 @@ async def mock_find_element(req: FindElementRequest):
 
 if __name__ == "__main__":
     async def main():
-        serial_id = "123.56.152.41:6529"
+        serial_id = "47.94.130.125:6521"
 
         # 等待连接操作完成
         await connect(ConnectRequest(serial_id=serial_id))
@@ -602,7 +637,7 @@ if __name__ == "__main__":
             return
             
         # 获取可见页面并切换
-        driver = device.web_executor
+        driver: SeleniumWebExecutor = device.web_executor
         if driver is None:
             logger.error("WebExecutor未初始化")
             return
@@ -612,7 +647,10 @@ if __name__ == "__main__":
             logger.info(f"成功切换到页面: {pages[0].handle}")
         else:
             logger.warning("没有找到可见页面")
-    
+
+        find_element = driver.get_raw_remote_webdriver().find_element(By.CSS_SELECTOR,"wx-view.search-text")
+        logger.info(f"find element : ${find_element.text}")
+        find_element.click()
     # 运行异步主函数
     asyncio.run(main())
 

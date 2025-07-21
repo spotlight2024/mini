@@ -1,38 +1,27 @@
-import time
 import logging
-from typing import Optional, List, Dict, Any, Union
+import time
+import os
+from typing import Optional, Any, List, Union
 
 import selenium
 from selenium import webdriver
-from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from selenium.webdriver.firefox.service import Service as FirefoxService
-from selenium.webdriver.edge.options import Options as EdgeOptions
-from selenium.webdriver.edge.service import Service as EdgeService
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.firefox import GeckoDriverManager
-from webdriver_manager.microsoft import EdgeChromiumDriverManager
-import json
-import os
 
-from hybrid_driver.log_config import get_logger
-from hybrid_driver.operation import OperationItem, OperationSequence
 from hybrid_driver.webdriver.web_executor import WebExecutor
-from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
+from hybrid_driver.api.models import ConnectConfig, OperationItem
 from hybrid_driver.config.settings import settings
-from hybrid_driver.api.models import ConnectConfig
+from hybrid_driver.log_config import get_logger
+from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
 
-# 获取logger实例
 logger = get_logger(__name__)
-LOG_DIR = os.path.dirname(os.path.abspath(__file__))
-
 
 TEST_CONFIG = {
     "chrome_version": "134.0.6998.136",
@@ -157,7 +146,24 @@ def connect_webdriver(serial_id: str) -> WebDriver:
 
 def connect_webdriver_with_config(config: ConnectConfig) -> WebDriver:
     """使用 ConnectConfig 创建 WebDriver"""
-    logger.info(f"开始创建 WebDriver config={config.model_dump()}")
+    # 确保 config 是 ConnectConfig 实例
+    if not isinstance(config, ConnectConfig):
+        logger.error(f"config 不是 ConnectConfig 实例，而是 {type(config)}: {config}")
+        raise ValueError(f"Expected ConnectConfig instance, got {type(config)}")
+    
+    try:
+        config_dict = config.model_dump()
+        logger.info(f"开始创建 WebDriver config={config_dict}")
+    except AttributeError as e:
+        logger.error(f"config 对象没有 model_dump 方法: {e}")
+        # 尝试使用 dict() 方法作为备选
+        try:
+            config_dict = dict(config)
+            logger.info(f"使用 dict() 方法获取配置: {config_dict}")
+        except Exception as e2:
+            logger.error(f"无法获取配置信息: {e2}")
+            config_dict = {"serial_id": str(config)}
+            logger.info(f"使用默认配置: {config_dict}")
     options = ChromeOptions()
 
     # 使用配置中的参数
@@ -174,8 +180,8 @@ def connect_webdriver_with_config(config: ConnectConfig) -> WebDriver:
     # 设置浏览器版本和平台
     if config.browser_version:
         options.set_capability("browserVersion", config.browser_version)
-    if config.platform_name:
-        options.set_capability("platformName", config.platform_name)
+
+    options.set_capability("platformName", "linux")
 
     logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
 
@@ -271,6 +277,9 @@ class SeleniumWebExecutor(WebExecutor):
         :return: 元素对象
         """
         try:
+            if self._driver is None:
+                logger.error("WebDriver未初始化")
+                return None
             return self._driver.find_element(by, value)
         except Exception as e:
             logger.error(f"查找元素失败: {e}")
@@ -284,6 +293,9 @@ class SeleniumWebExecutor(WebExecutor):
         :return: 元素列表
         """
         try:
+            if self._driver is None:
+                logger.error("WebDriver未初始化")
+                return None
             return self._driver.find_elements(by, value)
         except Exception as e:
             logger.error(f"查找元素失败: {e}")
@@ -298,6 +310,9 @@ class SeleniumWebExecutor(WebExecutor):
         :param trace_id: 追踪ID
         :return: 元素对象
         """
+        if self._driver is None:
+            logger.error("WebDriver未初始化")
+            return None
         return WebDriverUtils.wait_for_element(self._driver, by, value, timeout, trace_id)
 
     def wait_for_new_window(self, timeout: int = 10, old_handles: Optional[set] = None) -> Optional[str]:
@@ -307,6 +322,9 @@ class SeleniumWebExecutor(WebExecutor):
         :param old_handles: 旧窗口句柄集合
         :return: 新窗口句柄
         """
+        if self._driver is None:
+            logger.error("WebDriver未初始化")
+            return None
         return WebDriverUtils.wait_for_new_window(self._driver, timeout, old_handles)
 
     def wait_for_page_load(self, timeout: int = 10) -> bool:
@@ -315,6 +333,9 @@ class SeleniumWebExecutor(WebExecutor):
         :param timeout: 超时时间
         :return: 是否加载完成
         """
+        if self._driver is None:
+            logger.error("WebDriver未初始化")
+            return False
         return WebDriverUtils.wait_for_page_load(self._driver, timeout)
 
     def execute_script(self, script: str, *args) -> Any:
@@ -325,6 +346,9 @@ class SeleniumWebExecutor(WebExecutor):
         :return: 执行结果
         """
         try:
+            if self._driver is None:
+                logger.error("WebDriver未初始化")
+                return None
             return self._driver.execute_script(script, *args)
         except Exception as e:
             logger.error(f"执行脚本失败: {e}")
@@ -336,6 +360,9 @@ class SeleniumWebExecutor(WebExecutor):
         :return: URL字符串
         """
         try:
+            if self._driver is None:
+                logger.error("WebDriver未初始化")
+                return ""
             return self._driver.current_url
         except Exception as e:
             logger.error(f"获取URL失败: {e}")
@@ -347,6 +374,9 @@ class SeleniumWebExecutor(WebExecutor):
         :return: 页面源码字符串
         """
         try:
+            if self._driver is None:
+                logger.error("WebDriver未初始化")
+                return ""
             return self._driver.page_source
         except Exception as e:
             logger.error(f"获取页面源码失败: {e}")
@@ -357,6 +387,10 @@ class SeleniumWebExecutor(WebExecutor):
         处理常见弹窗
         """
         try:
+            if self._driver is None:
+                logger.error("WebDriver未初始化")
+                return
+                
             popup_selectors = [
                 "button.close",
                 ".modal-close",
@@ -388,6 +422,9 @@ class SeleniumWebExecutor(WebExecutor):
         :return: 窗口句柄列表
         """
         try:
+            if self._driver is None:
+                logger.error("WebDriver未初始化")
+                return []
             return self._driver.window_handles
         except Exception as e:
             logger.error(f"获取窗口句柄失败: {e}")
@@ -399,12 +436,18 @@ class SeleniumWebExecutor(WebExecutor):
         :param handle: 窗口句柄
         """
         try:
+            if self._driver is None:
+                logger.error("WebDriver未初始化")
+                return
             self._driver.switch_to.window(handle)
         except Exception as e:
             logger.error(f"切换窗口失败: {e}")
 
     def switch_to_new_window(self) -> None:
         try:
+            if self._driver is None:
+                logger.error("WebDriver未初始化")
+                return
             visible_page = WebDriverUtils.get_visible_page(self._driver)
             self.switch_to_window(visible_page[0].handle)
             logger.info(f"切换到当前可见的 page: {visible_page[0]}")
@@ -417,6 +460,9 @@ class SeleniumWebExecutor(WebExecutor):
         :return: 窗口句柄
         """
         try:
+            if self._driver is None:
+                logger.error("WebDriver未初始化")
+                return ""
             return self._driver.current_window_handle
         except Exception as e:
             logger.error(f"获取当前窗口句柄失败: {e}")
@@ -425,11 +471,12 @@ class SeleniumWebExecutor(WebExecutor):
     def get_visible_pages(self, timeout: int = 10) -> list[Any] | str:
         """获取可见页面列表"""
         if self._driver is None:
+            logger.error("WebDriver未初始化")
             return []
-        from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
-        return WebDriverUtils.get_visible_page(self._driver, timeout)
+        return WebDriverUtils.get_visible_page(self._driver, 10)
 
-    def get_raw_remote_webdriver(self) -> selenium.webdriver.remote.webdriver.WebDriver:
+    def get_raw_remote_webdriver(self) -> Optional[selenium.webdriver.remote.webdriver.WebDriver]:
+        """获取原始WebDriver实例"""
         return self._driver
 
 """
@@ -441,38 +488,42 @@ search btn:
 
 def main():
     from hybrid_driver.device_pool import DevicePool
-    device = DevicePool().connect("172.16.1.125:6524")
+
+    config = ConnectConfig(
+        serial_id="47.94.130.125:6521",
+        user_id="0",
+        android_process="com.tencent.mm:appbrand0"
+    )
+    device = DevicePool().connect(config)
 
     # switch to current page
     driver = device._web_execute._driver
 
     pages = WebDriverUtils.get_visible_page(driver)
-    driver.switch_to.window(pages[0].handle)
-
     try:
         # 构建操作序列
         operations = [
-            # click menu
-            OperationItem("click",
-                          native_action="ACTION_CLICK --close_dialog=1 --pkg=com.tencent.mm --id=com.tencent.mm:id/a0g --text=菜单",
-                          context_type="NATIVE", wait_for_new_window=True),
-            # 查找搜索按钮
-            OperationItem("find", method="css selector", selector="wx-view.query.menu-bar--query", timeout=2),
-            # 点击搜索按钮并等待新窗口
-            OperationItem("click", wait_for_new_window=True, timeout=2),
-            # 等待新页面渲染
-            OperationItem("wait_for_page_render", timeout=1),
-            # 查找输入框
-            OperationItem("find", method="css selector",
-                          selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=2),
-            OperationItem("click", wait_for_new_window=False, timeout=2),
+            # # click menu
+            # OperationItem("click",
+            #               native_action="ACTION_CLICK --close_dialog=1 --pkg=com.tencent.mm --id=com.tencent.mm:id/a0g --text=菜单",
+            #               context_type="NATIVE", wait_for_new_window=True),
+            # # 查找搜索按钮
+            # OperationItem("find", method="css selector", selector="wx-view.query.menu-bar--query", timeout=2),
+            # # 点击搜索按钮并等待新窗口
+            # OperationItem("click", wait_for_new_window=True, timeout=2),
+            # # 等待新页面渲染
+            # OperationItem("wait_for_page_render", timeout=1),
+            # # 查找输入框
+            # OperationItem("find", method="css selector",
+            #               selector="wx-input.query-bar--input_native[confirm-type='search']", timeout=2),
+            # OperationItem("click", wait_for_new_window=False, timeout=2),
             # # 输入搜索文本
             OperationItem("input_text", text="拿铁"),
-            # 查找搜索按钮
-            OperationItem("find", method="css selector", selector="wx-view.btn_query.query-bar--btn_query",
-                          timeout=2),
-            # 点击搜索按钮
-            OperationItem("click")
+            # # 查找搜索按钮
+            # OperationItem("find", method="css selector", selector="wx-view.btn_query.query-bar--btn_query",
+            #               timeout=2),
+            # # 点击搜索按钮
+            # OperationItem("click")
         ]
 
         # 构建并执行操作序列
@@ -592,6 +643,4 @@ def connect_remote():
 
 
 if __name__ == "__main__":
-    # main()
-    connect_remote()
-    
+    main()

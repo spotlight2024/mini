@@ -9,6 +9,9 @@ from hybrid_driver.webdriver.executor_factory import executor_factory
 from hybrid_driver.api.models import ConnectConfig
 
 from hybrid_driver.log_config import setup_logging
+from hybrid_driver.log_config import get_logger
+
+logger = get_logger(__name__)
 
 setup_logging()
 
@@ -35,7 +38,20 @@ class DevicePool:
     def connect(self, config: ConnectConfig) -> AndroidDevice:
         """连接设备并返回设备实例"""
         with self.lock:
-            logging.info(f"[DevicePool] 尝试连接 config={config.model_dump()}")
+            logger.info(f"start connect device: ${config}")
+            # 确保 config 是 ConnectConfig 实例
+            if not isinstance(config, ConnectConfig):
+                logger.error(f"config 不是 ConnectConfig 实例，而是 {type(config)}: {config}")
+                raise ValueError(f"Expected ConnectConfig instance, got {type(config)}")
+            
+            try:
+                config_dict = config.model_dump()
+                logger.info(f"[DevicePool] 尝试连接 config={config_dict}")
+            except AttributeError as e:
+                logger.error(f"config 对象没有 model_dump 方法: {e}")
+                config_dict = {"serial_id": config.serial_id if hasattr(config, 'serial_id') else str(config)}
+                logger.info(f"[DevicePool] 尝试连接 config={config_dict}")
+            
             device = self.pool.get(config.serial_id)
 
             # 如果设备不存在或已断开，创建新设备
@@ -48,15 +64,15 @@ class DevicePool:
                     )
                     if device.connect(config):
                         self.pool[config.serial_id] = device
-                        logging.info(f"[DevicePool] 设备连接成功 serial_id={config.serial_id}")
+                        logger.info(f"[DevicePool] 设备连接成功 serial_id={config.serial_id}")
                     else:
-                        logging.error(f"[DevicePool] 设备连接失败 serial_id={config.serial_id}")
+                        logger.error(f"[DevicePool] 设备连接失败 serial_id={config.serial_id}")
                         raise RuntimeError(f"Failed to connect device: {config.serial_id}")
                 except Exception as e:
-                    logging.error(f"[DevicePool] 设备连接失败 serial_id={config.serial_id}: {e}")
+                    logger.error(f"[DevicePool] 设备连接失败 serial_id={config.serial_id}: {e}")
                     raise
             else:
-                logging.info(f"[DevicePool] 设备已存在且存活 serial_id={config.serial_id}")
+                logger.info(f"[DevicePool] 设备已存在且存活 serial_id={config.serial_id}")
 
             return device
 
@@ -73,19 +89,19 @@ class DevicePool:
     def get(self, serial_id) -> Optional[AndroidDevice]:
         """获取设备实例，如果不存在返回 None"""
         with self.lock:
-            logging.info(f"[DevicePool] 获取设备 serial_id={serial_id}")
+            logger.info(f"[DevicePool] 获取设备 serial_id={serial_id}")
             return self.pool.get(serial_id)
 
     def disconnect(self, serial_id):
         """断开设备连接并释放资源"""
         with self.lock:
-            logging.info(f"[DevicePool] 断开设备 serial_id={serial_id}")
+            logger.info(f"[DevicePool] 断开设备 serial_id={serial_id}")
             device = self.pool.pop(serial_id, None)
             if device:
                 try:
                     device.disconnect()
                 except Exception as e:
-                    logging.error(f"[DevicePool] 断开设备失败 serial_id={serial_id}: {e}")
+                    logger.error(f"[DevicePool] 断开设备失败 serial_id={serial_id}: {e}")
 
     def _start_cleanup_task(self, interval=600):
         """启动清理任务，定期清理空闲设备"""
@@ -100,18 +116,18 @@ class DevicePool:
                             if not device.is_connected():
                                 self.disconnect(serial_id)
                 except Exception as e:
-                    logging.error(f"[DevicePool] 清理任务异常: {e}")
+                    logger.error(f"[DevicePool] 清理任务异常: {e}")
 
         t = threading.Thread(target=task, daemon=True)
         t.start()
 
     def __enter__(self):
         """支持上下文管理器"""
-        logging.info("[DevicePool] enter")
+        logger.info("[DevicePool] enter")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        logging.info("[DevicePool] exit")
+        logger.info("[DevicePool] exit")
         """退出上下文时清理所有设备"""
         # for serial_id in list(self.pool.keys()):
         #     self.disconnect(serial_id)

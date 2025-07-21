@@ -1,19 +1,17 @@
-import logging
 from fastapi import APIRouter
-from requests import session
-from typing import Dict, Any, Optional
 from datetime import datetime
+from typing import TypeVar, Callable, cast
+
+from fastapi import APIRouter
 
 from hybrid_driver.api.models import (
     ConnectRequest, ConnectConfig, DisconnectRequest, ActionRequest, APIResponse,
-    ConnectionData, ErrorData, DisconnectData, ActionData,
-    DeviceInfo, DeviceCapabilities
+    ConnectionData, ErrorData, DeviceInfo, DeviceCapabilities
 )
 from hybrid_driver.device_pool import DevicePool
-from hybrid_driver.utils.async_utils import run_sync
 from hybrid_driver.log_config import get_logger
-from hybrid_driver.device.android_device import AndroidDevice
-from typing import TypeVar, Callable, Awaitable, cast
+from hybrid_driver.utils.async_utils import run_sync
+from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
 
 router = APIRouter(prefix="/device", tags=["设备管理"])
 logger = get_logger(__name__)
@@ -38,14 +36,22 @@ async def connect(req: ConnectRequest):
         device = await run_sync_typed(DevicePool().connect, config)  # 类型安全
         if device is not None:
             web_executor = device.get_web_driver()
+            session_id = "unknown"
+            
             if web_executor and hasattr(web_executor, 'get_raw_remote_webdriver'):
                 try:
                     raw_driver = web_executor.get_raw_remote_webdriver()
-                    session_id = str(raw_driver.session_id) if raw_driver else "unknown"
-                except Exception:
+                    if raw_driver:
+                        # 获取session_id但不关闭driver
+                        session_id = str(raw_driver.session_id) if raw_driver else "unknown"
+                        logger.info(f"获取到session_id: {session_id}")
+                    else:
+                        logger.warning("raw_driver为None")
+                except Exception as e:
+                    logger.error(f"获取session_id失败: {e}")
                     session_id = "unknown"
             else:
-                session_id = "unknown"
+                logger.warning("web_executor未初始化或没有get_raw_remote_webdriver方法")
             
             # 使用 Pydantic 模型构建响应数据
             connection_data = ConnectionData(
@@ -64,10 +70,53 @@ async def connect(req: ConnectRequest):
                 )
             )
             
+            # 获取可见页面并切换
+            web_executor = device.web_executor
+            if web_executor is None:
+                logger.error("WebExecutor未初始化")
+                return APIResponse(
+                    code=1004, 
+                    message="WebExecutor未初始化",
+                    data=connection_data.model_dump()
+                )
+            
+            # 类型检查
+            if not isinstance(web_executor, SeleniumWebExecutor):
+                logger.error(f"WebExecutor类型错误: {type(web_executor)}")
+                return APIResponse(
+                    code=1004, 
+                    message="WebExecutor类型错误",
+                    data=connection_data.model_dump()
+                )
+            
+            executor: SeleniumWebExecutor = web_executor
+            driver = executor.get_raw_remote_webdriver()
+            if driver is None:
+                logger.error("WebExecutor未初始化")
+                return APIResponse(
+                    code=1004, 
+                    message="WebExecutor未初始化",
+                    data=connection_data.model_dump()
+                )
+
+            pages = await run_sync_typed(executor.get_visible_pages)
+
+            logger.info(f"pages : ${pages}")
+            try:
+                data_dict = connection_data.model_dump()
+            except AttributeError as e:
+                logger.error(f"connection_data 没有 model_dump 方法: {e}")
+                data_dict = {
+                    "session_id": session_id,
+                    "serial_id": req.serial_id,
+                    "user_id": req.user_id,
+                    "status": "connected"
+                }
+            
             return APIResponse(
                 code=0, 
                 message="设备连接成功", 
-                data=connection_data.model_dump()
+                data=data_dict
             )
         else:
             error_data = ErrorData(
@@ -80,25 +129,30 @@ async def connect(req: ConnectRequest):
                 ]
             )
             
+            try:
+                error_dict = error_data.model_dump()
+            except AttributeError as e:
+                logger.error(f"error_data 没有 model_dump 方法: {e}")
+                error_dict = {
+                    "serial_id": req.serial_id,
+                    "error_reason": "设备不可用或连接超时"
+                }
+            
             return APIResponse(
                 code=1001, 
                 message="设备连接失败",
-                data=error_data.model_dump()
+                data=error_dict
             )
     except Exception as ex:
         logger.error(f"连接设备异常: {ex}")
-        error_data = ErrorData(
-            serial_id=req.serial_id,
-            error_reason="系统异常",
-            exception_type=type(ex).__name__,
-            error_details=str(ex)
-        )
-        
         return APIResponse(
             code=2000, 
-            message="系统异常", 
+            message="连接设备时发生异常", 
             error=str(ex),
-            data=error_data.model_dump()
+            data={
+                "serial_id": req.serial_id,
+                "exception_type": type(ex).__name__
+            }
         )
 
 

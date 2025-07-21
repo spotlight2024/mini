@@ -5,7 +5,7 @@ from pathlib import Path
 from loguru import logger
 
 def setup_logging(
-    log_level="INFO",
+    log_level="TRACE",
     log_dir="logs",
     rotation="10 MB",
     retention="1 week",

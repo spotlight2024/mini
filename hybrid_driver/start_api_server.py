@@ -36,7 +36,7 @@ def main():
             "hybrid_driver.server_optimized:app",
             host=args.host,
             port=args.port,
-            reload=args.reload,
+            reload=True,
             log_level=config.log_level.lower()
         )
     except KeyboardInterrupt:

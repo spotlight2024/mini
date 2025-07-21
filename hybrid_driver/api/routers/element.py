@@ -119,7 +119,14 @@ async def click(req: ClickRequest):
     try:
         device = await run_sync(DevicePool().get, req.serial_id)
         if device is None:
-            device = await run_sync(DevicePool().connect, req.serial_id)
+            # 创建 ConnectConfig 对象
+            from hybrid_driver.api.models import ConnectConfig
+            config = ConnectConfig(
+                serial_id=req.serial_id,
+                user_id="0",  # 默认用户ID
+                android_process="com.tencent.mm:appbrand0"
+            )
+            device = await run_sync(DevicePool().connect, config)
             if device is None:
                 return APIResponse(
                     code=1002, 
@@ -134,31 +141,31 @@ async def click(req: ClickRequest):
                 error="WebDriver not initialized",
                 trace_id=trace_id
             )
-        
-        try:
-            pages = await run_sync(device._web_execute.get_visible_pages)
-            # 强制类型安全，pages 只允许为 list，否则置空
-            if not isinstance(pages, list):
-                pages = []
-            # 只保留真正的页面对象（可选：可加更严格的类型检查）
-            if len(pages) == 0:
-                return APIResponse(
-                    code=1006, 
-                    message="没有可用的页面", 
-                    error="No available pages found",
-                    trace_id=trace_id
-                )
-            # 只遍历 list 类型
-            page0 = pages[0]
-            await run_sync(device._web_execute.switch_to_window, getattr(page0, 'handle', page0))
-        except Exception as e:
-            return APIResponse(
-                code=1007, 
-                message="页面切换失败", 
-                error=f"Failed to switch to page: {str(e)}",
-                trace_id=trace_id
-            )
-        
+        #
+        # try:
+        #     pages = await run_sync(device._web_execute.get_visible_pages)
+        #     # 强制类型安全，pages 只允许为 list，否则置空
+        #     if not isinstance(pages, list):
+        #         pages = []
+        #     # 只保留真正的页面对象（可选：可加更严格的类型检查）
+        #     if len(pages) == 0:
+        #         return APIResponse(
+        #             code=1006,
+        #             message="没有可用的页面",
+        #             error="No available pages found",
+        #             trace_id=trace_id
+        #         )
+        #     # 只遍历 list 类型
+        #     page0 = pages[0]
+        #     await run_sync(device._web_execute.switch_to_window, getattr(page0, 'handle', page0))
+        # except Exception as e:
+        #     return APIResponse(
+        #         code=1007,
+        #         message="页面切换失败",
+        #         error=f"Failed to switch to page: {str(e)}",
+        #         trace_id=trace_id
+        #     )
+        #
         try:
             from hybrid_driver.operation import Click
             click_op = Click(
@@ -233,7 +240,27 @@ async def run_operations(req: OperationRequest):
     device = await run_sync(DevicePool().get, req.serial_id)
     if not device:
         return APIResponse(code=400101, message="device not found", trace_id=trace_id)
-    ops = build_operations([op.model_dump() for op in req.operations])
+    try:
+        ops = build_operations([op.model_dump() for op in req.operations])
+    except AttributeError as e:
+        # 如果 operations 中的某些项不是 Pydantic 模型，尝试转换为字典
+        operation_dicts = []
+        for op in req.operations:
+            try:
+                if hasattr(op, 'model_dump'):
+                    operation_dicts.append(op.model_dump())
+                else:
+                    # 尝试将对象转换为字典
+                    operation_dicts.append(dict(op))
+            except Exception as e2:
+                logging.error(f"无法转换操作对象: {op}, 错误: {e2}")
+                return APIResponse(
+                    code=2000, 
+                    message="系统异常", 
+                    error=f"无法处理操作对象: {str(e2)}",
+                    trace_id=trace_id
+                )
+        ops = build_operations(operation_dicts)
     seq = OperationSequence(ops)
     results = await run_sync(seq.execute, device)
     return APIResponse(code=0, message="success", data={"results": results}, trace_id=trace_id)

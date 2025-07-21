@@ -53,7 +53,8 @@ class FindElement(Operation):
                     return element
 
             # 查找元素
-            elem = device.wait_for_element(self.method, self.selector, self.timeout)
+            # elem = device.wait_for_element(self.method, self.selector, self.timeout)
+            elem = device.find_element(self.method, self.selector)
             if elem:
                 logger.info(f"[{FindElement}], Element found: {elem}")
                 # 更新上下文
