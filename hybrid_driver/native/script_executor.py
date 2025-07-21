@@ -12,24 +12,24 @@ import re
 
 class EncoderUtils:
     """编码工具类，用于对参数值进行编码以避免特殊字符问题"""
-    
+
     # 需要转义的特殊字符集合
     HEX_CHARS = {' ', '\n', '\r', '\t', '#', '=', ',', '|', '-', '[', ']', '{', '}'}
-    
+
     @staticmethod
     def encode_string(text: str) -> str:
         """
         将字符串中的特殊字符进行十六进制编码
-        
+
         Args:
             text: 需要编码的字符串
-            
+
         Returns:
             编码后的字符串
         """
         if not text:
             return text
-            
+
         result = []
         for char in text:
             if char in EncoderUtils.HEX_CHARS:
@@ -37,7 +37,7 @@ class EncoderUtils:
                 result.append(f'%{ord(char):02X}')
             else:
                 result.append(char)
-        
+
         return ''.join(result)
 
 class Script(BaseModel):
@@ -88,10 +88,10 @@ class CommandExecutor:
     def _replace_variables(self, commands: str) -> str:
         """
         替换commands中的变量占位符
-        
+
         Args:
             commands: 包含{{PARAM_NAME}}格式占位符的命令字符串
-            
+
         Returns:
             替换变量后的命令字符串
         """
@@ -106,15 +106,15 @@ class CommandExecutor:
             else:
                 print(f"[VARIABLE_REPLACE] Warning: Parameter '{param_name}' not found in params")
                 return match.group(0)  # 如果找不到参数，保持原样
-        
+
         # 使用正则表达式查找并替换所有{{PARAM_NAME}}格式的占位符
         pattern = r'\{\{([^}]+)\}\}'
         result = re.sub(pattern, replace_variable, commands)
-        
+
         if result != commands:
             print(f"[VARIABLE_REPLACE] Original: {commands}")
             print(f"[VARIABLE_REPLACE] Replaced: {result}")
-        
+
         return result
 
     async def execute(self):
@@ -366,7 +366,9 @@ async def execute(httpRequest: Request, requestData: ScriptExecuteRequest) -> Co
     print(f"[REQUEST] data: {requestData}")
     req_id = requestData.req_id
     client_ip = httpRequest.client.host if httpRequest.client else "unknown"
-    command_execute_url = f"http://127.0.0.1:{requestData.port}/execute"
+    if client_ip.startswith("172.16."):
+        client_ip = "127.0.0.1"
+    command_execute_url = f"http://{client_ip}:{requestData.port}/execute"
     params = requestData.script.params
     if params == None:
         params = {}
