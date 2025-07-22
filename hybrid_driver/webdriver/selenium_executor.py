@@ -595,10 +595,11 @@ def connect_remote():
     options.add_experimental_option("androidUseRunningApp", True)
     options.add_experimental_option('androidDeviceSerial', serial_id)
     options.add_experimental_option("androidProcess", "com.tencent.mm:appbrand0")
-    options.set_capability("browserVersion", "134")
+    options.set_capability("browserVersion", "138")
     options.set_capability("platformName", "linux")
     options.set_capability("browserName","chrome")
     # options.set_capability("se:serial_id", serial_id)
+    options("se:adbDeviceId", "aaaa")
 
     logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
 
@@ -643,4 +644,5 @@ def connect_remote():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    connect_remote()

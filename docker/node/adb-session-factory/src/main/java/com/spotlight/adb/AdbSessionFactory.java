@@ -1,6 +1,7 @@
 package com.spotlight.adb;
 
 import org.openqa.selenium.Capabilities;
+import org.openqa.selenium.Platform;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.grid.data.CreateSessionRequest;
 import org.openqa.selenium.grid.node.ActiveSession;
@@ -26,13 +27,13 @@ public class AdbSessionFactory implements SessionFactory {
     public Capabilities getStereotype() {
         System.out.println("[AdbSessionFactory] getStereotype() called, returning chrome capability");
         // 只声明 chrome 能力，不包含 adbDeviceId
-        return new DesiredCapabilities("chrome", "", org.openqa.selenium.Platform.ANY);
+        return new DesiredCapabilities("chrome", "138", Platform.valueOf("linux"));
     }
 
     @Override
     public boolean test(Capabilities capabilities) {
         boolean match = "chrome".equalsIgnoreCase(capabilities.getBrowserName())
-            && capabilities.asMap().containsKey("adbDeviceId");
+            && capabilities.asMap().containsKey("se:adbDeviceId");
         System.out.println("[AdbSessionFactory] test() called, browserName=" + capabilities.getBrowserName() + ", adbDeviceId=" + capabilities.asMap().get("adbDeviceId") + ", match=" + match);
         return match;
     }
