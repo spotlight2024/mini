@@ -28,6 +28,7 @@ COPY ./scripts/custom_startup.sh /opt/custom-scripts/
 COPY ./scripts/adb_init.sh /opt/custom-scripts/
 RUN chmod +x /opt/custom-scripts/custom_startup.sh /opt/custom-scripts/adb_init.sh
 
+COPY ./node/adb-session-factory/target/adb-session-factory-1.0-SNAPSHOT.jar /opt/selenium/extensions/
 # 创建启动脚本包装器
 RUN echo '#!/bin/bash' > /opt/bin/custom-entrypoint.sh && \
     echo 'set -e' >> /opt/bin/custom-entrypoint.sh && \
