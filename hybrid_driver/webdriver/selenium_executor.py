@@ -580,7 +580,7 @@ def connect_remote_local():
     logger.info(f"page : {driver.page_source}")
 
 def connect_remote():
-    serial_id = "123.56.152.41:6529"
+    serial_id = "172.16.1.125:6569"
     logger.info(f"开始创建 WebDriver serial_id={serial_id}")
     options = ChromeOptions()
 
@@ -599,7 +599,7 @@ def connect_remote():
     options.set_capability("platformName", "linux")
     options.set_capability("browserName","chrome")
     # options.set_capability("se:serial_id", serial_id)
-    options("se:adbDeviceId", "aaaa")
+    options.set_capability("se:adbDeviceId", serial_id)
 
     logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
 
