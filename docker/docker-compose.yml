@@ -26,55 +26,73 @@ services:
       - "4444:4444"
     environment:
       # - SE_LOG_LEVEL=DEBUG
-      - SE_NODE_SESSION_TIMEOUT=100
-      - SE_SESSION_REQUEST_TIMEOUT=30
+      - SE_NODE_SESSION_TIMEOUT=15
+      - SE_SESSION_REQUEST_TIMEOUT=15
       - SE_ENABLE_TRACING=true
-      - SE_LOG_LEVEL=DEBUG
+      - SE_LOG_LEVEL=ALL
     # volumes:
     #   # 挂载Hub配置文件
     #   - ./config/grid-config.toml:/opt/selenium/config.toml:ro
     networks:
       - selenium-grid
 
-  #==================
-  # Node-Docker (直接使用宿主机Docker)
-  #==================
-  node-docker:
-    image: selenium/node-docker:latest
-    container_name: selenium-node-docker
-    environment:
-      - SE_EVENT_BUS_HOST=selenium-hub
-      - SE_EVENT_BUS_PUBLISH_PORT=4442
-      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
-      - SE_NODE_DOCKER_CONFIG_FILENAME=docker.toml 
-      # - SE_ENABLE_TRACING=true
-      # - SE_LOG_LEVEL=DEBUG
-    volumes:
-      - ./assets:/opt/selenium/assets
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./config/node-docker-config.toml:/opt/selenium/docker.toml
-    devices:
-      - /dev/bus/usb:/dev/bus/usb
-    privileged: true
+  chrome-driver:
+    image: custom-selenium-chrome:adb_1
     depends_on:
       - selenium-hub
+    volumes:
+      - ./node/adb-session-factory/target/adb-session-factory-1.1-SNAPSHOT.jar:/opt/selenium/ext/adb-session-factory.jar
+    environment:
+      - SE_EXTRA_LIBS=/opt/selenium/ext/adb-session-factory.jar
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_LOG_LEVEL=ALL
+      - CONFIG_FILE=/opt/selenium/config-node.toml
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true  
     networks:
       - selenium-grid
 
   #==================
+  # Node-Docker (直接使用宿主机Docker)
+  #==================
+  # node-docker:
+  #   image: selenium/node-docker:latest
+  #   container_name: selenium-node-docker
+  #   environment:
+  #     - SE_EVENT_BUS_HOST=selenium-hub
+  #     - SE_EVENT_BUS_PUBLISH_PORT=4442
+  #     - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+  #     - SE_NODE_DOCKER_CONFIG_FILENAME=docker.toml 
+  #     - SE_LOG_LEVEL=ALL
+  #     # - SE_ENABLE_TRACING=true
+  #     # - SE_LOG_LEVEL=DEBUG
+  #   volumes:
+  #     - ./assets:/opt/selenium/assets
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - ./config/node-docker-config.toml:/opt/selenium/docker.toml
+  #   devices:
+  #     - /dev/bus/usb:/dev/bus/usb
+  #   privileged: true
+  #   depends_on:
+  #     - selenium-hub
+  #   networks:
+  #     - selenium-grid
+
+  #==================
   # Portainer (可选 - Docker管理界面)
   #==================
-  portainer:
-    image: portainer/portainer-ce:latest
-    container_name: portainer
-    ports:
-      - "9000:9000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer-data:/data
-    networks:
-      - selenium-grid
-    restart: unless-stopped
+  # portainer:
+  #   image: portainer/portainer-ce:latest
+  #   container_name: portainer
+  #   ports:
+  #     - "9000:9000"
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - portainer-data:/data
+  #   networks:
+  #     - selenium-grid
+  #   restart: unless-stopped
 
 #==================
 # 网络配置
