@@ -43,7 +43,6 @@ services:
     environment:
       - SE_EVENT_BUS_HOST=selenium-hub
       - SE_LOG_LEVEL=ALL
-      - CONFIG_FILE=/opt/selenium/config-node.toml
     devices:
       - /dev/bus/usb:/dev/bus/usb
     privileged: true  
