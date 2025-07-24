@@ -40,10 +40,7 @@ services:
     image: custom-selenium-chrome:adb_1
     depends_on:
       - selenium-hub
-    volumes:
-      - ./node/adb-session-factory/target/adb-session-factory-1.1-SNAPSHOT.jar:/opt/selenium/ext/adb-session-factory.jar
     environment:
-      - SE_EXTRA_LIBS=/opt/selenium/ext/adb-session-factory.jar
       - SE_EVENT_BUS_HOST=selenium-hub
       - SE_LOG_LEVEL=ALL
       - CONFIG_FILE=/opt/selenium/config-node.toml

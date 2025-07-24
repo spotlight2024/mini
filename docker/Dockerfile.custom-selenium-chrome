@@ -28,9 +28,9 @@ RUN mkdir -p /root/.android
 # 复制自定义脚本到镜像
 COPY ./scripts/custom_startup.sh /opt/custom-scripts/
 COPY ./scripts/adb_init.sh /opt/custom-scripts/
-# RUN chmod +x /opt/custom-scripts/custom_startup.sh /opt/custom-scripts/adb_init.sh
+RUN chmod +x /opt/custom-scripts/custom_startup.sh
 
-COPY ./node/adb-session-factory/target/adb-session-factory-1.1-SNAPSHOT.jar /opt/selenium/extensions/
+# COPY ./node/adb-session-factory/target/adb-session-factory-1.1-SNAPSHOT.jar /opt/selenium/extensions/
 
 # 复制 selenium-server.jar 到容器
 COPY ./node/selenuim/selenium_server_deploy.jar /opt/selenium/selenium-server.jar

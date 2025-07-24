@@ -120,20 +120,20 @@ else
     echo "✗ 日志目录不可写"
 fi
 
-# 初始化 ADB 服务
-echo ""
-echo "=== 初始化 ADB 服务 ==="
-if [ -f /opt/custom-scripts/adb_init.sh ]; then
-    echo "执行 ADB 初始化脚本..."
-    /opt/custom-scripts/adb_init.sh
-    echo "ADB 初始化完成"
-else
-    echo "警告: ADB 初始化脚本不存在"
-fi
+# # 初始化 ADB 服务
+# echo ""
+# echo "=== 初始化 ADB 服务 ==="
+# if [ -f /opt/custom-scripts/adb_init.sh ]; then
+#     echo "执行 ADB 初始化脚本..."
+#     /opt/custom-scripts/adb_init.sh
+#     echo "ADB 初始化完成"
+# else
+#     echo "警告: ADB 初始化脚本不存在"
+# fi
 
-# 显示 ADB 设备状态
-echo "当前 ADB 设备状态:"
-adb devices
+# # 显示 ADB 设备状态
+# echo "当前 ADB 设备状态:"
+# adb devices
 
 echo ""
 echo "=== 自定义启动脚本执行完成 ==="
