@@ -12,7 +12,7 @@ max-sessions = 3
 # Docker镜像和capability映射配置
 configs = [
     # "selenium/standalone-chrome:137.0-chromedriver-137.0-grid-4.34.0-20250707", '{"browserName": "chrome","browserVersion": "137","platformName": "linux"}'
-    "custom-selenium-chrome", '{"browserName": "chrome","browserVersion": "138","platformName": "linux"}'
+    "custom-selenium-chrome:adb", '{"browserName": "chrome","browserVersion": "138","platformName": "linux"}'
 
 ]
 
