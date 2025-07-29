@@ -1,4 +1,4 @@
-FROM selenium/node-chrome:138.0.7204.157-chromedriver-138.0.7204.157-grid-4.34.0-20250717
+FROM selenium/node-chrome:128.0.6613.137-chromedriver-128.0.6613.137-grid-4.34.0-20250717
 
 # 设置工作目录
 WORKDIR /opt/scripts
@@ -7,6 +7,7 @@ WORKDIR /opt/scripts
 USER root
 
 ENV SE_EXTRA_LIBS=/opt/selenium/extensions/adb-session-factory-1.1-SNAPSHOT.jar
+ENV ADB_PROXY_LOG_LEVEL=INFO
 
 # 安装必要的工具
 RUN apt-get update && apt-get install -y \
@@ -17,18 +18,29 @@ RUN apt-get update && apt-get install -y \
     vim \
     adb \
     android-tools-adb \
+    python3 \
+    python3-pip \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建脚本目录
-RUN mkdir -p /opt/scripts /opt/custom-scripts /opt/adb
+RUN mkdir -p /opt/scripts /opt/custom-scripts /opt/adb /opt/scripts/logs
 
 # 创建 ADB 配置目录
 RUN mkdir -p /root/.android
 
+# 设置日志目录权限
+RUN chmod 755 /opt/scripts/logs
+RUN chown -R 1200:1200 /opt/scripts/logs
+
 # 复制自定义脚本到镜像
 COPY ./scripts/custom_startup.sh /opt/custom-scripts/
 COPY ./scripts/adb_init.sh /opt/custom-scripts/
+COPY ./scripts/proxy/adb_proxy.py /opt/custom-scripts/
+COPY ./scripts/stop_adb_proxy.sh /opt/custom-scripts/
 RUN chmod +x /opt/custom-scripts/custom_startup.sh
+RUN chmod +x /opt/custom-scripts/adb_proxy.py
+RUN chmod +x /opt/custom-scripts/stop_adb_proxy.sh
 
 # COPY ./node/adb-session-factory/target/adb-session-factory-1.1-SNAPSHOT.jar /opt/selenium/extensions/
 

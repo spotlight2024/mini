@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  chrome-driver:
+    build:
+      context: .
+      dockerfile: Dockerfile.custom-selenium-chrome
+    container_name: chrome-driver-adb-proxy
+    ports:
+      - "4444:4444"  # Selenium Grid
+      - "5037:5037"  # ADB Proxy
+    environment:
+      # ADB代理日志级别配置
+      # 可选值: DEBUG, INFO, WARNING, ERROR, CRITICAL, NONE
+      # DEBUG: 最详细的日志，包含所有请求和响应数据
+      # INFO: 一般信息日志，包含连接和基本操作
+      # WARNING: 只显示警告和错误
+      # ERROR: 只显示错误信息
+      # CRITICAL: 只显示严重错误
+      # NONE: 完全关闭日志输出（最高性能）
+      - ADB_PROXY_LOG_LEVEL=INFO
+      
+      # 其他Selenium相关环境变量
+      - SE_NODE_MAX_SESSIONS=4
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      - SE_VNC_YES_NO=no
+      - SE_NOVNC_YES_NO=no
+      - SE_VNC_NO_PASSWORD=yes
+      - SE_NOVNC_NO_PASSWORD=yes
+      - SE_VNC_VIEW_ONLY=no
+      - SE_NOVNC_VIEW_ONLY=no
+    volumes:
+      # 挂载ADB相关目录
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/usb:/dev/usb
+    devices:
+      # 允许访问USB设备
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true
+    restart: unless-stopped
+
+  # 示例：高性能模式（关闭所有日志）
+  chrome-driver-performance:
+    build:
+      context: .
+      dockerfile: Dockerfile.custom-selenium-chrome
+    container_name: chrome-driver-performance
+    ports:
+      - "4445:4444"  # 使用不同端口避免冲突
+      - "5038:5037"  # ADB Proxy端口
+    environment:
+      # 完全关闭日志输出以获得最高性能
+      - ADB_PROXY_LOG_LEVEL=NONE
+      - SE_NODE_MAX_SESSIONS=4
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/usb:/dev/usb
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true
+    restart: unless-stopped
+
+  # 示例：调试模式（详细日志）
+  chrome-driver-debug:
+    build:
+      context: .
+      dockerfile: Dockerfile.custom-selenium-chrome
+    container_name: chrome-driver-debug
+    ports:
+      - "4446:4444"  # 使用不同端口避免冲突
+      - "5039:5037"  # ADB Proxy端口
+    environment:
+      # 启用详细调试日志
+      - ADB_PROXY_LOG_LEVEL=DEBUG
+      - SE_NODE_MAX_SESSIONS=4
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/usb:/dev/usb
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true
+    restart: unless-stopped 

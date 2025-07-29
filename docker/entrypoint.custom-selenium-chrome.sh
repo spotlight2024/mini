@@ -1,10 +1,22 @@
 #!/bin/bash
 set -e
 
+# 定义清理函数
+cleanup() {
+    echo "=== 容器关闭，执行清理操作 ==="
+    if [ -f /opt/custom-scripts/stop_adb_proxy.sh ]; then
+        /opt/custom-scripts/stop_adb_proxy.sh
+    fi
+    echo "=== 清理操作完成 ==="
+}
+
+# 设置信号处理
+trap cleanup SIGTERM SIGINT
+
 echo "=== 自定义 Selenium Chrome 容器启动 ==="
 echo "容器启动时间: $(date)"
 echo "当前进程ID: $$"
-echo "传入的参数: $@"
+echo "传入的参数: $*"
 echo "执行阶段: 1. 自定义启动脚本包装器开始"
 
 echo "# EXTRA_LIBS 环境变量检查"
@@ -24,6 +36,6 @@ else
 fi
 
 echo "执行阶段: 4. 启动原始 Selenium Chrome 服务..."
-echo "即将执行: exec /opt/bin/entry_point.sh $@"
+echo "即将执行: exec /opt/bin/entry_point.sh $*"
 echo "注意: exec 将替换当前进程，后续日志将由 Selenium 服务输出"
 exec /opt/bin/entry_point.sh "$@" 

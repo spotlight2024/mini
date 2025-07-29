@@ -37,12 +37,13 @@ services:
       - selenium-grid
 
   chrome-driver:
-    image: custom-selenium-chrome:adb_1
+    image: custom-selenium-chrome:adb_proxy
     depends_on:
       - selenium-hub
     environment:
       - SE_EVENT_BUS_HOST=selenium-hub
       - SE_LOG_LEVEL=ALL
+      - ADB_PROXY_LOG_LEVEL=DEBUG
     devices:
       - /dev/bus/usb:/dev/bus/usb
     privileged: true  

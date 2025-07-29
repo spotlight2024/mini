@@ -74,17 +74,17 @@ export CUSTOM_LOG_LEVEL="$CUSTOM_LOG_LEVEL"
 # 示例：创建日志目录
 mkdir -p /opt/scripts/logs
 
-# 示例：写入启动日志
-cat > /opt/scripts/logs/startup.log << EOF
-启动时间: $(date)
-运行模式: ${CUSTOM_MODE:-默认模式}
-超时时间: ${CUSTOM_TIMEOUT} 秒
-日志级别: ${CUSTOM_LOG_LEVEL}
-容器ID: $(hostname)
-进程ID: $$
-父进程ID: $PPID
-执行阶段: 自定义启动脚本
-EOF
+# 示例：输出启动信息到控制台
+echo "=== 启动信息 ==="
+echo "启动时间: $(date)"
+echo "运行模式: ${CUSTOM_MODE:-默认模式}"
+echo "超时时间: ${CUSTOM_TIMEOUT} 秒"
+echo "日志级别: ${CUSTOM_LOG_LEVEL}"
+echo "容器ID: $(hostname)"
+echo "进程ID: $$"
+echo "父进程ID: $PPID"
+echo "执行阶段: 自定义启动脚本"
+echo "=================="
 
 # 示例：根据模式执行不同的初始化
 case "${CUSTOM_MODE}" in
@@ -134,6 +134,67 @@ fi
 # # 显示 ADB 设备状态
 # echo "当前 ADB 设备状态:"
 # adb devices
+
+# 启动 ADB 代理服务
+echo ""
+echo "=== 启动 ADB 代理服务 ==="
+
+# 首先启动真实的 ADB 服务在 5038 端口
+echo "启动真实 ADB 服务在 5038 端口..."
+adb -P 5038 start-server
+echo "ADB 服务已启动在端口 5038"
+
+if [ -f /opt/custom-scripts/adb_proxy.py ]; then
+    echo "启动 ADB 代理服务在 5037 端口..."
+    
+    # 检查Python环境
+    echo "检查Python环境..."
+    python3 --version
+    which python3
+    
+    # 检查脚本权限
+    echo "检查脚本权限..."
+    ls -la /opt/custom-scripts/adb_proxy.py
+    
+    # 确保日志目录存在并有正确权限
+    echo "确保日志目录权限..."
+    mkdir -p /opt/scripts/logs
+    chmod 755 /opt/scripts/logs
+    
+    # 在后台启动代理服务
+    echo "启动代理服务..."
+    nohup python3 /opt/custom-scripts/adb_proxy.py &
+    ADB_PROXY_PID=$!
+    echo "ADB 代理服务已启动，PID: $ADB_PROXY_PID"
+    
+    # 等待代理服务启动
+    sleep 3
+    
+    # 检查代理服务是否正常运行
+    if ps -p $ADB_PROXY_PID > /dev/null; then
+        echo "✓ ADB 代理服务运行正常"
+        # 将PID保存到文件，以便后续管理
+        echo $ADB_PROXY_PID > /opt/scripts/adb_proxy.pid
+        
+        # 测试代理连接
+        echo "测试代理连接..."
+        if nc -z localhost 5037; then
+            echo "✓ 代理服务监听端口 5037 正常"
+        else
+            echo "✗ 代理服务监听端口 5037 失败"
+        fi
+    else
+        echo "✗ ADB 代理服务启动失败"
+        echo "检查代理服务进程状态..."
+        ps aux | grep adb_proxy
+    fi
+else
+    echo "警告: ADB 代理脚本不存在: /opt/custom-scripts/adb_proxy.py"
+fi
+
+# 显示 ADB 设备状态
+echo "当前 ADB 设备状态:"
+adb devices
 
 echo ""
 echo "=== 自定义启动脚本执行完成 ==="
