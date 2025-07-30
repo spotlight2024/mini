@@ -31,6 +31,33 @@ SpotLight 是一个面向 Android 虚拟机自动化的云端混合驱动平台�
 
 ---
 
+## 📚 详细文档导航
+
+### 📖 业务代码文档
+- [📋 架构设计](docs/architecture/ARCHITECTURE.md) - 系统架构详解
+- [🔌 API 文档](docs/api/API.md) - 完整API接口说明
+- [📋 部署指南](docs/guides/DEPLOYMENT.md) - 部署和运维指南
+- [🚀 快速部署](docs/guides/QUICK_DEPLOYMENT.md) - 一键部署指南
+- [🛠️ 开发工具](docs/guides/DEV_TOOLS_RECOMMEND.md) - 开发环境配置
+- [📝 操作指令](docs/guides/Instruction.MD) - 操作指令系统说明
+- [⚙️ 服务管理](docs/guides/SERVICE_MANAGEMENT.md) - 服务管理详细指南
+
+### 🐳 容器化文档
+- [🔧 自定义 Selenium](docker/README.custom-selenium.md) - 自定义镜像使用指南
+- [📱 ADB 集成](docker/README.adb-integration.md) - ADB 功能集成说明
+- [🔄 ADB Proxy](docker/scripts/proxy/README.md) - 代理服务详细文档
+- [🏗️ 集群部署](docker/README.adb-proxy.md) - 集群部署方案
+
+### 🔧 Selenium 修改文档
+- [📋 贡献指南](selenium/CONTRIBUTING.md) - Selenium 贡献指南
+- [🔧 构建说明](selenium/README.md) - Selenium 构建和部署
+- [📚 API 文档](selenium/py/README.md) - Python 绑定文档
+
+### 🏗️ 架构整合文档
+- [📋 三大架构层整合](docs/architecture/THREE_LAYER_ARCHITECTURE.md) - 完整的三层架构整合说明
+
+---
+
 ## 🚀 快速开始
 
 ### 环境准备
@@ -326,35 +353,6 @@ pip install -e selenium/py
 # 验证安装
 python -c "import selenium; print(selenium.__version__)"
 ```
-
----
-
-## 📚 详细文档导航
-
-### 📖 业务代码文档
-- [📋 架构设计](docs/architecture/ARCHITECTURE.md) - 系统架构详解
-- [🔌 API 文档](docs/api/API.md) - 完整API接口说明
-- [📋 部署指南](docs/guides/DEPLOYMENT.md) - 部署和运维指南
-- [🚀 快速部署](docs/guides/QUICK_DEPLOYMENT.md) - 一键部署指南
-- [🛠️ 开发工具](docs/guides/DEV_TOOLS_RECOMMEND.md) - 开发环境配置
-- [📝 操作指令](docs/guides/Instruction.MD) - 操作指令系统说明
-- [⚙️ 服务管理](docs/guides/SERVICE_MANAGEMENT.md) - 服务管理详细指南
-
-### 🐳 容器化文档
-- [🔧 自定义 Selenium](docker/README.custom-selenium.md) - 自定义镜像使用指南
-- [📱 ADB 集成](docker/README.adb-integration.md) - ADB 功能集成说明
-- [🔄 ADB Proxy](docker/scripts/proxy/README.md) - 代理服务详细文档
-- [🏗️ 集群部署](docker/README.adb-proxy.md) - 集群部署方案
-
-### 🔧 Selenium 修改文档
-- [📋 贡献指南](selenium/CONTRIBUTING.md) - Selenium 贡献指南
-- [🔧 构建说明](selenium/README.md) - Selenium 构建和部署
-- [📚 API 文档](selenium/py/README.md) - Python 绑定文档
-
-### 🏗️ 架构整合文档
-- [📋 三大架构层整合](docs/architecture/THREE_LAYER_ARCHITECTURE.md) - 完整的三层架构整合说明
-
----
 
 ## 🧪 测试和验证
 
