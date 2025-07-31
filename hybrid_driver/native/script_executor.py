@@ -9,6 +9,63 @@ import aiohttp
 import json
 import threading
 import re
+import socket
+import ipaddress
+import netifaces
+
+def is_ip_in_same_subnet(target_ip: str) -> bool:
+    """
+    检查目标IP是否与本机某个网络接口在同一网段
+    
+    Args:
+        target_ip: 目标IP地址
+        
+    Returns:
+        bool: 如果在同一网段返回True，否则返回False
+    """
+    try:
+        target_addr = ipaddress.ip_address(target_ip)
+        
+        # 获取所有网络接口
+        interfaces = netifaces.interfaces()
+        
+        for interface in interfaces:
+            # 获取接口的地址信息
+            addrs = netifaces.ifaddresses(interface)
+            
+            # 检查IPv4地址
+            if netifaces.AF_INET in addrs:
+                for addr_info in addrs[netifaces.AF_INET]:
+                    if 'addr' in addr_info and 'netmask' in addr_info:
+                        try:
+                            # 创建网络对象
+                            local_ip = addr_info['addr']
+                            netmask = addr_info['netmask']
+                            
+                            # 跳过回环地址
+                            if local_ip.startswith('127.'):
+                                continue
+                                
+                            # 创建网络对象
+                            network = ipaddress.IPv4Network(f"{local_ip}/{netmask}", strict=False)
+                            
+                            # 检查目标IP是否在这个网络中
+                            if target_addr in network:
+                                print(f"[NETWORK_CHECK] Target IP {target_ip} is in same subnet as {local_ip}/{netmask}")
+                                return True
+                        except (ipaddress.AddressValueError, ValueError) as e:
+                            print(f"[NETWORK_CHECK] Error processing interface {interface}: {e}")
+                            continue
+        
+        print(f"[NETWORK_CHECK] Target IP {target_ip} is not in any local subnet")
+        return False
+        
+    except ipaddress.AddressValueError:
+        print(f"[NETWORK_CHECK] Invalid IP address: {target_ip}")
+        return False
+    except Exception as e:
+        print(f"[NETWORK_CHECK] Error checking network: {e}")
+        return False
 
 class EncoderUtils:
     """编码工具类，用于对参数值进行编码以避免特殊字符问题"""
@@ -50,6 +107,7 @@ class Script(BaseModel):
 
 class ScriptExecuteRequest(BaseModel):
     req_id: str
+    ip: str
     port: int
     script: Script
 
@@ -363,16 +421,23 @@ def _build_script_result(executor: CommandExecutor) -> CommandResult:
 
 @commandRouter.post("/execute", response_model=CommandResult)
 async def execute(httpRequest: Request, requestData: ScriptExecuteRequest) -> CommandResult:
-    print(f"[REQUEST] data: {requestData}")
-    req_id = requestData.req_id
     client_ip = httpRequest.client.host if httpRequest.client else "unknown"
-    if client_ip.startswith("172.16."):
-        client_ip = "127.0.0.1"
-    command_execute_url = f"http://{client_ip}:{requestData.port}/execute"
+    print(f"[REQUEST] data: {requestData}, client_ip: {client_ip}")
+
+    ip = requestData.ip
+    # 检查ip是否与本机某一个ip在同一个网段。如果不是，使用127.0.0.1作为ip
+    if not is_ip_in_same_subnet(ip):
+        print(f"[IP_CHECK] IP {ip} is not in same subnet, using 127.0.0.1 instead")
+        ip = "127.0.0.1"
+    else:
+        print(f"[IP_CHECK] IP {ip} is in same subnet, using original IP")
+
+    command_execute_url = f"http://{ip}:{requestData.port}/execute"
     params = requestData.script.params
     if params == None:
         params = {}
 
+    req_id = requestData.req_id
     executor = CommandExecutor(
         req_id=req_id,
         command_execute_url=command_execute_url,
