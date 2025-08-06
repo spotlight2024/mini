@@ -1,7 +1,17 @@
 import logging
 import time
 import os
+import sys
 from typing import Optional, Any, List, Union
+
+# 添加项目根目录到 Python 路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))  # hybrid_driver 的父目录
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# 设置环境变量，确保配置正确加载
+os.environ.setdefault('ENVIRONMENT', 'development')
 
 import selenium
 from selenium import webdriver
@@ -20,6 +30,7 @@ from hybrid_driver.api.models import ConnectConfig, OperationItem
 from hybrid_driver.config.settings import settings
 from hybrid_driver.log_config import get_logger
 from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
+# 代理功能现在通过Docker Chrome扩展实现
 
 logger = get_logger(__name__)
 
@@ -97,6 +108,40 @@ def find_chromedriver(path):
     raise FileNotFoundError("No valid chromedriver executable found.")
 
 
+def configure_proxy_options(options: ChromeOptions, enable_proxy: bool = True):
+    """
+    配置Chrome代理相关选项
+    
+    注意：实际的代理插件已经在Docker容器中预安装，
+    通过环境变量 SE_OPTS 来加载，这里只是添加反检测选项
+    
+    Args:
+        options: Chrome选项对象
+        enable_proxy: 是否启用代理相关优化
+    """
+    if not enable_proxy:
+        logger.info("代理功能未启用")
+        return
+    
+    logger.info("配置代理相关的Chrome选项")
+    
+    # 添加反检测选项
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+    
+    # 设置User-Agent（模拟桌面版浏览器）
+    options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36')
+    
+    # 禁用一些可能暴露自动化特征的功能
+    options.add_argument('--disable-extensions-except')
+    options.add_argument('--disable-plugins-discovery')
+    
+    logger.info("代理相关Chrome选项配置完成")
+
+
 def connect_webdriver(serial_id: str) -> WebDriver:
     logger.info(f"开始创建 WebDriver serial_id={serial_id}")
     options = ChromeOptions()
@@ -144,7 +189,7 @@ def connect_webdriver(serial_id: str) -> WebDriver:
         return driver
 
 
-def connect_webdriver_with_config(config: ConnectConfig) -> WebDriver:
+def connect_webdriver_with_config(config: ConnectConfig, use_proxy: bool = True) -> WebDriver:
     """使用 ConnectConfig 创建 WebDriver"""
     # 确保 config 是 ConnectConfig 实例
     if not isinstance(config, ConnectConfig):
@@ -153,7 +198,7 @@ def connect_webdriver_with_config(config: ConnectConfig) -> WebDriver:
     
     try:
         config_dict = config.model_dump()
-        logger.info(f"开始创建 WebDriver config={config_dict}")
+        logger.info(f"开始创建 WebDriver config={config_dict}, use_proxy={use_proxy}")
     except AttributeError as e:
         logger.error(f"config 对象没有 model_dump 方法: {e}")
         # 尝试使用 dict() 方法作为备选
@@ -164,16 +209,17 @@ def connect_webdriver_with_config(config: ConnectConfig) -> WebDriver:
             logger.error(f"无法获取配置信息: {e2}")
             config_dict = {"serial_id": str(config)}
             logger.info(f"使用默认配置: {config_dict}")
+    
     options = ChromeOptions()
 
     # 使用配置中的参数
-    options.enable_mobile(
-        android_package=config.android_package,
-        device_serial=config.serial_id,
-    )
-    options.add_experimental_option("androidUseRunningApp", True)
-    if config.android_process:
-        options.add_experimental_option("androidProcess", config.android_process)
+    # options.enable_mobile(
+    #     android_package=config.android_package,
+    #     device_serial=config.serial_id,
+    # )
+    # options.add_experimental_option("androidUseRunningApp", True)
+    # if config.android_process:
+    #     options.add_experimental_option("androidProcess", config.android_process)
 
     options.set_capability("browserName", "chrome")
     
@@ -183,34 +229,44 @@ def connect_webdriver_with_config(config: ConnectConfig) -> WebDriver:
 
     options.set_capability("platformName", "linux")
 
+    # 配置代理相关选项（如果启用）
+    if use_proxy:
+        configure_proxy_options(options, enable_proxy=True)
+        logger.info("代理相关选项已配置")
+
     logger.info(f"Chrome 选项配置: {options.to_capabilities()}")
 
-    if config.webdriver_mode == "remote":
-        # 远程 WebDriver
-        remote_url = config.remote_url or settings.REMOTE_WEBDRIVER_URL
-        if not remote_url:
-            raise ValueError("REMOTE_WEBDRIVER_URL 未配置")
-        logger.info(f"使用 RemoteWebDriver: {remote_url}")
+    try:
+        if config.webdriver_mode == "remote":
+            # 远程 WebDriver
+            remote_url = config.remote_url or settings.REMOTE_WEBDRIVER_URL
+            if not remote_url:
+                raise ValueError("REMOTE_WEBDRIVER_URL 未配置")
+            logger.info(f"使用 RemoteWebDriver: {remote_url}")
 
-        driver = webdriver.Remote(
-            command_executor=remote_url,
-            options=options
-        )
-        driver.implicitly_wait(3)
-        logger.info(f"RemoteWebDriver 创建成功 serial_id={config.serial_id}")
-        return driver
-    else:
-        # 本地 WebDriver
-        path = ChromeDriverManager(driver_version=config.browser_version or TEST_CONFIG["chrome_version"]).install()
-        logger.info(f"ChromeDriver 路径: {path}")
-        if 'THIRD_PARTY_NOTICES.chromedriver' in path:
-            path = path.replace('THIRD_PARTY_NOTICES.chromedriver', 'chromedriver')
-            logger.info(f"更新后的 ChromeDriver 路径: {path}")
-        service = ChromeService(executable_path=path)
-        driver = webdriver.Chrome(options=options, service=service)
-        driver.implicitly_wait(3)
-        logger.info(f"WebDriver 创建成功 serial_id={config.serial_id}")
-        return driver
+            driver = webdriver.Remote(
+                command_executor=remote_url,
+                options=options
+            )
+            driver.implicitly_wait(3)
+            logger.info(f"RemoteWebDriver 创建成功 serial_id={config.serial_id}")
+            return driver
+        else:
+            # 本地 WebDriver
+            path = ChromeDriverManager(driver_version=config.browser_version or TEST_CONFIG["chrome_version"]).install()
+            logger.info(f"ChromeDriver 路径: {path}")
+            if 'THIRD_PARTY_NOTICES.chromedriver' in path:
+                path = path.replace('THIRD_PARTY_NOTICES.chromedriver', 'chromedriver')
+                logger.info(f"更新后的 ChromeDriver 路径: {path}")
+            service = ChromeService(executable_path=path)
+            driver = webdriver.Chrome(options=options, service=service)
+            driver.implicitly_wait(3)
+            logger.info(f"WebDriver 创建成功 serial_id={config.serial_id}")
+            return driver
+            
+    except Exception as e:
+        logger.error(f"WebDriver创建失败: {e}")
+        raise
 
 
 class SeleniumWebExecutor(WebExecutor):
@@ -527,15 +583,15 @@ def main():
         ]
 
         # 构建并执行操作序列
-        sequence = OperationSequence(operations)
-        results = sequence.execute(device)
+        # sequence = OperationSequence(operations)
+        # results = sequence.execute(device)
 
         # 打印结果
-        for i, result in enumerate(results):
-            print(f"Step {i + 1}: {'Success' if result['success'] else 'Failed'}")
-            if not result['success']:
-                print(f"Error: {result['error']}")
-            print(f"Time: {result['elapsed']:.2f}s")
+        # for i, result in enumerate(results):
+        #     print(f"Step {i + 1}: {'Success' if result['success'] else 'Failed'}")
+        #     if not result['success']:
+        #         print(f"Error: {result['error']}")
+        #     print(f"Time: {result['elapsed']:.2f}s")
     except Exception as e:
         logger.error(f"执行操作序列失败: {e}")
     finally:
@@ -643,6 +699,60 @@ def connect_remote():
         driver.quit()
 
 
+def test_proxy_connection():
+    """测试带代理的连接功能"""
+    from hybrid_driver.api.models import ConnectConfig
+    
+    logger.info("开始测试代理连接功能")
+    logger.info("注意：代理配置需要通过Docker环境变量设置")
+    
+    # 创建配置
+    config = ConnectConfig(
+        serial_id="172.16.1.125:6569",
+        user_id="0",
+        # android_process="com.tencent.mm:appbrand0",
+        # android_package="com.tencent.mm",
+        webdriver_mode="remote",
+        remote_url="http://172.16.1.129:4444/wd/hub",
+        browser_version="128.0"
+    )
+    
+    driver = None
+    try:
+        # 创建带代理的WebDriver
+        driver = connect_webdriver_with_config(config, use_proxy=True)
+        logger.info("代理WebDriver创建成功")
+        
+        # 测试访问淘宝
+        logger.info("尝试访问淘宝...")
+        driver.get("https://uland.taobao.com/coupon/edetail?e=chTvPCmcIoYNfLV8niU3R5TgU2jJNKOfc4SfXBF8mZqxtWnxHaCboBl9BC%2FpCqWzOLtF6Mp9jnu97Nb7y7XdFPSJ0ADlKjx69FisZt9E7OLLkU4k%2FaBIVWVfKa%2BhVnNDJilEeD1Bf1dvjAmba7v22ZjB6TX2HR3QCtDxl4QgpYBniV%2Bsu%2BOU536iSyl7wVuGCJYBN6wuCER6WaEZ2TVC1yBVpr%2FC8sidurWhnlNnIc8grP0piSuJF96MZTuMEqemyVQgIblpLEtY7jo7Tk7iURlqjQc7%2B9fT&app_pvid=59590_33.4.137.170_1093_1754462579250&ptl=floorId:80309;app_pvid:59590_33.4.137.170_1093_1754462579250;tpp_pvid:83f30852-c16f-4239-baa2-fb2505240354&union_lens=lensId%3AMAPI%401754462579%40210489aa_0e0a_1987e1e6a52_40f1%4001%40eyJmbG9vcklkIjo4MDMwOX0ie")
+        
+        # 等待页面加载
+        time.sleep(5)
+        
+        # 获取页面信息
+        current_url = driver.current_url
+        title = driver.title
+        logger.info(f"访问成功 - URL: {current_url}, Title: {title}")
+        
+        # 检查是否成功绕过反爬虫
+        if "淘宝" in title or "taobao" in current_url.lower():
+            logger.info("✅ 成功访问淘宝，代理工作正常！")
+        else:
+            logger.warning("⚠️ 可能被重定向或阻止访问")
+            
+        return driver
+        
+    except Exception as e:
+        logger.error(f"测试代理连接失败: {e}")
+        if driver:
+            driver.quit()
+        raise
+
+
 if __name__ == "__main__":
     # main()
-    connect_remote()
+    # connect_remote()
+    
+    # 测试代理功能
+    test_proxy_connection()

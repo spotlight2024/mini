@@ -38,11 +38,45 @@ COPY ./scripts/custom_startup.sh /opt/custom-scripts/
 COPY ./scripts/adb_init.sh /opt/custom-scripts/
 COPY ./scripts/proxy/adb_proxy.py /opt/custom-scripts/
 COPY ./scripts/stop_adb_proxy.sh /opt/custom-scripts/
+COPY ./scripts/setup_proxy_config.sh /opt/custom-scripts/
+COPY ./test.sh /opt/custom-scripts/
 RUN chmod +x /opt/custom-scripts/custom_startup.sh
 RUN chmod +x /opt/custom-scripts/adb_proxy.py
 RUN chmod +x /opt/custom-scripts/stop_adb_proxy.sh
+RUN chmod +x /opt/custom-scripts/setup_proxy_config.sh
+RUN chmod +x /opt/custom-scripts/test.sh
 
-# COPY ./node/adb-session-factory/target/adb-session-factory-1.1-SNAPSHOT.jar /opt/selenium/extensions/
+# 创建Chrome扩展目录（动态生成）
+RUN mkdir -p /opt/chrome_extensions/proxy_auth
+RUN chown -R 1200:1200 /opt/chrome_extensions/proxy_auth
+
+# 创建Chrome包装脚本
+RUN echo '#!/bin/bash' > /usr/local/bin/chrome-with-proxy && \
+    echo '# Chrome启动包装脚本，强制加载代理扩展' >> /usr/local/bin/chrome-with-proxy && \
+    echo '' >> /usr/local/bin/chrome-with-proxy && \
+    echo 'EXTENSION_PATH="/opt/chrome_extensions/proxy_auth"' >> /usr/local/bin/chrome-with-proxy && \
+    echo 'ORIGINAL_CHROME="/usr/bin/google-chrome.original"' >> /usr/local/bin/chrome-with-proxy && \
+    echo '' >> /usr/local/bin/chrome-with-proxy && \
+    echo '# 检查是否需要加载扩展' >> /usr/local/bin/chrome-with-proxy && \
+    echo 'if [ "$PROXY_ENABLED" = "true" ] && [ -d "$EXTENSION_PATH" ]; then' >> /usr/local/bin/chrome-with-proxy && \
+    echo '    # 检查是否已经包含扩展参数' >> /usr/local/bin/chrome-with-proxy && \
+    echo '    if [[ "$*" != *"--load-extension"* ]]; then' >> /usr/local/bin/chrome-with-proxy && \
+    echo '        echo "添加代理扩展到Chrome启动参数: $EXTENSION_PATH" >&2' >> /usr/local/bin/chrome-with-proxy && \
+    echo '        exec "$ORIGINAL_CHROME" --load-extension="$EXTENSION_PATH" --disable-blink-features=AutomationControlled "$@"' >> /usr/local/bin/chrome-with-proxy && \
+    echo '    else' >> /usr/local/bin/chrome-with-proxy && \
+    echo '        echo "扩展参数已存在，直接启动Chrome: $*" >&2' >> /usr/local/bin/chrome-with-proxy && \
+    echo '        exec "$ORIGINAL_CHROME" "$@"' >> /usr/local/bin/chrome-with-proxy && \
+    echo '    fi' >> /usr/local/bin/chrome-with-proxy && \
+    echo 'else' >> /usr/local/bin/chrome-with-proxy && \
+    echo '    echo "代理未启用或扩展不存在，直接启动Chrome: $*" >&2' >> /usr/local/bin/chrome-with-proxy && \
+    echo '    exec "$ORIGINAL_CHROME" "$@"' >> /usr/local/bin/chrome-with-proxy && \
+    echo 'fi' >> /usr/local/bin/chrome-with-proxy
+
+RUN chmod +x /usr/local/bin/chrome-with-proxy
+
+# 备份原始Chrome并替换为包装脚本
+RUN mv /usr/bin/google-chrome /usr/bin/google-chrome.original
+RUN ln -s /usr/local/bin/chrome-with-proxy /usr/bin/google-chrome
 
 # 复制 selenium-server.jar 到容器
 COPY ./node/selenuim/selenium_server_deploy.jar /opt/selenium/selenium-server.jar

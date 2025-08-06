@@ -22,6 +22,8 @@ show_help() {
     echo "开发工具命令:"
     echo "  cli       运行CLI工具"
     echo "  test      运行测试"
+    echo "  test-proxy 测试代理功能"
+    echo "  test-docker-proxy 测试Docker代理方案"
     echo "  install   安装依赖"
     echo "  clean     清理缓存"
     echo ""
@@ -75,6 +77,16 @@ case "$1" in
         echo "🧪 运行测试..."
         cd "$SCRIPT_DIR"
         python3 -m pytest tests/ -v
+        ;;
+    test-proxy)
+        echo "🔗 测试代理功能..."
+        cd "$SCRIPT_DIR"
+        python3 scripts/test_proxy.py
+        ;;
+    test-docker-proxy)
+        echo "🐳 测试Docker代理方案..."
+        cd "$SCRIPT_DIR/docker"
+        ./test_proxy_docker.sh
         ;;
     install)
         echo "📦 安装依赖..."

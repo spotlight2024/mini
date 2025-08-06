@@ -47,6 +47,7 @@ SpotLight 是一个面向 Android 虚拟机自动化的云端混合驱动平台�
 - [📱 ADB 集成](docker/README.adb-integration.md) - ADB 功能集成说明
 - [🔄 ADB Proxy](docker/scripts/proxy/README.md) - 代理服务详细文档
 - [🏗️ 集群部署](docker/README.adb-proxy.md) - 集群部署方案
+- [🌐 Chrome代理扩展](docker/README_PROXY.md) - 完全动态生成的代理方案
 
 ### 🔧 Selenium 修改文档
 - [📋 贡献指南](selenium/CONTRIBUTING.md) - Selenium 贡献指南

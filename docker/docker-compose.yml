@@ -29,7 +29,7 @@ services:
       - SE_NODE_SESSION_TIMEOUT=15
       - SE_SESSION_REQUEST_TIMEOUT=15
       - SE_ENABLE_TRACING=true
-      - SE_LOG_LEVEL=ALL
+      - SE_LOG_LEVEL=INFO
     # volumes:
     #   # 挂载Hub配置文件
     #   - ./config/grid-config.toml:/opt/selenium/config.toml:ro
@@ -42,8 +42,16 @@ services:
       - selenium-hub
     environment:
       - SE_EVENT_BUS_HOST=selenium-hub
-      - SE_LOG_LEVEL=ALL
-      - ADB_PROXY_LOG_LEVEL=DEBUG
+      - SE_LOG_LEVEL=INFO
+      # - ADB_PROXY_LOG_LEVEL=DEBUG
+      # 代理配置环境变量
+      - PROXY_ENABLED=${PROXY_ENABLED:-false}
+      - PROXY_HOST=${PROXY_HOST:-}
+      - PROXY_PORT=${PROXY_PORT:-}
+      - PROXY_USERNAME=${PROXY_USERNAME:-}
+      - PROXY_PASSWORD=${PROXY_PASSWORD:-}
+      # Chrome启动参数，加载代理插件
+      - SE_CHROME_ARGS=--load-extension=/opt/chrome_extensions/proxy_auth --disable-blink-features=AutomationControlled --no-sandbox
     devices:
       - /dev/bus/usb:/dev/bus/usb
     privileged: true  

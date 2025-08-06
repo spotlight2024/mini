@@ -31,7 +31,7 @@ check_docker() {
 check_files() {
     local required_files=(
         "Dockerfile.custom-selenium-chrome"
-        "docker-compose.custom-selenium.yml"
+        "docker-compose.custom-selenium-adb.yml"
         "scripts/custom_startup.sh"
     )
     
@@ -48,7 +48,7 @@ check_files() {
 build_image() {
     print_message $BLUE "开始构建自定义 Selenium Chrome 镜像..."
     
-    docker compose -f docker-compose.custom-selenium.yml build --no-cache
+    docker compose -f docker-compose.custom-selenium-adb.yml build --no-cache
     
     if [ $? -eq 0 ]; then
         print_message $GREEN "✓ 镜像构建成功"
@@ -63,21 +63,21 @@ start_test_container() {
     print_message $BLUE "启动测试容器..."
     
     # 停止可能存在的容器
-    docker compose -f docker-compose.custom-selenium.yml down 2>/dev/null || true
+    docker compose -f docker-compose.custom-selenium-adb.yml down 2>/dev/null || true
     
     # 启动生产模式容器
-    docker compose -f docker-compose.custom-selenium.yml up -d custom-selenium-chrome
+    docker compose -f docker-compose.custom-selenium-adb.yml up -d custom-selenium-chrome-adb
     
     # 等待容器启动
     print_message $YELLOW "等待容器启动..."
     sleep 10
     
     # 检查容器状态
-    if docker compose -f docker-compose.custom-selenium.yml ps | grep -q "Up"; then
+    if docker compose -f docker-compose.custom-selenium-adb.yml ps | grep -q "Up"; then
         print_message $GREEN "✓ 测试容器启动成功"
     else
         print_message $RED "✗ 测试容器启动失败"
-        docker compose -f docker-compose.custom-selenium.yml logs custom-selenium-chrome
+        docker compose -f docker-compose.custom-selenium-adb.yml logs custom-selenium-chrome-adb
         exit 1
     fi
 }
@@ -100,7 +100,7 @@ test_selenium_service() {
     fi
     
     # 测试自定义脚本日志
-    local container_id=$(docker compose -f docker-compose.custom-selenium.yml ps -q custom-selenium-chrome)
+    local container_id=$(docker compose -f docker-compose.custom-selenium-adb.yml ps -q custom-selenium-chrome-adb)
     if docker exec "$container_id" test -f /opt/scripts/logs/startup.log; then
         print_message $GREEN "✓ 自定义启动脚本日志文件存在"
     else
@@ -112,17 +112,17 @@ test_selenium_service() {
 show_container_info() {
     print_message $BLUE "容器信息:"
     echo "----------------------------------------"
-    docker compose -f docker-compose.custom-selenium.yml ps
+    docker compose -f docker-compose.custom-selenium-adb.yml ps
     echo ""
     
     print_message $BLUE "容器日志 (最近 20 行):"
     echo "----------------------------------------"
-    docker compose -f docker-compose.custom-selenium.yml logs --tail=20 custom-selenium-chrome
+    docker compose -f docker-compose.custom-selenium-adb.yml logs --tail=20 custom-selenium-chrome-adb
     echo ""
     
     print_message $BLUE "自定义启动脚本日志:"
     echo "----------------------------------------"
-    local container_id=$(docker compose -f docker-compose.custom-selenium.yml ps -q custom-selenium-chrome)
+    local container_id=$(docker compose -f docker-compose.custom-selenium-adb.yml ps -q custom-selenium-chrome-adb)
     if [ -n "$container_id" ]; then
         docker exec "$container_id" cat /opt/scripts/logs/startup.log 2>/dev/null || echo "日志文件不存在"
     fi
@@ -132,7 +132,7 @@ show_container_info() {
 # 清理测试环境
 cleanup() {
     print_message $YELLOW "清理测试环境..."
-    docker compose -f docker-compose.custom-selenium.yml down
+    docker compose -f docker-compose.custom-selenium-adb.yml down
     print_message $GREEN "✓ 清理完成"
 }
 
@@ -182,11 +182,11 @@ main() {
             show_container_info
             ;;
         stop)
-            docker compose -f docker-compose.custom-selenium.yml down
+            docker compose -f docker-compose.custom-selenium-adb.yml down
             print_message $GREEN "✓ 容器已停止"
             ;;
         logs)
-            docker compose -f docker-compose.custom-selenium.yml logs -f custom-selenium-chrome
+            docker compose -f docker-compose.custom-selenium-adb.yml logs -f custom-selenium-chrome-adb
             ;;
         info)
             show_container_info

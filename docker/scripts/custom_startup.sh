@@ -135,6 +135,17 @@ fi
 # echo "当前 ADB 设备状态:"
 # adb devices
 
+# 设置代理配置
+echo ""
+echo "=== 设置代理配置 ==="
+if [ -f /opt/custom-scripts/setup_proxy_config.sh ]; then
+    echo "执行代理配置设置..."
+    /opt/custom-scripts/setup_proxy_config.sh
+    echo "代理配置设置完成"
+else
+    echo "代理配置脚本不存在，跳过代理设置"
+fi
+
 # 启动 ADB 代理服务
 echo ""
 echo "=== 启动 ADB 代理服务 ==="
@@ -201,6 +212,21 @@ echo "=== 自定义启动脚本执行完成 ==="
 echo "脚本完成时间: $(date)"
 echo "即将启动 Selenium 服务..."
 echo ""
+
+# 验证代理扩展配置
+echo ""
+echo "=== 验证代理扩展配置 ==="
+if [ "$PROXY_ENABLED" = "true" ]; then
+    echo "✓ 代理功能已启用"
+    if [ -f "/opt/chrome_extensions/proxy_auth/proxy_config.json" ]; then
+        echo "✓ 代理配置文件已生成"
+    fi
+    if [ -f "/usr/bin/google-chrome.original" ]; then
+        echo "✓ Chrome包装脚本已配置"
+    fi
+else
+    echo "代理功能未启用"
+fi
 
 # 脚本执行完成，继续启动 Selenium 服务
 # 注意：这里不会执行任何命令，因为会被 custom-entrypoint.sh 中的 exec 调用 
