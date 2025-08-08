@@ -22,8 +22,8 @@ app = FastAPI(
 
 # 初始化全局组件
 device_pool = DevicePool()
-auto_scaler = SpotLightAutoScaler()
-auto_scaler.start_monitoring()
+# auto_scaler = SpotLightAutoScaler()
+# auto_scaler.start_monitoring()
 
 logger = get_logger(__name__)
 
