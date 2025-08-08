@@ -1,22 +1,6 @@
+version: '3.8'
+
 services:
-
-  spotlight-api:
-    image: docker-spotlight-api:latest
-    container_name: spotlight-api
-    ports:
-      - "8000:8000"
-    environment:
-      - PYTHONUNBUFFERED=1
-    depends_on:
-      - selenium-hub
-    networks:
-      - selenium-grid
-    volumes:
-      - ../hybrid_driver:/app/hybrid_driver
-
-  #==================
-  # Selenium Hub
-  #==================
   selenium-hub:
     image: selenium/hub:latest
     container_name: selenium-hub
@@ -25,81 +9,45 @@ services:
       - "4443:4443"
       - "4444:4444"
     environment:
-      # - SE_LOG_LEVEL=DEBUG
-      - SE_NODE_SESSION_TIMEOUT=15
-      - SE_SESSION_REQUEST_TIMEOUT=15
-      - SE_ENABLE_TRACING=true
-      - SE_LOG_LEVEL=ALL
-    # volumes:
-    #   # 挂载Hub配置文件
-    #   - ./config/grid-config.toml:/opt/selenium/config.toml:ro
+      - SE_NODE_SESSION_TIMEOUT=300
+      - SE_SESSION_REQUEST_TIMEOUT=300
+      - SE_NODE_MAX_SESSIONS=2
     networks:
       - selenium-grid
+    restart: unless-stopped
 
-  chrome-driver:
-    image: custom-selenium-chrome:adb_proxy
+  chrome-node-1:
+    image: chrome-tinyproxy-node:latest
+    container_name: chrome-node-1
     depends_on:
       - selenium-hub
     environment:
       - SE_EVENT_BUS_HOST=selenium-hub
-      - SE_LOG_LEVEL=ALL
-      - ADB_PROXY_LOG_LEVEL=DEBUG
-    devices:
-      - /dev/bus/usb:/dev/bus/usb
-    privileged: true  
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_NODE_MAX_SESSIONS=1
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      # 上游代理配置 - 节点1
+      - PROXY_HOST=101.96.145.103
+      - PROXY_PORT=58001
+      - PROXY_USERNAME=vgmpgv
+      - PROXY_PASSWORD=1bk79g9y
+      # HTTP代理环境变量 (让Chrome透明使用tinyproxy)
+      - HTTP_PROXY=http://127.0.0.1:8888
+      - HTTPS_PROXY=http://127.0.0.1:8888
+      - http_proxy=http://127.0.0.1:8888
+      - https_proxy=http://127.0.0.1:8888
+      # 增加会话超时时间防止崩溃
+      - SE_NODE_SESSION_TIMEOUT=600
+      - SE_SESSION_REQUEST_TIMEOUT=600
     networks:
       - selenium-grid
+    shm_size: 2gb
+    restart: unless-stopped
+    # 增加资源限制以支持Chrome 138
+    mem_limit: 2gb
+    cpus: 2.0
 
-  #==================
-  # Node-Docker (直接使用宿主机Docker)
-  #==================
-  # node-docker:
-  #   image: selenium/node-docker:latest
-  #   container_name: selenium-node-docker
-  #   environment:
-  #     - SE_EVENT_BUS_HOST=selenium-hub
-  #     - SE_EVENT_BUS_PUBLISH_PORT=4442
-  #     - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
-  #     - SE_NODE_DOCKER_CONFIG_FILENAME=docker.toml 
-  #     - SE_LOG_LEVEL=ALL
-  #     # - SE_ENABLE_TRACING=true
-  #     # - SE_LOG_LEVEL=DEBUG
-  #   volumes:
-  #     - ./assets:/opt/selenium/assets
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #     - ./config/node-docker-config.toml:/opt/selenium/docker.toml
-  #   devices:
-  #     - /dev/bus/usb:/dev/bus/usb
-  #   privileged: true
-  #   depends_on:
-  #     - selenium-hub
-  #   networks:
-  #     - selenium-grid
-
-  #==================
-  # Portainer (可选 - Docker管理界面)
-  #==================
-  # portainer:
-  #   image: portainer/portainer-ce:latest
-  #   container_name: portainer
-  #   ports:
-  #     - "9000:9000"
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #     - portainer-data:/data
-  #   networks:
-  #     - selenium-grid
-  #   restart: unless-stopped
-
-#==================
-# 网络配置
-#==================
 networks:
   selenium-grid:
     driver: bridge
-
-#==================
-# 数据卷
-#==================
-volumes:
-  portainer-data: 
