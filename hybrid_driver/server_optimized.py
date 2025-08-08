@@ -9,6 +9,7 @@ from hybrid_driver.log_config import get_logger
 
 # 导入路由模块
 from hybrid_driver.api.routers import device, element, page, collect, mock
+from hybrid_driver.native import script_executor
 from hybrid_driver.operation import OperationItem, OperationSequence
 from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
 
@@ -32,6 +33,9 @@ app.include_router(element.router)
 app.include_router(page.router)
 app.include_router(collect.router)
 app.include_router(mock.router)
+
+app.include_router(script_executor.commandRouter)
+
 
 
 @app.get("/health")
