@@ -1,44 +1,12 @@
-import logging
-import time
-from typing import Optional, Any, List
-import uuid
-import asyncio
-import random
+"""
+兼容保留：仅转发 app 实例到新的统一入口。
 
-from fastapi import FastAPI
-from pydantic import BaseModel
-import selenium.webdriver.support.expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
+历史上外部可能通过 "hybrid_driver.server:app" 引用服务入口。
+现在统一入口是 "hybrid_driver.server_optimized:app"，
+此文件只做兼容转发，避免外部引用立刻崩溃。
+"""
 
-from hybrid_driver.native import script_executor
-from hybrid_driver.device_pool import DevicePool
-from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
-from hybrid_driver.webdriver.webdriver_utils import WebDriverUtils
-from hybrid_driver.operation import OperationSequence, FindElement, Click, Wait, JS, HandlePopup, build_operations, CollectItemsOp
-from hybrid_driver.auto_scaler import SpotLightAutoScaler
-from hybrid_driver.utils.async_utils import run_sync
-
-from hybrid_driver.log_config import get_logger
-
-
-app = FastAPI()
-device_pool = DevicePool()
-app.include_router(script_executor.commandRouter)
-
-# 初始化自动扩缩容和指标收集
-auto_scaler = SpotLightAutoScaler()
-auto_scaler.start_monitoring()
-
-logger = get_logger(__name__)
-
-
-class ConnectRequest(BaseModel):
-    serial_id: str
-
-
-class DisconnectRequest(BaseModel):
-    serial_id: str
+from .server_optimized import app  # noqa: F401
 
 
 class ActionRequest(BaseModel):
@@ -99,10 +67,11 @@ async def connect(req: ConnectRequest):
     try:
         # 创建 ConnectConfig 对象
         from hybrid_driver.api.models import ConnectConfig
+
         config = ConnectConfig(
             serial_id=req.serial_id,
             user_id="connect_user",  # 默认用户ID
-            android_process="com.tencent.mm:appbrand0"
+            android_process="com.tencent.mm:appbrand0",
         )
         device = await run_sync(device_pool.connect, config)
         if device is not None:
@@ -182,10 +151,11 @@ async def click(req: ClickRequest):
         if device is None:
             # 创建 ConnectConfig 对象
             from hybrid_driver.api.models import ConnectConfig
+
             config = ConnectConfig(
                 serial_id=req.serial_id,
                 user_id="click_user",  # 默认用户ID
-                android_process="com.tencent.mm:appbrand0"
+                android_process="com.tencent.mm:appbrand0",
             )
             device = await run_sync(device_pool.connect, config)
             if device is None:
@@ -193,14 +163,14 @@ async def click(req: ClickRequest):
                     code=1002,
                     message="设备未找到或连接失败",
                     error=f"Device {req.serial_id} not found or connection failed",
-                    trace_id=trace_id
+                    trace_id=trace_id,
                 )
-        if not hasattr(device, '_web_execute') or device._web_execute is None:
+        if not hasattr(device, "_web_execute") or device._web_execute is None:
             return APIResponse(
                 code=1004,
                 message="WebDriver未初始化",
                 error="WebDriver not initialized",
-                trace_id=trace_id
+                trace_id=trace_id,
             )
         # 使用装饰器模式获取 WebDriver
         # 移除所有 web_driver_decorator 相关代码和注释
@@ -216,17 +186,19 @@ async def click(req: ClickRequest):
                     code=1006,
                     message="没有可用的页面",
                     error="No available pages found",
-                    trace_id=trace_id
+                    trace_id=trace_id,
                 )
             # 只遍历 list 类型
             page0 = pages[0]
-            await run_sync(device._web_execute.switch_to_window, getattr(page0, 'handle', page0))
+            await run_sync(
+                device._web_execute.switch_to_window, getattr(page0, "handle", page0)
+            )
         except Exception as e:
             return APIResponse(
                 code=1007,
                 message="页面切换失败",
                 error=f"Failed to switch to page: {str(e)}",
-                trace_id=trace_id
+                trace_id=trace_id,
             )
         try:
             click_op = Click(
@@ -234,7 +206,7 @@ async def click(req: ClickRequest):
                 selector=req.selector,
                 timeout=req.timeout or 10,
                 wait_for_new_window=req.wait_for_new_window or False,
-                context_type="WEB"
+                context_type="WEB",
             )
             result = await run_sync(click_op.execute, device)
             if result:
@@ -242,40 +214,50 @@ async def click(req: ClickRequest):
                     code=0,
                     message="点击操作成功",
                     data={"method": req.method, "selector": req.selector},
-                    trace_id=trace_id
+                    trace_id=trace_id,
                 )
             else:
                 return APIResponse(
                     code=1003,
                     message="点击操作失败",
                     error="Click operation returned false",
-                    trace_id=trace_id
+                    trace_id=trace_id,
                 )
         except Exception as e:
             error_msg = str(e)
-            if "element not found" in error_msg.lower() or "no such element" in error_msg.lower():
+            if (
+                "element not found" in error_msg.lower()
+                or "no such element" in error_msg.lower()
+            ):
                 return APIResponse(
                     code=1008,
                     message="元素未找到",
                     error=f"Element not found: {error_msg}",
                     data={"method": req.method, "selector": req.selector},
-                    trace_id=trace_id
+                    trace_id=trace_id,
                 )
-            elif "element not interactable" in error_msg.lower() or "element click intercepted" in error_msg.lower():
+            elif (
+                "element not interactable" in error_msg.lower()
+                or "element click intercepted" in error_msg.lower()
+            ):
                 return APIResponse(
                     code=1009,
                     message="元素不可交互",
                     error=f"Element not interactable: {error_msg}",
                     data={"method": req.method, "selector": req.selector},
-                    trace_id=trace_id
+                    trace_id=trace_id,
                 )
             elif "timeout" in error_msg.lower():
                 return APIResponse(
                     code=1010,
                     message="操作超时",
                     error=f"Operation timeout: {error_msg}",
-                    data={"method": req.method, "selector": req.selector, "timeout": req.timeout},
-                    trace_id=trace_id
+                    data={
+                        "method": req.method,
+                        "selector": req.selector,
+                        "timeout": req.timeout,
+                    },
+                    trace_id=trace_id,
                 )
             else:
                 return APIResponse(
@@ -283,15 +265,16 @@ async def click(req: ClickRequest):
                     message="点击操作异常",
                     error=f"Click operation exception: {error_msg}",
                     data={"method": req.method, "selector": req.selector},
-                    trace_id=trace_id
+                    trace_id=trace_id,
                 )
     except Exception as e:
         return APIResponse(
             code=2000,
             message="系统异常",
             error=f"System exception: {str(e)}",
-            trace_id=trace_id
+            trace_id=trace_id,
         )
+
 
 @app.post("/run_operations", response_model=APIResponse)
 async def run_operations(req: OperationRequest):
@@ -306,7 +289,7 @@ async def run_operations(req: OperationRequest):
         operation_dicts = []
         for op in req.operations:
             try:
-                if hasattr(op, 'model_dump'):
+                if hasattr(op, "model_dump"):
                     operation_dicts.append(op.model_dump())
                 else:
                     # 尝试将对象转换为字典
@@ -317,12 +300,14 @@ async def run_operations(req: OperationRequest):
                     code=2000,
                     message="系统异常",
                     error=f"无法处理操作对象: {str(e2)}",
-                    trace_id=trace_id
+                    trace_id=trace_id,
                 )
         ops = build_operations(operation_dicts)
     seq = OperationSequence(ops)
     results = await run_sync(seq.execute, device)
-    return APIResponse(code=0, message="success", data={"results": results}, trace_id=trace_id)
+    return APIResponse(
+        code=0, message="success", data={"results": results}, trace_id=trace_id
+    )
 
 
 @app.post("/check_page")
@@ -353,29 +338,26 @@ async def check_page(request: dict):
             page_source_str = str(page_source) if page_source is not None else ""
 
             # 简单的页面检测逻辑，可以根据需要扩展
-            is_current_page = check_page_type(current_url_str, page_source_str, required_page)
+            is_current_page = check_page_type(
+                current_url_str, page_source_str, required_page
+            )
 
             return {
                 "code": 0,
                 "message": "Page check completed",
                 "isCurrentPage": is_current_page,
                 "currentPage": detect_current_page(current_url_str, page_source_str),
-                "currentUrl": current_url_str
+                "currentUrl": current_url_str,
             }
 
         except Exception as e:
             logging.error(f"Page check failed: {str(e)}")
-            return {
-                "code": 3,
-                "message": f"Page check error: {str(e)}"
-            }
+            return {"code": 3, "message": f"Page check error: {str(e)}"}
 
     except Exception as e:
         logging.error(f"Check page request failed: {str(e)}")
-        return {
-            "code": 4,
-            "message": f"Request processing error: {str(e)}"
-        }
+        return {"code": 4, "message": f"Request processing error: {str(e)}"}
+
 
 def check_page_type(url: str, page_source: str, required_page: str) -> bool:
     """检查页面类型"""
@@ -386,7 +368,10 @@ def check_page_type(url: str, page_source: str, required_page: str) -> bool:
             if "home" in url.lower() or "index" in url.lower():
                 return True
             # 检查页面源码中是否包含首页特征
-            if any(keyword in page_source.lower() for keyword in ["首页", "主页", "home", "menu_page"]):
+            if any(
+                keyword in page_source.lower()
+                for keyword in ["首页", "主页", "home", "menu_page"]
+            ):
                 return True
 
         elif required_page == "ShopDetail":
@@ -394,14 +379,20 @@ def check_page_type(url: str, page_source: str, required_page: str) -> bool:
             if "shop" in url.lower() or "store" in url.lower():
                 return True
             # 检查页面源码中是否包含店铺详情页特征
-            if any(keyword in page_source.lower() for keyword in ["店铺", "商店", "shop", "store", "商品"]):
+            if any(
+                keyword in page_source.lower()
+                for keyword in ["店铺", "商店", "shop", "store", "商品"]
+            ):
                 return True
 
         elif required_page == "SearchShopList":
             # 检查是否为店铺搜索页
             if "search" in url.lower():
                 return True
-            if any(keyword in page_source.lower() for keyword in ["搜索", "search", "店铺列表"]):
+            if any(
+                keyword in page_source.lower()
+                for keyword in ["搜索", "search", "店铺列表"]
+            ):
                 return True
 
         # 更多页面类型可以在此扩展
@@ -411,6 +402,7 @@ def check_page_type(url: str, page_source: str, required_page: str) -> bool:
     except Exception as e:
         logging.error(f"Page type check failed: {str(e)}")
         return False
+
 
 def detect_current_page(url: str, page_source: str) -> str:
     """检测当前页面类型"""
@@ -424,9 +416,13 @@ def detect_current_page(url: str, page_source: str) -> str:
             return "SearchShopList"
 
         # 根据页面内容检测
-        if any(keyword in page_source.lower() for keyword in ["首页", "主页", "menu_page"]):
+        if any(
+            keyword in page_source.lower() for keyword in ["首页", "主页", "menu_page"]
+        ):
             return "Home"
-        elif any(keyword in page_source.lower() for keyword in ["店铺", "商店", "商品列表"]):
+        elif any(
+            keyword in page_source.lower() for keyword in ["店铺", "商店", "商品列表"]
+        ):
             return "ShopDetail"
         elif any(keyword in page_source.lower() for keyword in ["搜索", "店铺列表"]):
             return "SearchShopList"
@@ -436,6 +432,7 @@ def detect_current_page(url: str, page_source: str) -> str:
     except Exception as e:
         logging.error(f"Page detection failed: {str(e)}")
         return "Unknown"
+
 
 @app.post("/find_elements", response_model=APIResponse)
 async def find_elements(req: FindElementRequest):
@@ -450,7 +447,7 @@ async def find_elements(req: FindElementRequest):
                 code=1002,
                 message="设备未找到",
                 error=f"Device {req.serial_id} not found",
-                trace_id=trace_id
+                trace_id=trace_id,
             )
 
         elements = await run_sync(device.find_elements, req.method, req.selector)
@@ -461,7 +458,7 @@ async def find_elements(req: FindElementRequest):
                 code=1003,
                 message="elements not found",
                 error=f"No elements found with selector: {req.selector}",
-                trace_id=trace_id
+                trace_id=trace_id,
             )
 
         # 提取元素信息
@@ -477,8 +474,8 @@ async def find_elements(req: FindElementRequest):
                         "class": element.get_attribute("class"),
                         "name": element.get_attribute("name"),
                         "href": element.get_attribute("href"),
-                        "src": element.get_attribute("src")
-                    }
+                        "src": element.get_attribute("src"),
+                    },
                 }
                 element_data.append(element_info)
             except Exception as e:
@@ -489,18 +486,12 @@ async def find_elements(req: FindElementRequest):
         return APIResponse(
             code=0,
             message="success",
-            data={
-                "elements": element_data,
-                "count": len(element_data)
-            },
-            trace_id=trace_id
+            data={"elements": element_data, "count": len(element_data)},
+            trace_id=trace_id,
         )
     except Exception as e:
         return APIResponse(
-            code=2000,
-            message="系统异常",
-            error=str(e),
-            trace_id=trace_id
+            code=2000, message="系统异常", error=str(e), trace_id=trace_id
         )
 
 
@@ -533,14 +524,13 @@ async def collect_items(req: CollectItemsRequest):
                 code=1002,
                 message="设备未找到",
                 error=f"Device {req.serial_id} not found",
-                trace_id=trace_id
+                trace_id=trace_id,
             )
 
         # 创建收集操作，支持新协议和老协议
         if req.config_json or req.config_file:
             collect_op = CollectItemsOp(
-                config_json=req.config_json,
-                config_file=req.config_file
+                config_json=req.config_json, config_file=req.config_file
             )
         else:
             collect_op = CollectItemsOp(
@@ -551,7 +541,7 @@ async def collect_items(req: CollectItemsRequest):
                 dialog_views=req.dialog_views or [],
                 loading_view=req.loading_view,
                 close_dialog=req.close_dialog if req.close_dialog is not None else True,
-                package_name=req.package_name
+                package_name=req.package_name,
             )
 
         # 执行收集操作
@@ -559,31 +549,27 @@ async def collect_items(req: CollectItemsRequest):
 
         if result:
             return APIResponse(
-                code=0,
-                message="收集成功",
-                data=result,
-                trace_id=trace_id
+                code=0, message="收集成功", data=result, trace_id=trace_id
             )
         else:
             return APIResponse(
                 code=1003,
                 message="收集失败",
                 error="No items collected",
-                trace_id=trace_id
+                trace_id=trace_id,
             )
 
     except Exception as e:
         return APIResponse(
-            code=2000,
-            message="系统异常",
-            error=str(e),
-            trace_id=trace_id
+            code=2000, message="系统异常", error=str(e), trace_id=trace_id
         )
+
 
 @app.get("/health")
 def health_check():
     """健康检查接口"""
     return {"status": "healthy", "timestamp": time.time()}
+
 
 @app.post("/mock_click", response_model=APIResponse)
 async def mock_click(req: ClickRequest):
@@ -593,7 +579,9 @@ async def mock_click(req: ClickRequest):
     await asyncio.sleep(delay)
     end = time.time()
     process_time = end - start
-    logging.info(f"mock_click 处理完成，delay={delay:.2f}，process_time={process_time:.2f}")
+    logging.info(
+        f"mock_click 处理完成，delay={delay:.2f}，process_time={process_time:.2f}"
+    )
     return APIResponse(
         code=0,
         message=f"模拟点击成功，耗时{delay:.2f}秒",
@@ -601,9 +589,10 @@ async def mock_click(req: ClickRequest):
             "method": req.method,
             "selector": req.selector,
             "mock_delay": delay,
-            "process_time": process_time
-        }
+            "process_time": process_time,
+        },
     )
+
 
 @app.post("/mock_find_element", response_model=APIResponse)
 async def mock_find_element(req: FindElementRequest):
@@ -613,18 +602,22 @@ async def mock_find_element(req: FindElementRequest):
     await asyncio.sleep(delay)
     end = time.time()
     process_time = end - start
-    logging.info(f"mock_find_element 处理完成，delay={delay:.2f}，process_time={process_time:.2f}")
+    logging.info(
+        f"mock_find_element 处理完成，delay={delay:.2f}，process_time={process_time:.2f}"
+    )
     return APIResponse(
         code=0,
         message=f"模拟查找元素成功，耗时{delay:.2f}秒",
         data={
             "element": f"mock_element_{req.selector}",
             "mock_delay": delay,
-            "process_time": process_time
-        }
+            "process_time": process_time,
+        },
     )
 
+
 if __name__ == "__main__":
+
     async def main():
         serial_id = "47.94.130.125:6521"
 
@@ -650,10 +643,11 @@ if __name__ == "__main__":
         else:
             logger.warning("没有找到可见页面")
 
-        find_element = driver.get_raw_remote_webdriver().find_element(By.CSS_SELECTOR,"wx-view.search-text")
+        find_element = driver.get_raw_remote_webdriver().find_element(
+            By.CSS_SELECTOR, "wx-view.search-text"
+        )
         logger.info(f"find element : ${find_element.text}")
         find_element.click()
+
     # 运行异步主函数
     asyncio.run(main())
-
-

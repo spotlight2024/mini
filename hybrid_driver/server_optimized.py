@@ -1,14 +1,16 @@
-import time
 import asyncio
 import json
-from fastapi import FastAPI
+import time
 
-from hybrid_driver.device_pool import DevicePool
-from hybrid_driver.auto_scaler import SpotLightAutoScaler
-from hybrid_driver.log_config import get_logger
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from hybrid_driver.api.models import APIResponse
 
 # 导入路由模块
-from hybrid_driver.api.routers import device, element, page, collect, mock
+from hybrid_driver.api.routers import collect, device, element, mock, page
+from hybrid_driver.device_pool import DevicePool
+from hybrid_driver.log_config import get_logger
 from hybrid_driver.native import script_executor
 from hybrid_driver.operation import OperationItem, OperationSequence
 from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
@@ -17,13 +19,11 @@ from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
 app = FastAPI(
     title="SpotLight Hybrid Driver API",
     description="混合驱动自动化测试API服务",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # 初始化全局组件
 device_pool = DevicePool()
-# auto_scaler = SpotLightAutoScaler()
-# auto_scaler.start_monitoring()
 
 logger = get_logger(__name__)
 
@@ -35,7 +35,6 @@ app.include_router(collect.router)
 app.include_router(mock.router)
 
 app.include_router(script_executor.commandRouter)
-
 
 
 @app.get("/health")
@@ -50,8 +49,28 @@ def root():
     return {
         "message": "SpotLight Hybrid Driver API",
         "version": "1.0.0",
-        "docs": "/docs"
+        "docs": "/docs",
     }
+
+
+# ========== 轻量 trace_id 中间件与统一异常处理 ==========
+@app.middleware("http")
+async def inject_trace_id(request: Request, call_next):
+    trace_id = request.headers.get("X-Trace-Id") or str(int(time.time() * 1000))
+    request.state.trace_id = trace_id
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        logger.exception(f"Unhandled exception: {exc}")
+        payload = APIResponse(
+            code=2000,
+            message="系统异常",
+            error=str(exc),
+            trace_id=trace_id,
+        ).model_dump()
+        response = JSONResponse(status_code=500, content=payload)
+    response.headers["X-Trace-Id"] = trace_id
+    return response
 
 
 def extract_restaurant_info_js(driver):
@@ -200,19 +219,21 @@ def extract_restaurant_info_js(driver):
     
     return extractRestaurantInfo();
     """
-    
+
     try:
         result = driver.execute_script(js_code)
-        
-        if result.get('success'):
-            logger.info(f"成功提取 {result['count']} 家餐厅信息 (总共找到 {result['total_found']} 个项目)")
-            if result.get('errors'):
+
+        if result.get("success"):
+            logger.info(
+                f"成功提取 {result['count']} 家餐厅信息 (总共找到 {result['total_found']} 个项目)"
+            )
+            if result.get("errors"):
                 logger.warning(f"提取过程中的错误: {result['errors']}")
-            return result['data']
+            return result["data"]
         else:
             logger.error(f"提取失败: {result.get('error')}")
             return []
-            
+
     except Exception as e:
         logger.error(f"JavaScript执行失败: {e}")
         return []
@@ -225,7 +246,7 @@ def get_current_page_restaurants(driver):
     logger.info("开始提取餐厅信息...")
 
     restaurants = extract_restaurant_info_js(driver)
-    
+
     if restaurants:
         # 打印结果
         logger.info("=== 餐厅信息提取结果 ===")
@@ -233,31 +254,37 @@ def get_current_page_restaurants(driver):
             logger.info(f"{i}. {restaurant.get('name', '未知')}")
             logger.info(f"   店铺ID: {restaurant.get('shop_id', '未知')}")
             logger.info(f"   排队状态: {restaurant.get('queue_status', '未知')}")
-            if 'waiting_tables' in restaurant:
+            if "waiting_tables" in restaurant:
                 logger.info(f"   等待桌数: {restaurant['waiting_tables']}")
-            if 'rating_info' in restaurant:
+            if "rating_info" in restaurant:
                 logger.info(f"   评分信息: {restaurant['rating_info']}")
-            if 'address' in restaurant:
+            if "address" in restaurant:
                 logger.info(f"   地址: {restaurant['address']}")
             logger.info("")
-        
+
         # 保存到文件
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        filename = f'restaurants_data_{timestamp}.json'
-        
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump({
-                'timestamp': timestamp,
-                'total_count': len(restaurants),
-                'data': restaurants
-            }, f, ensure_ascii=False, indent=2)
-        
+        filename = f"restaurants_data_{timestamp}.json"
+
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "timestamp": timestamp,
+                    "total_count": len(restaurants),
+                    "data": restaurants,
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
+
         logger.info(f"餐厅数据已保存到 {filename}")
-        
+
     else:
         logger.warning("未提取到餐厅数据")
-    
+
     return restaurants
+
 
 async def main():
     """主函数 - 用于测试"""
@@ -267,7 +294,13 @@ async def main():
     from hybrid_driver.api.models import ConnectRequest
     from hybrid_driver.api.routers.device import connect
 
-    await connect(ConnectRequest(serial_id=serial_id, user_id="10", android_process="com.tencent.mm:appbrand0"))
+    await connect(
+        ConnectRequest(
+            serial_id=serial_id,
+            user_id="10",
+            android_process="com.tencent.mm:appbrand0",
+        )
+    )
 
     # switch to current page
     device = await asyncio.get_event_loop().run_in_executor(
@@ -288,8 +321,6 @@ async def main():
     )
     #
     logger.info(f"pages : ${pages}")
-
-
 
     # operations = [
     #     # 查找搜索按钮
@@ -317,8 +348,8 @@ async def main():
     #
     # logger.info(f"餐厅信息提取完成，共获取 {len(restaurants)} 家餐厅信息")
 
-
     device.disconnect()
+
 
 if __name__ == "__main__":
     # 运行异步主函数

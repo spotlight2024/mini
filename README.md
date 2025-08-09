@@ -36,8 +36,8 @@ SpotLight 是一个面向 Android 虚拟机自动化的云端混合驱动平台�
 ### 📖 业务代码文档
 - [📋 架构设计](docs/architecture/ARCHITECTURE.md) - 系统架构详解
 - [🔌 API 文档](docs/api/API.md) - 完整API接口说明
-- [📋 部署指南](docs/guides/DEPLOYMENT.md) - 部署和运维指南
-- [🚀 快速部署](docs/guides/QUICK_DEPLOYMENT.md) - 一键部署指南
+- [📋 部署指南](docs/deployment-guide.md) - 完整部署和运维指南
+- [🚀 快速启动](docs/quick-start.md) - 一键部署指南
 - [🛠️ 开发工具](docs/guides/DEV_TOOLS_RECOMMEND.md) - 开发环境配置
 - [📝 操作指令](docs/guides/Instruction.MD) - 操作指令系统说明
 - [⚙️ 服务管理](docs/guides/SERVICE_MANAGEMENT.md) - 服务管理详细指南
@@ -65,31 +65,64 @@ SpotLight 是一个面向 Android 虚拟机自动化的云端混合驱动平台�
 ```bash
 # 1. 克隆项目
 git clone <repository-url>
-cd mini
+cd spot_light
 
 # 2. 安装依赖
-python3 -m venv .venv && source .venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements/requirements.txt
 
 # 3. 启动服务
-./start.sh start
-
-# 4. 查看状态
-./start.sh status
+./scripts/spotlight.sh dev
 ```
 
-### 一键启动
+### 🚀 一键启动
 
 ```bash
-# 使用主启动脚本
-./start.sh start      # 启动服务
-./start.sh stop       # 停止服务
-./start.sh status     # 查看状态
-./start.sh restart    # 重启服务
-./start.sh logs       # 查看日志
-./start.sh cli        # 运行CLI工具
-./start.sh test       # 运行测试
+# 给脚本执行权限
+chmod +x scripts/spotlight.sh
+
+# 🖥️ 本地开发（推荐新手）
+./scripts/spotlight.sh dev      # 开发模式，支持热重载
+
+# 🐳 Docker开发（推荐团队）
+./scripts/spotlight.sh docker-dev  # 代码挂载，支持热重载
+
+# 🚀 生产部署
+./scripts/spotlight.sh serve    # 本地生产模式
+./scripts/spotlight.sh docker   # Docker生产模式
+
+# 📖 查看帮助
+./scripts/spotlight.sh --help
 ```
+
+### ✅ 验证启动
+
+```bash
+# 健康检查
+curl http://localhost:10001/health
+
+# API文档
+open http://localhost:10001/docs
+
+# 部署状态检查
+./scripts/check-deployment.sh
+```
+
+### 🔧 常用命令
+
+| 命令                                | 说明                   | 适用场景     |
+| ----------------------------------- | ---------------------- | ------------ |
+| `./scripts/spotlight.sh dev`        | 本地开发（热重载）     | 个人开发调试 |
+| `./scripts/spotlight.sh docker-dev` | Docker开发（代码挂载） | 团队协作开发 |
+| `./scripts/spotlight.sh serve`      | 本地生产模式           | 本地测试部署 |
+| `./scripts/spotlight.sh docker`     | Docker生产模式         | 生产环境部署 |
+
+### 📚 快速参考
+
+- **5分钟快速启动**: [快速启动指南](docs/quick-start.md)
+- **完整部署流程**: [部署指南](docs/deployment-guide.md)
+- **部署状态检查**: `./scripts/check-deployment.sh`
+- **生产环境管理**: `./scripts/spotlight.sh --help`
 
 ---
 
@@ -126,18 +159,18 @@ hybrid_driver/
 
 ### API 模块化设计
 
-| 功能模块 | 端点 | 说明 |
-|----------|------|------|
-| 设备管理 | `POST /device/connect` | 连接设备 |
-| | `POST /device/disconnect` | 断开设备 |
-| | `POST /device/action` | 执行设备操作 |
-| 元素操作 | `POST /element/find` | 查找单个元素 |
-| | `POST /element/find_all` | 查找多个元素 |
-| | `POST /element/click` | 点击元素 |
-| | `POST /element/operations` | 执行操作序列 |
-| 页面管理 | `POST /page/check` | 检查页面状态 |
-| 数据收集 | `POST /collect/items` | 收集元素信息 |
-| 模拟测试 | `POST /mock/click` | 模拟点击 |
+| 功能模块 | 端点                       | 说明         |
+| -------- | -------------------------- | ------------ |
+| 设备管理 | `POST /device/connect`     | 连接设备     |
+|          | `POST /device/disconnect`  | 断开设备     |
+|          | `POST /device/action`      | 执行设备操作 |
+| 元素操作 | `POST /element/find`       | 查找单个元素 |
+|          | `POST /element/find_all`   | 查找多个元素 |
+|          | `POST /element/click`      | 点击元素     |
+|          | `POST /element/operations` | 执行操作序列 |
+| 页面管理 | `POST /page/check`         | 检查页面状态 |
+| 数据收集 | `POST /collect/items`      | 收集元素信息 |
+| 模拟测试 | `POST /mock/click`         | 模拟点击     |
 
 ### 使用示例
 
