@@ -42,9 +42,248 @@ check_docker() {
   fi
 }
 
+# 智能环境检测和启动方式选择
+smart_environment_setup() {
+  echo -e "${BLUE}🔍 智能环境检测...${NC}"
+  
+  # 检测Python版本和可用性
+  local python_cmd=""
+  if command -v python3 &> /dev/null; then
+    python_cmd="python3"
+    echo -e "${GREEN}✅ 检测到Python3: $(python3 --version)${NC}"
+  elif command -v python &> /dev/null; then
+    python_cmd="python"
+    echo -e "${GREEN}✅ 检测到Python: $(python --version)${NC}"
+  else
+    echo -e "${RED}❌ 未检测到Python环境${NC}"
+    echo -e "${YELLOW}💡 建议: 安装Python 3.8+ 或使用Docker模式${NC}"
+    return 1
+  fi
+  
+  # 检测Docker可用性
+  local docker_available=false
+  if command -v docker &> /dev/null && docker info &> /dev/null; then
+    docker_available=true
+    echo -e "${GREEN}✅ Docker环境可用${NC}"
+  else
+    echo -e "${YELLOW}⚠️  Docker环境不可用${NC}"
+  fi
+  
+  # 检测虚拟环境
+  local venv_active=false
+  if [[ "${VIRTUAL_ENV:-}" != "" ]]; then
+    venv_active=true
+    echo -e "${GREEN}✅ 虚拟环境已激活: $VIRTUAL_ENV${NC}"
+  else
+    echo -e "${YELLOW}⚠️  未检测到虚拟环境${NC}"
+  fi
+  
+  # 检测Python依赖
+  local python_ready=false
+  local missing_deps=()
+  
+  # 检查关键依赖包
+  if ! $python_cmd -c "import fastapi" 2>/dev/null; then
+    missing_deps+=("fastapi")
+  fi
+  
+  if ! $python_cmd -c "import uvicorn" 2>/dev/null; then
+    missing_deps+=("uvicorn")
+  fi
+  
+  if ! $python_cmd -c "import selenium" 2>/dev/null; then
+    missing_deps+=("selenium")
+  fi
+  
+  if [ ${#missing_deps[@]} -eq 0 ]; then
+    python_ready=true
+    echo -e "${GREEN}✅ Python环境就绪${NC}"
+  else
+    echo -e "${YELLOW}⚠️  Python环境缺少依赖: ${missing_deps[*]}${NC}"
+  fi
+  
+  # 智能选择启动方式
+  if [ "$python_ready" = true ] && [ "$venv_active" = true ]; then
+    echo -e "${GREEN}🎯 选择: 本地Python虚拟环境启动${NC}"
+    return 0  # 本地Python虚拟环境
+  elif [ "$python_ready" = true ]; then
+    echo -e "${GREEN}🎯 选择: 本地Python环境启动${NC}"
+    return 0  # 本地Python
+  elif [ "$docker_available" = true ]; then
+    echo -e "${GREEN}🎯 选择: Docker环境启动${NC}"
+    return 2  # Docker
+  else
+    echo -e "${RED}❌ 无法找到可用的启动环境${NC}"
+    return 1  # 失败
+  fi
+}
+
+# 智能Python环境管理和依赖安装
+setup_python_environment() {
+  echo -e "${BLUE}🐍 智能Python环境管理...${NC}"
+  
+  local python_cmd=""
+  if command -v python3 &> /dev/null; then
+    python_cmd="python3"
+  elif command -v python &> /dev/null; then
+    python_cmd="python"
+  else
+    echo -e "${RED}❌ Python命令不可用${NC}"
+    return 1
+  fi
+  
+  # 检查虚拟环境
+  if [[ "$VIRTUAL_ENV" == "" ]]; then
+    echo -e "${YELLOW}⚠️  未检测到虚拟环境${NC}"
+    echo -e "${BLUE}💡 推荐: 创建虚拟环境确保依赖一致性${NC}"
+    
+    # 检查是否已有venv目录
+    if [ -d "venv" ]; then
+      echo -e "${BLUE}🔍 检测到现有venv目录，尝试激活...${NC}"
+      source venv/bin/activate
+      if [[ "$VIRTUAL_ENV" != "" ]]; then
+        echo -e "${GREEN}✅ 虚拟环境激活成功: $VIRTUAL_ENV${NC}"
+      else
+        echo -e "${YELLOW}⚠️  虚拟环境激活失败，重新创建${NC}"
+        rm -rf venv
+        create_virtual_environment "$python_cmd"
+      fi
+    else
+      echo -e "${YELLOW}是否要创建虚拟环境？(推荐: y)${NC}"
+      read -r response
+      if [[ "$response" =~ ^[Yy]$ ]] || [[ "$response" == "" ]]; then
+        create_virtual_environment "$python_cmd"
+      else
+        echo -e "${YELLOW}⚠️  将使用系统Python环境，可能存在依赖冲突${NC}"
+      fi
+    fi
+  else
+    echo -e "${GREEN}✅ 虚拟环境已激活: $VIRTUAL_ENV${NC}"
+  fi
+  
+  # 安装依赖
+  install_python_dependencies "$python_cmd"
+}
+
+# 创建虚拟环境
+create_virtual_environment() {
+  local python_cmd="$1"
+  echo -e "${BLUE}🔧 创建虚拟环境...${NC}"
+  
+  # 创建虚拟环境
+  $python_cmd -m venv venv
+  if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ 虚拟环境创建失败${NC}"
+    return 1
+  fi
+  
+  # 激活虚拟环境
+  source venv/bin/activate
+  if [[ "$VIRTUAL_ENV" == "" ]]; then
+    echo -e "${RED}❌ 虚拟环境激活失败${NC}"
+    return 1
+  fi
+  
+  echo -e "${GREEN}✅ 虚拟环境创建并激活成功: $VIRTUAL_ENV${NC}"
+  
+  # 升级pip
+  echo -e "${BLUE}📦 升级pip...${NC}"
+  pip install --upgrade pip
+  
+  return 0
+}
+
+# 安装Python依赖
+install_python_dependencies() {
+  local python_cmd="$1"
+  echo -e "${BLUE}📦 安装Python依赖...${NC}"
+  
+  # 检查requirements.txt
+  if [ -f "requirements.txt" ]; then
+    echo -e "${BLUE}📋 检测到requirements.txt，安装完整依赖${NC}"
+    
+    # 使用国内镜像源安装
+    pip install --trusted-host pypi.tuna.tsinghua.edu.cn \
+      -i https://pypi.tuna.tsinghua.edu.cn/simple \
+      --retries 3 \
+      --timeout 300 \
+      -r requirements.txt
+    
+    if [ $? -eq 0 ]; then
+      echo -e "${GREEN}✅ 所有依赖安装完成${NC}"
+      return 0
+    else
+      echo -e "${YELLOW}⚠️  完整依赖安装失败，尝试核心依赖安装${NC}"
+    fi
+  fi
+  
+  # 安装核心依赖
+  local core_deps=("fastapi" "uvicorn" "selenium" "pydantic" "requests")
+  echo -e "${BLUE}📦 安装核心依赖: ${core_deps[*]}${NC}"
+  
+  pip install --trusted-host pypi.tuna.tsinghua.edu.cn \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    --retries 3 \
+    --timeout 300 \
+    "${core_deps[@]}"
+  
+  if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ 核心依赖安装完成${NC}"
+    return 0
+  else
+    echo -e "${RED}❌ 依赖安装失败，尝试使用默认源...${NC}"
+    pip install --retries 3 --timeout 300 "${core_deps[@]}"
+    
+    if [ $? -eq 0 ]; then
+      echo -e "${GREEN}✅ 依赖安装完成${NC}"
+      return 0
+    else
+      echo -e "${RED}❌ 依赖安装完全失败${NC}"
+      return 1
+    fi
+  fi
+}
+
+# 检查端口占用
+check_port_availability() {
+  local port="$1"
+  
+  if netstat -tlnp 2>/dev/null | grep -q ":$port "; then
+    echo -e "${YELLOW}⚠️  端口 ${port} 已被占用${NC}"
+    
+    # 查找占用端口的进程
+    local pid=$(netstat -tlnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1)
+    
+    if [ -n "$pid" ]; then
+      echo -e "${BLUE}🔍 占用进程ID: ${pid}${NC}"
+      echo -e "${YELLOW}是否要停止该进程？(y/N)${NC}"
+      read -r response
+      
+      if [[ "$response" =~ ^[Yy]$ ]]; then
+        echo -e "${BLUE}🛑 正在停止进程 ${pid}...${NC}"
+        kill -9 "$pid" 2>/dev/null
+        sleep 2
+        
+        # 再次检查端口
+        if ! netstat -tlnp 2>/dev/null | grep -q ":$port "; then
+          echo -e "${GREEN}✅ 端口 ${port} 已释放${NC}"
+        else
+          echo -e "${RED}❌ 端口 ${port} 仍被占用，请手动处理${NC}"
+          exit 1
+        fi
+      else
+        echo -e "${RED}❌ 端口被占用，无法启动服务${NC}"
+        exit 1
+      fi
+    fi
+  else
+    echo -e "${GREEN}✅ 端口 ${port} 可用${NC}"
+  fi
+}
+
 # 本地开发模式
 run_dev() {
-  local host="${HOST:-${API_HOST_DEFAULT:-127.0.0.1}}"
+  local host="${HOST:-${API_HOST_DEFAULT:-0.0.0.0}}"
   local port="${PORT:-${API_PORT_DEFAULT:-10001}}"
   
   echo -e "${BLUE}[DEV] Starting SpotLight API in development mode${NC}"
@@ -52,10 +291,53 @@ run_dev() {
   echo "  Port: ${port}"
   echo "  Auto-reload: enabled"
   
-  python -m uvicorn hybrid_driver.server_optimized:app \
-    --host "${host}" \
-    --port "${port}" \
-    --reload
+  # 智能环境检测
+  smart_environment_setup
+  local env_result=$?
+  
+  case $env_result in
+    0)  # 本地Python环境
+      echo -e "${GREEN}🎯 使用本地Python环境启动${NC}"
+      check_port_availability "$port"
+      
+      echo -e "${BLUE}🚀 启动服务...${NC}"
+      
+      # 后台启动服务
+      nohup python3 -m uvicorn hybrid_driver.server_optimized:app \
+        --host "${host}" \
+        --port "${port}" \
+        --reload > uvicorn.log 2>&1 &
+      
+      local pid=$!
+      sleep 2
+      
+      # 检查服务是否成功启动
+      if kill -0 $pid 2>/dev/null; then
+        echo -e "${GREEN}✅ 服务已成功启动在后台${NC}"
+        echo "🌐 Service: http://${host}:${port}"
+        echo "📚 API Docs: http://${host}:${port}/docs"
+        echo "💚 Health: http://${host}:${port}/health"
+        echo "📝 Logs: tail -f uvicorn.log"
+        echo "🛑 Stop: kill $pid"
+        echo ""
+        echo "💡 Tips:"
+        echo "  - 代码修改会自动重载"
+        echo "  - 查看日志: tail -f uvicorn.log"
+        echo "  - 停止服务: kill $pid"
+      else
+        echo -e "${RED}❌ 服务启动失败，请检查日志: uvicorn.log${NC}"
+        exit 1
+      fi
+      ;;
+    2)  # Docker环境
+      echo -e "${GREEN}🎯 使用Docker环境启动${NC}"
+      run_docker_dev
+      ;;
+    *)  # 失败
+      echo -e "${RED}❌ 环境检测失败，无法启动服务${NC}"
+      exit 1
+      ;;
+  esac
 }
 
 # 本地生产模式
@@ -71,11 +353,54 @@ run_serve() {
   echo "  Workers: ${workers}"
   echo "  Log Level: ${level}"
   
-  python -m uvicorn hybrid_driver.server_optimized:app \
-    --host "${host}" \
-    --port "${port}" \
-    --workers "${workers}" \
-    --log-level "${level}"
+  # 智能环境检测
+  smart_environment_setup
+  local env_result=$?
+  
+  case $env_result in
+    0)  # 本地Python环境
+      echo -e "${GREEN}🎯 使用本地Python环境启动${NC}"
+      check_port_availability "$port"
+      
+      echo -e "${BLUE}🚀 启动服务...${NC}"
+      
+      # 后台启动服务
+      nohup python3 -m uvicorn hybrid_driver.server_optimized:app \
+        --host "${host}" \
+        --port "${port}" \
+        --workers "${workers}" \
+        --log-level "${level}" > uvicorn.log 2>&1 &
+      
+      local pid=$!
+      sleep 2
+      
+      # 检查服务是否成功启动
+      if kill -0 $pid 2>/dev/null; then
+        echo -e "${GREEN}✅ 服务已成功启动在后台${NC}"
+        echo "🌐 Service: http://${host}:${port}"
+        echo "📚 API Docs: http://${host}:${port}/docs"
+        echo "💚 Health: http://${host}:${port}/health"
+        echo "📝 Logs: tail -f uvicorn.log"
+        echo "🛑 Stop: kill $pid"
+        echo ""
+        echo "💡 Tips:"
+        echo "  - 多进程模式: ${workers} workers"
+        echo "  - 查看日志: tail -f uvicorn.log"
+        echo "  - 停止服务: kill $pid"
+      else
+        echo -e "${RED}❌ 服务启动失败，请检查日志: uvicorn.log${NC}"
+        exit 1
+      fi
+      ;;
+    2)  # Docker环境
+      echo -e "${GREEN}🎯 使用Docker环境启动${NC}"
+      run_docker
+      ;;
+    *)  # 失败
+      echo -e "${RED}❌ 环境检测失败，无法启动服务${NC}"
+      exit 1
+      ;;
+  esac
 }
 
 # Docker开发模式（代码挂载，支持热重载）
@@ -146,48 +471,193 @@ run_docker() {
   echo "  - Stop: docker compose -f docker-compose.api.yml down"
 }
 
-# 构建生产镜像（暂时留口子）
+# 构建生产镜像
 build_image() {
   local tag="${1:-latest}"
+  local context="${2:-.}"
   
-  echo -e "${YELLOW}[BUILD] Building production image...${NC}"
+  echo -e "${BLUE}[BUILD] Building SpotLight production image...${NC}"
   echo "  Tag: ${tag}"
-  echo "  Status: 🚧 功能开发中，暂时不可用"
-  echo ""
-  echo "💡 提示: 生产环境构建功能正在开发中，敬请期待！"
+  echo "  Context: ${context}"
+  echo "  Dockerfile: Dockerfile.spotlight"
   
-  # TODO: 实现生产镜像构建逻辑
-  # docker build --build-arg VERSION="$tag" -t "$IMAGE_NAME:$tag" -f Dockerfile.spotlight .
+  # 检查Dockerfile是否存在
+  if [[ ! -f "Dockerfile.spotlight" ]]; then
+    echo -e "${YELLOW}⚠️  Dockerfile.spotlight 不存在，正在创建...${NC}"
+    create_spotlight_dockerfile
+  fi
+  
+  # 检查构建上下文
+  if [[ ! -d "$context" ]]; then
+    echo -e "${RED}❌ 构建上下文目录不存在: ${context}${NC}"
+    exit 1
+  fi
+  
+  # 构建镜像
+  echo -e "${BLUE}🔨 开始构建镜像...${NC}"
+  if docker build \
+    --build-arg VERSION="$tag" \
+    --build-arg BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+    --build-arg GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')" \
+    -t "$IMAGE_NAME:$tag" \
+    -f Dockerfile.spotlight \
+    "$context"; then
+    
+    echo -e "${GREEN}✅ 镜像构建成功！${NC}"
+    echo "  Image: $IMAGE_NAME:$tag"
+    echo "  Size: $(docker images "$IMAGE_NAME:$tag" --format "{{.Size}}")"
+    
+    # 显示镜像信息
+    echo ""
+    echo "📦 镜像详情:"
+    docker images "$IMAGE_NAME:$tag" --format "table {{.Repository}}\t{{.Tag}}\t{{.CreatedAt}}\t{{.Size}}"
+    
+    # 可选：推送到镜像仓库
+    if [[ -n "${DOCKER_REGISTRY:-}" ]]; then
+      echo ""
+      echo -e "${YELLOW}💡 提示: 检测到镜像仓库配置，可以使用以下命令推送镜像:${NC}"
+      echo "  docker tag $IMAGE_NAME:$tag $DOCKER_REGISTRY/$IMAGE_NAME:$tag"
+      echo "  docker push $DOCKER_REGISTRY/$IMAGE_NAME:$tag"
+    fi
+  else
+    echo -e "${RED}❌ 镜像构建失败${NC}"
+    exit 1
+  fi
 }
 
-# 部署到生产环境（暂时留口子）
+# 部署到生产环境
 deploy_production() {
   local tag="${1:-latest}"
   local port="${2:-10001}"
+  local env_file="${3:-.env.production}"
   
-  echo -e "${YELLOW}[DEPLOY] Deploying to production...${NC}"
+  echo -e "${BLUE}[DEPLOY] Deploying SpotLight to production...${NC}"
   echo "  Tag: ${tag}"
   echo "  Port: ${port}"
-  echo "  Status: 🚧 功能开发中，暂时不可用"
-  echo ""
-  echo "💡 提示: 生产环境部署功能正在开发中，敬请期待！"
+  echo "  Environment: ${env_file}"
   
-  # TODO: 实现生产环境部署逻辑
+  # 检查镜像是否存在
+  if ! docker images "$IMAGE_NAME:$tag" | grep -q "$tag"; then
+    echo -e "${YELLOW}⚠️  镜像 $IMAGE_NAME:$tag 不存在，正在构建...${NC}"
+    build_image "$tag"
+  fi
+  
+  # 检查生产环境配置文件
+  if [[ ! -f "$env_file" ]]; then
+    echo -e "${YELLOW}⚠️  生产环境配置文件不存在，正在创建默认配置...${NC}"
+    create_production_env_file "$env_file"
+  fi
+  
+  # 设置环境变量
+  export API_PORT="$port"
+  export ENVIRONMENT="production"
+  export IMAGE_TAG="$tag"
+  
+  # 停止现有服务
+  echo -e "${BLUE}🛑 停止现有生产服务...${NC}"
+  docker compose -f docker-compose.api.yml down 2>/dev/null || true
+  
+  # 启动生产服务
+  echo -e "${BLUE}🚀 启动生产服务...${NC}"
+  if docker compose -f docker-compose.api.yml up -d; then
+    echo -e "${GREEN}✅ 生产环境部署成功！${NC}"
+    echo ""
+    echo "🌐 Service: http://localhost:${port}"
+    echo "📚 API Docs: http://localhost:${port}/docs"
+    echo "💚 Health: http://localhost:${port}/health"
+    echo ""
+    echo "💡 管理命令:"
+    echo "  - 查看状态: $0 status"
+    echo "  - 查看日志: $0 logs docker"
+    echo "  - 停止服务: docker compose -f docker-compose.api.yml down"
+    echo "  - 重启服务: docker compose -f docker-compose.api.yml restart"
+    
+    # 等待服务启动
+    echo ""
+    echo -e "${BLUE}⏳ 等待服务启动...${NC}"
+    local max_attempts=30
+    local attempt=1
+    
+    while [[ $attempt -le $max_attempts ]]; do
+      if curl -f "http://localhost:${port}/health" >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ 服务已就绪！${NC}"
+        break
+      fi
+      
+      echo -n "."
+      sleep 2
+      ((attempt++))
+    done
+    
+    if [[ $attempt -gt $max_attempts ]]; then
+      echo -e "${YELLOW}⚠️  服务启动超时，请检查日志: $0 logs docker${NC}"
+    fi
+  else
+    echo -e "${RED}❌ 生产环境部署失败${NC}"
+    exit 1
+  fi
 }
 
-# 更新代码并部署（暂时留口子）
+# 更新代码并部署
 update_and_deploy() {
   local tag="${1:-latest}"
   local port="${2:-10001}"
+  local env_file="${3:-.env.production}"
   
-  echo -e "${YELLOW}[UPDATE] Updating code and deploying...${NC}"
+  echo -e "${BLUE}[UPDATE] Updating SpotLight code and deploying...${NC}"
   echo "  Tag: ${tag}"
   echo "  Port: ${port}"
-  echo "  Status: 🚧 功能开发中，暂时不可用"
-  echo ""
-  echo "💡 提示: 生产环境更新部署功能正在开发中，敬请期待！"
+  echo "  Environment: ${env_file}"
   
-  # TODO: 实现更新部署逻辑
+  # 检查Git仓库状态
+  if [[ -d ".git" ]]; then
+    echo -e "${BLUE}📥 检查代码更新...${NC}"
+    
+    # 获取当前分支
+    local current_branch=$(git branch --show-current 2>/dev/null || echo "unknown")
+    echo "  Current branch: ${current_branch}"
+    
+    # 拉取最新代码
+    if git pull origin "$current_branch" 2>/dev/null; then
+      echo -e "${GREEN}✅ 代码更新成功${NC}"
+      
+      # 获取最新提交信息
+      local latest_commit=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+      local commit_message=$(git log -1 --pretty=format:"%s" 2>/dev/null || echo "No message")
+      echo "  Latest commit: ${latest_commit}"
+      echo "  Message: ${commit_message}"
+      
+      # 更新标签为最新提交
+      if [[ "$tag" == "latest" ]]; then
+        tag="$latest_commit"
+        echo "  Updated tag: ${tag}"
+      fi
+    else
+      echo -e "${YELLOW}⚠️  代码更新失败，继续使用当前版本${NC}"
+    fi
+  else
+    echo -e "${YELLOW}⚠️  未检测到Git仓库，跳过代码更新检查${NC}"
+  fi
+  
+  # 重新构建镜像
+  echo -e "${BLUE}🔨 重新构建镜像...${NC}"
+  build_image "$tag"
+  
+  # 部署到生产环境
+  echo -e "${BLUE}🚀 部署更新后的服务...${NC}"
+  deploy_production "$tag" "$port" "$env_file"
+  
+  echo -e "${GREEN}✅ 更新部署完成！${NC}"
+  echo ""
+  echo "💡 更新摘要:"
+  echo "  - 镜像标签: ${tag}"
+  echo "  - 服务端口: ${port}"
+  echo "  - 部署时间: $(date '+%Y-%m-%d %H:%M:%S')"
+  echo ""
+  echo "🔍 验证部署:"
+  echo "  - 健康检查: curl http://localhost:${port}/health"
+  echo "  - 服务状态: $0 status"
+  echo "  - 查看日志: $0 logs docker"
 }
 
 # 查看部署状态
@@ -259,6 +729,374 @@ show_logs() {
   esac
 }
 
+# 创建开发环境Docker Compose文件
+create_dev_compose_file() {
+  echo -e "${BLUE}🔧 创建开发环境配置文件...${NC}"
+  
+  cat > docker-compose.dev.yml << 'EOF'
+version: '3.8'
+
+services:
+  selenium-hub:
+    image: selenium/hub:4.15.0
+    container_name: spotlight-selenium-hub
+    ports:
+      - "4442:4442"
+      - "4443:4443"
+      - "4444:4444"
+    environment:
+      - GRID_MAX_SESSION=16
+      - GRID_BROWSER_TIMEOUT=300
+      - GRID_TIMEOUT=300
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4444/wd/hub/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  hybrid-driver-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.spotlight
+    container_name: spotlight-hybrid-driver-dev
+    ports:
+      - "10001:10001"
+    environment:
+      - SELENIUM_HUB_URL=http://selenium-hub:4444/wd/hub
+      - LOG_LEVEL=debug
+      - ENVIRONMENT=development
+    volumes:
+      - ./hybrid_driver:/app/hybrid_driver
+      - ./requirements.txt:/app/requirements.txt
+      - ./config:/app/config
+    depends_on:
+      selenium-hub:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  chrome-node:
+    image: selenium/node-chrome:4.15.0
+    container_name: spotlight-chrome-node
+    shm_size: 2gb
+    depends_on:
+      selenium-hub:
+        condition: service_healthy
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_NODE_MAX_SESSIONS=4
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+    restart: unless-stopped
+
+networks:
+  default:
+    name: spotlight-network
+EOF
+
+  echo -e "${GREEN}✅ docker-compose.dev.yml 创建完成${NC}"
+}
+
+# 创建SpotLight Dockerfile
+create_spotlight_dockerfile() {
+  echo -e "${BLUE}🔧 创建Dockerfile...${NC}"
+  
+  cat > Dockerfile.spotlight << 'EOF'
+FROM python:3.10-slim
+
+# 设置工作目录
+WORKDIR /app
+
+# 设置环境变量
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_TIMEOUT=300
+ENV PIP_DEFAULT_TIMEOUT=300
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    gnupg \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# 复制依赖文件
+COPY requirements.txt .
+
+# 使用国内镜像源安装Python依赖
+RUN pip install --trusted-host pypi.tuna.tsinghua.edu.cn \
+    -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    --retries 3 \
+    --timeout 300 \
+    -r requirements.txt
+
+# 复制应用代码
+COPY . .
+
+# 暴露端口
+EXPOSE 10001
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:10001/health || exit 1
+
+# 启动命令
+CMD ["python", "-m", "uvicorn", "hybrid_driver.start_api_server:app", "--host", "0.0.0.0", "--port", "10001", "--reload"]
+EOF
+
+  echo -e "${GREEN}✅ Dockerfile.spotlight 创建完成${NC}"
+}
+
+# 创建生产环境配置文件
+create_production_env_file() {
+  local env_file="$1"
+  echo -e "${BLUE}🔧 创建生产环境配置文件...${NC}"
+  
+  cat > "$env_file" << 'EOF'
+# SpotLight API Configuration
+
+# API Host
+API_HOST=0.0.0.0
+
+# API Port
+API_PORT=10001
+
+# Log Level
+LOG_LEVEL=info
+
+# Environment
+ENVIRONMENT=production
+
+# Image Tag
+IMAGE_TAG=latest
+
+# Docker Registry (if needed for pushing)
+# DOCKER_REGISTRY=your_registry.com
+
+# Image Name
+IMAGE_NAME=spotlight-api
+
+# Build Arguments
+BUILD_DATE=
+GIT_COMMIT=
+EOF
+
+  echo -e "${GREEN}✅ $env_file 创建完成${NC}"
+}
+
+# 创建开发环境配置文件
+create_dev_env_file() {
+  local env_file="$1"
+  echo -e "${BLUE}🔧 创建开发环境配置文件...${NC}"
+  
+  cat > "$env_file" << 'EOF'
+# SpotLight API Development Configuration
+
+# API Host
+API_HOST=0.0.0.0
+
+# API Port
+API_PORT=10001
+
+# Log Level
+LOG_LEVEL=debug
+
+# Environment
+ENVIRONMENT=development
+
+# Image Tag
+IMAGE_TAG=dev
+
+# Image Name
+IMAGE_NAME=spotlight-api
+
+# Build Arguments
+BUILD_DATE=
+GIT_COMMIT=
+
+# Development Settings
+PYTHONDONTWRITEBYTECODE=1
+PYTHONUNBUFFERED=1
+EOF
+
+  echo -e "${GREEN}✅ $env_file 创建完成${NC}"
+}
+
+# 验证环境配置
+validate_environment() {
+  local env_file="${1:-.env}"
+  
+  if [[ -f "$env_file" ]]; then
+    echo -e "${BLUE}🔍 验证环境配置: $env_file${NC}"
+    
+    # 加载环境变量
+    set -a
+    source "$env_file"
+    set +a
+    
+    # 验证必要的环境变量
+    local required_vars=("API_HOST" "API_PORT" "LOG_LEVEL" "ENVIRONMENT")
+    local missing_vars=()
+    
+    for var in "${required_vars[@]}"; do
+      if [[ -z "${!var}" ]]; then
+        missing_vars+=("$var")
+      fi
+    done
+    
+    if [[ ${#missing_vars[@]} -gt 0 ]]; then
+      echo -e "${YELLOW}⚠️  缺少必要的环境变量: ${missing_vars[*]}${NC}"
+      return 1
+    else
+      echo -e "${GREEN}✅ 环境配置验证通过${NC}"
+      return 0
+    fi
+  else
+    echo -e "${YELLOW}⚠️  环境配置文件不存在: $env_file${NC}"
+    return 1
+  fi
+}
+
+# 清理Docker资源
+cleanup_docker() {
+  local force="${1:-false}"
+  
+  echo -e "${BLUE}🧹 清理Docker资源...${NC}"
+  
+  if [[ "$force" == "true" ]]; then
+    echo -e "${YELLOW}⚠️  强制清理模式${NC}"
+    
+    # 停止并删除所有相关容器
+    docker compose -f docker-compose.api.yml down --volumes --remove-orphans 2>/dev/null || true
+    docker compose -f docker-compose.dev.yml down --volumes --remove-orphans 2>/dev/null || true
+    
+    # 删除相关镜像
+    docker rmi "$IMAGE_NAME:latest" 2>/dev/null || true
+    docker rmi "$IMAGE_NAME:dev" 2>/dev/null || true
+    
+    # 清理未使用的资源
+    docker system prune -f
+    
+    echo -e "${GREEN}✅ 强制清理完成${NC}"
+  else
+    echo -e "${BLUE}📋 安全清理模式${NC}"
+    
+    # 只停止服务，保留数据
+    docker compose -f docker-compose.api.yml down 2>/dev/null || true
+    docker compose -f docker-compose.dev.yml down 2>/dev/null || true
+    
+    echo -e "${GREEN}✅ 安全清理完成${NC}"
+  fi
+}
+
+# 停止本地服务
+stop_local_service() {
+  echo -e "${BLUE}🛑 停止本地服务...${NC}"
+  
+  # 查找uvicorn进程
+  local pid=$(ps aux | grep "uvicorn.*hybrid_driver.server_optimized:app" | grep -v grep | awk '{print $2}')
+  
+  if [ -n "$pid" ]; then
+    echo -e "${BLUE}🛑 正在停止进程 ${pid}...${NC}"
+    kill -TERM "$pid" 2>/dev/null
+    
+    # 等待进程优雅退出
+    local count=0
+    while kill -0 "$pid" 2>/dev/null && [ $count -lt 10 ]; do
+      sleep 1
+      count=$((count + 1))
+    done
+    
+    # 如果进程仍然存在，强制杀死
+    if kill -0 "$pid" 2>/dev/null; then
+      echo -e "${YELLOW}⚠️  进程未响应，强制终止...${NC}"
+      kill -KILL "$pid" 2>/dev/null
+    fi
+    
+    sleep 1
+    echo -e "${GREEN}✅ 本地服务已停止${NC}"
+  else
+    echo -e "${YELLOW}⚠️  本地服务未运行，无需停止${NC}"
+  fi
+}
+
+# 重启本地服务
+restart_local_service() {
+  echo -e "${BLUE}🔄 重启本地服务...${NC}"
+  
+  # 先停止服务
+  stop_local_service
+  
+  # 等待一下确保端口释放
+  sleep 2
+  
+  # 重新启动服务
+  echo -e "${BLUE}🚀 启动服务...${NC}"
+  
+  # 获取当前配置
+  local host="${HOST:-${API_HOST_DEFAULT:-0.0.0.0}}"
+  local port="${PORT:-${API_PORT_DEFAULT:-10001}}"
+  
+  # 后台启动服务
+  nohup python3 -m uvicorn hybrid_driver.server_optimized:app \
+    --host "${host}" \
+    --port "${port}" \
+    --reload > uvicorn.log 2>&1 &
+  
+  local new_pid=$!
+  sleep 3
+  
+  # 检查服务是否成功启动
+  if kill -0 $new_pid 2>/dev/null; then
+    echo -e "${GREEN}✅ 本地服务已重启${NC}"
+    echo "🌐 Service: http://${host}:${port}"
+    echo "📚 API Docs: http://${host}:${port}/docs"
+    echo "💚 Health: http://${host}:${port}/health"
+    echo "📝 Logs: tail -f uvicorn.log"
+    echo "🛑 Stop: kill $new_pid"
+  else
+    echo -e "${RED}❌ 本地服务重启失败，请检查日志: uvicorn.log${NC}"
+    exit 1
+  fi
+}
+
+# 显示本地服务状态
+show_local_status() {
+  echo -e "${BLUE}[STATUS-LOCAL] 本地服务状态:${NC}"
+  
+  # 查找uvicorn进程
+  local pid=$(ps aux | grep "uvicorn.*hybrid_driver.server_optimized:app" | grep -v grep | awk '{print $2}')
+  
+  if [ -n "$pid" ]; then
+    echo -e "  ✅ 本地服务正在运行"
+    echo "  📊 进程ID: $pid"
+    
+    # 检查端口监听状态
+    local port="${PORT:-${API_PORT_DEFAULT:-10001}}"
+    if netstat -tlnp 2>/dev/null | grep ":$port " >/dev/null; then
+      local host_info=$(netstat -tlnp 2>/dev/null | grep ":$port " | head -1)
+      echo "  🌐 监听地址: $host_info"
+    fi
+    
+    echo "🌐 Service: http://localhost:$port"
+    echo "📚 API Docs: http://localhost:$port/docs"
+    echo "💚 Health: http://localhost:$port/health"
+    echo "📝 Logs: tail -f uvicorn.log"
+    echo "🛑 Stop: ./scripts/spotlight.sh stop"
+    echo "🔄 Restart: ./scripts/spotlight.sh restart"
+  else
+    echo -e "  ❌ 本地服务未运行"
+    echo "💡 启动服务: ./scripts/spotlight.sh dev"
+  fi
+}
+
 # 显示帮助信息
 show_help() {
   cat <<'EOF'
@@ -272,12 +1110,18 @@ SpotLight 统一启动脚本
   docker-dev   - Docker开发模式 (代码挂载，热重载)
   docker       - Docker生产模式 (代码打包)
 
-🔧 生产环境管理命令 (开发中):
+🔧 本地服务管理命令:
+  stop         - 停止本地服务
+  restart      - 重启本地服务
+  status-local - 查看本地服务状态
+
+🔧 生产环境管理命令:
   build        - 构建生产镜像
   deploy       - 部署到生产环境
   update       - 更新代码并部署
   status       - 查看部署状态
   logs         - 查看服务日志
+  cleanup      - 清理Docker资源
 
 📋 选项:
   --host HOST      指定主机地址
@@ -285,11 +1129,14 @@ SpotLight 统一启动脚本
   --workers N      指定工作进程数 (仅serve模式)
   --log-level LEVEL 指定日志级别
   --tag TAG        指定版本标签 (仅生产命令)
+  --force          强制操作 (仅cleanup命令)
 
 🌍 环境变量:
   API_HOST         默认主机地址
   API_PORT         默认端口号
   LOG_LEVEL        默认日志级别
+  IMAGE_NAME       镜像名称
+  DOCKER_REGISTRY  镜像仓库地址
 
 💡 使用示例:
   # 开发环境
@@ -300,14 +1147,21 @@ SpotLight 统一启动脚本
   ./scripts/spotlight.sh serve --port 10001 --workers 4
   ./scripts/spotlight.sh docker --port 10001
   
-  # 生产管理 (开发中)
+  # 生产管理
   ./scripts/spotlight.sh build --tag v1.0.0
+  ./scripts/spotlight.sh deploy --tag v1.0.0 --port 10001
+  ./scripts/spotlight.sh update --tag v1.0.0 --port 10001
   ./scripts/spotlight.sh status
   ./scripts/spotlight.sh logs docker
+  
+  # 资源管理
+  ./scripts/spotlight.sh cleanup        # 安全清理
+  ./scripts/spotlight.sh cleanup --force # 强制清理
 
 📚 更多信息:
   - 快速启动: docs/quick-start.md
   - 详细部署: docs/deployment-guide.md
+  - Docker开发: docs/docker-development.md
 EOF
 }
 
@@ -319,24 +1173,39 @@ case "${CMD}" in
   docker-dev) run_docker_dev;;
   docker) run_docker;;
   
-  # 生产环境管理命令 (开发中)
+  # 本地服务管理命令
+  stop) stop_local_service;;
+  restart) restart_local_service;;
+  status-local) show_local_status;;
+  
+  # 生产环境管理命令
   build) 
     tag="${1:-latest}"
-    port="${2:-10001}"
-    build_image "$tag"
+    context="${2:-.}"
+    build_image "$tag" "$context"
     ;;
   deploy)
     tag="${1:-latest}"
     port="${2:-10001}"
-    deploy_production "$tag" "$port"
+    env_file="${3:-.env.production}"
+    deploy_production "$tag" "$port" "$env_file"
     ;;
   update)
     tag="${1:-latest}"
     port="${2:-10001}"
-    update_and_deploy "$tag" "$port"
+    env_file="${3:-.env.production}"
+    update_and_deploy "$tag" "$port" "$env_file"
     ;;
   status) show_status;;
   logs) show_logs "${1:-}";;
+  cleanup) 
+    force="${1:-false}"
+    if [[ "$force" == "--force" ]]; then
+      cleanup_docker "true"
+    else
+      cleanup_docker "false"
+    fi
+    ;;
   
   # 帮助和错误处理
   help|--help|-h) show_help;;
