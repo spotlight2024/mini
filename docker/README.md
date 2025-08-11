@@ -140,6 +140,29 @@ SE_NODE_SESSION_TIMEOUT=600
 SE_SESSION_REQUEST_TIMEOUT=600
 ```
 
+## 👥 用户数据持久化
+
+### 多用户会话管理
+```bash
+# 启动用户Alice的会话
+./user_session.sh start alice
+
+# 切换到用户Bob
+./user_session.sh switch bob
+
+# 查看所有用户
+./user_session.sh list
+
+# 查看当前状态
+./user_session.sh status
+```
+
+### 特点
+- ✅ **多用户隔离**: 每个用户独立的数据目录
+- ✅ **登录持久化**: 淘宝登录状态自动保存
+- ✅ **快速切换**: 3-5秒完成用户切换
+- ✅ **数据安全**: 存储在宿主机，不会丢失
+
 ## 🧪 测试验证
 
 ### 基础测试
@@ -162,6 +185,18 @@ driver.get("https://www.taobao.com")
 print(f"页面标题: {driver.title}")
 
 driver.quit()
+```
+
+### 用户会话测试
+```bash
+# 1. 启动用户会话
+./user_session.sh start user_alice
+
+# 2. 运行测试脚本
+python3 user_session_demo.py user_alice
+
+# 3. 检查用户数据
+ls -la /data/chrome-profiles/user_alice/
 ```
 
 ### IP验证

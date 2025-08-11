@@ -27,9 +27,12 @@ services:
       - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
       - SE_NODE_MAX_SESSIONS=1
       - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      # VNC配置
+      - SE_VNC_NO_PASSWORD=true
+      - SE_NOVNC_NO_PASSWORD=true
       # 上游代理配置 - 节点1
-      - PROXY_HOST=101.96.145.103
-      - PROXY_PORT=58001
+      - PROXY_HOST=60.188.112.219
+      - PROXY_PORT=60002
       - PROXY_USERNAME=vgmpgv
       - PROXY_PASSWORD=1bk79g9y
       # HTTP代理环境变量 (让Chrome透明使用tinyproxy)

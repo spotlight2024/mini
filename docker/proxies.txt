@@ -2,7 +2,7 @@
 # 格式: username:password@host:port
 
 # 您的真实代理
-vgmpgv:1bk79g9y@101.96.145.103:58001
+vgmpgv:1bk79g9y@60.188.112.219:60002
 
 # 示例代理（用于测试扩展）
 # user2:pass2@proxy2.example.com:8080
