@@ -6,6 +6,7 @@
 
 import time
 import json
+import os
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -18,10 +19,19 @@ def test_proxy_functionality():
     print("🧪 代理功能测试")
     print("=" * 50)
     
+    # 定义用户ID和用户数据目录
+    userId = "test2"
+    # Chrome在容器内使用的路径，通过挂载映射到服务器目录
+    user_data_dir = f"/opt/chrome_user_data/{userId}"
+    print(f"👤 用户ID: {userId}")
+    print(f"📁 容器内Chrome数据目录: {user_data_dir}")
+    print(f"💾 实际存储到服务器: /root/workspace/chrome_data/{userId}")
+    
     # Chrome选项配置
     options = Options()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument(f'--user-data-dir={user_data_dir}')
     print("🔧 Chrome选项已设置: 基本配置")
     
     try:
@@ -36,6 +46,7 @@ def test_proxy_functionality():
         # 1. 验证代理IP
         print("\n🔍 步骤1: 验证代理IP...")
         driver.get("https://qifu-api.baidubce.com/ip/local/geo/v1/district")
+        print(f"driver.capabilities: {driver.capabilities}")
         time.sleep(3)
         
         try:
@@ -46,9 +57,9 @@ def test_proxy_functionality():
             print(f"   ⚠️  IP检查异常: {e}")
         
         # 2. 访问淘宝首页
-        print("\n🛒 步骤2: 访问淘宝首页...")
-        driver.get("https://www.taobao.com")
-        time.sleep(3)
+        # print("\n🛒 步骤2: 访问淘宝首页...")
+        driver.get("https://www.baidu.com")
+        # time.sleep(3)
         
         print(f"   ✅ 页面标题: {driver.title}")
         
@@ -69,7 +80,7 @@ def test_proxy_functionality():
             # 保持浏览器打开5秒供观察
             print("\n⏳ 保持浏览器5秒供观察...")
             time.sleep(5)
-            driver.quit()
+            # driver.quit()
             print("🔄 浏览器已关闭")
         except:
             pass

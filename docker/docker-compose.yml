@@ -16,13 +16,14 @@ services:
       - selenium-grid
     restart: unless-stopped
 
-  chrome-node-1:
+  chrome-node-5:
     image: chrome-tinyproxy-node:latest
-    container_name: chrome-node-1
+    container_name: chrome-node-5
     depends_on:
       - selenium-hub
     environment:
       - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_NODE_DELETE_SESSION_ON_UI=true
       - SE_EVENT_BUS_PUBLISH_PORT=4442
       - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
       - SE_NODE_MAX_SESSIONS=1
@@ -31,10 +32,10 @@ services:
       - SE_VNC_NO_PASSWORD=true
       - SE_NOVNC_NO_PASSWORD=true
       # 上游代理配置 - 节点1
-      - PROXY_HOST=60.188.112.219
-      - PROXY_PORT=60002
-      - PROXY_USERNAME=vgmpgv
-      - PROXY_PASSWORD=1bk79g9y
+      # - PROXY_HOST=60.188.112.219
+      # - PROXY_PORT=60002
+      # - PROXY_USERNAME=vgmpgv
+      # - PROXY_PASSWORD=1bk79g9y
       # HTTP代理环境变量 (让Chrome透明使用tinyproxy)
       - HTTP_PROXY=http://127.0.0.1:8888
       - HTTPS_PROXY=http://127.0.0.1:8888
@@ -43,6 +44,9 @@ services:
       # 增加会话超时时间防止崩溃
       - SE_NODE_SESSION_TIMEOUT=600
       - SE_SESSION_REQUEST_TIMEOUT=600
+    volumes:
+      # 直接挂载服务器目录，Chrome数据直接读写到服务器
+      - /root/workspace/chrome_data:/opt/chrome_user_data:rw
     networks:
       - selenium-grid
     shm_size: 2gb
