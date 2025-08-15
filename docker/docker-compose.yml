@@ -16,9 +16,9 @@ services:
       - selenium-grid
     restart: unless-stopped
 
-  chrome-node-5:
+  chrome-node-6:
     image: chrome-tinyproxy-node:latest
-    container_name: chrome-node-5
+    container_name: chrome-node-6
     depends_on:
       - selenium-hub
     environment:
@@ -32,10 +32,10 @@ services:
       - SE_VNC_NO_PASSWORD=true
       - SE_NOVNC_NO_PASSWORD=true
       # 上游代理配置 - 节点1
-      # - PROXY_HOST=60.188.112.219
-      # - PROXY_PORT=60002
-      # - PROXY_USERNAME=vgmpgv
-      # - PROXY_PASSWORD=1bk79g9y
+      - PROXY_HOST=183.162.239.238
+      - PROXY_PORT=64021
+      - PROXY_USERNAME=2hi9ub
+      - PROXY_PASSWORD=6yy47euj
       # HTTP代理环境变量 (让Chrome透明使用tinyproxy)
       - HTTP_PROXY=http://127.0.0.1:8888
       - HTTPS_PROXY=http://127.0.0.1:8888

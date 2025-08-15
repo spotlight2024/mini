@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chrome-node
+  namespace: selenium-grid
+  labels:
+    app: chrome-node
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: chrome-node
+  template:
+    metadata:
+      labels:
+        app: chrome-node
+    spec:
+      securityContext:
+        fsGroup: 1201
+      containers:
+      - name: chrome-node
+        image: chrome-tinyproxy-node:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5555
+          name: node
+        - containerPort: 5900
+          name: vnc
+        - containerPort: 7900
+          name: novnc
+        env:
+        - name: SE_EVENT_BUS_HOST
+          value: selenium-hub
+        - name: SE_EVENT_BUS_PUBLISH_PORT
+          value: "4442"
+        - name: SE_EVENT_BUS_SUBSCRIBE_PORT
+          value: "4443"
+        - name: SE_NODE_DELETE_SESSION_ON_UI
+          value: "true"
+        - name: SE_NODE_MAX_SESSIONS
+          value: "1"
+        - name: SE_NODE_OVERRIDE_MAX_SESSIONS
+          value: "true"
+        - name: SE_VNC_NO_PASSWORD
+          value: "true"
+        - name: SE_NOVNC_NO_PASSWORD
+          value: "true"
+        # 透明代理配置 - 使用容器内 tinyproxy
+        - name: HTTP_PROXY
+          value: "http://127.0.0.1:8888"
+        - name: HTTPS_PROXY
+          value: "http://127.0.0.1:8888"
+        - name: http_proxy
+          value: "http://127.0.0.1:8888"
+        - name: https_proxy
+          value: "http://127.0.0.1:8888"
+        - name: SE_NODE_SESSION_TIMEOUT
+          value: "600"
+        - name: SE_SESSION_REQUEST_TIMEOUT
+          value: "600"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1536Mi"
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+        volumeMounts:
+        - name: chrome-user-data
+          mountPath: /opt/chrome_user_data
+        - name: dshm
+          mountPath: /dev/shm
+      volumes:
+      - name: chrome-user-data
+        emptyDir:
+          sizeLimit: "1Gi"
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "2Gi"
+

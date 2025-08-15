@@ -31,13 +31,13 @@ def test_proxy_functionality():
     options = Options()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument(f'--user-data-dir={user_data_dir}')
+    # options.add_argument(f'--user-data-dir={user_data_dir}')
     print("🔧 Chrome选项已设置: 基本配置")
     
     try:
         print("📡 连接到Selenium Grid...")
         driver = webdriver.Remote(
-            command_executor='http://localhost:4444/wd/hub',
+            command_executor='http://localhost:30444/wd/hub',
             options=options
         )
         

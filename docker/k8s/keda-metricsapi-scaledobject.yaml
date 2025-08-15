@@ -1,0 +1,20 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: chrome-node-autoscale-metrics
+  namespace: selenium-grid
+spec:
+  scaleTargetRef:
+    name: chrome-node
+  pollingInterval: 5
+  cooldownPeriod: 180
+  minReplicaCount: 3
+  maxReplicaCount: 100
+  triggers:
+  - type: metrics-api
+    metadata:
+      targetValue: "1"
+      url: "http://grid-metrics-exporter.selenium-grid.svc.cluster.local:8080/value"
+      valueLocation: "value"
+
+

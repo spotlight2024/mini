@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grid-metrics-exporter
+  namespace: selenium-grid
+  labels:
+    app: grid-metrics-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grid-metrics-exporter
+  template:
+    metadata:
+      labels:
+        app: grid-metrics-exporter
+    spec:
+      containers:
+      - name: exporter
+        image: python:3.11-slim
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: HUB_URL
+          value: "http://selenium-hub:4444"
+        - name: BUFFER
+          value: "2"
+        - name: PORT
+          value: "8080"
+        command: ["python","/app/exporter.py"]
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: code
+          mountPath: /app
+      volumes:
+      - name: code
+        configMap:
+          name: grid-metrics-exporter
+          items:
+          - key: exporter.py
+            path: exporter.py
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grid-metrics-exporter
+  namespace: selenium-grid
+spec:
+  selector:
+    app: grid-metrics-exporter
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+
+

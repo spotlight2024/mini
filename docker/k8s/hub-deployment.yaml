@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: selenium-hub
+  namespace: selenium-grid
+  labels:
+    app: selenium-hub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: selenium-hub
+  template:
+    metadata:
+      labels:
+        app: selenium-hub
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/hostname: selenium-cluster-control-plane
+      containers:
+      - name: hub
+        image: selenium/hub:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 4442
+          hostPort: 4442
+          name: event-publish
+        - containerPort: 4443
+          hostPort: 4443
+          name: event-subscribe
+        - containerPort: 4444
+          hostPort: 4444
+          name: web
+        env:
+        - name: SE_NODE_SESSION_TIMEOUT
+          value: "300"
+        - name: SE_SESSION_REQUEST_TIMEOUT
+          value: "300"
+        - name: SE_NODE_MAX_SESSIONS
+          value: "2"
+
