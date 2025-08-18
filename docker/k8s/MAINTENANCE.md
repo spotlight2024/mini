@@ -224,3 +224,6 @@ kubectl -n selenium-grid delete pods --field-selector=status.phase=Failed
 ---
 
 *最后更新时间: 2024年12月*
+
+
+

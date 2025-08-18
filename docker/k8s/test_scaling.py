@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-测试 Selenium Grid 扩容功能 - 并发版本
+测试 Selenium Grid 扩容功能 - 真正并发版本
 """
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 from selenium.webdriver.common.by import By
 from datetime import datetime
+import queue
 
 def get_timestamp():
     """获取当前时间戳"""
@@ -20,8 +21,13 @@ def log_with_timestamp(message):
     timestamp = get_timestamp()
     print(f"[{timestamp}] {message}")
 
-def create_session(session_id):
-    """创建单个 Selenium 会话"""
+def create_session_concurrent(session_id, start_barrier):
+    """创建单个 Selenium 会话 - 并发版本"""
+    log_with_timestamp(f"🚀 会话 {session_id}: 准备就绪，等待并发启动...")
+    
+    # 等待所有线程准备就绪
+    start_barrier.wait()
+    
     log_with_timestamp(f"🚀 会话 {session_id}: 开始创建...")
     
     # 用户特定的存储路径 - 让 Chrome 自己创建目录
@@ -79,7 +85,7 @@ def create_session(session_id):
         
         # 保持会话活跃一段时间
         log_with_timestamp(f"⏳ 会话 {session_id}: 保持活跃 30 秒...")
-        time.sleep(30)
+        # time.sleep(30)
         
         # 关闭会话
         driver.quit()
@@ -97,9 +103,12 @@ def create_session(session_id):
         return error_msg
 
 def test_concurrent_scaling(concurrent_count=5):
-    """测试并发扩容功能"""
+    """测试并发扩容功能 - 真正并发版本"""
     log_with_timestamp(f"🚀 开始测试 Selenium Grid 并发扩容功能...")
     log_with_timestamp(f"📊 并发数: {concurrent_count}")
+    
+    # 创建同步屏障，确保所有线程同时启动
+    start_barrier = threading.Barrier(concurrent_count)
     
     # 记录总体开始时间
     overall_start_time = time.time()
@@ -108,9 +117,11 @@ def test_concurrent_scaling(concurrent_count=5):
     with ThreadPoolExecutor(max_workers=concurrent_count) as executor:
         # 提交所有任务
         future_to_session = {
-            executor.submit(create_session, i+1): i+1 
+            executor.submit(create_session_concurrent, i+1, start_barrier): i+1 
             for i in range(concurrent_count)
         }
+        
+        log_with_timestamp(f"🎯 已提交 {concurrent_count} 个并发任务，等待所有线程准备就绪...")
         
         # 收集结果
         results = []
@@ -140,5 +151,5 @@ def test_concurrent_scaling(concurrent_count=5):
     log_with_timestamp("🎉 并发扩容测试完成！")
 
 if __name__ == "__main__":
-    # 设置并发数为 5
-    test_concurrent_scaling(concurrent_count=5)
+    # 设置并发数为 10
+    test_concurrent_scaling(concurrent_count=6)

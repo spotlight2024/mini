@@ -1,0 +1,16 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: chrome-nas-storage
+provisioner: nas.csi.aliyun.com
+parameters:
+  server: "10127497f3-wws17.cn-beijing.nas.aliyuncs.com"
+  path: "/"
+  vers: "4.0"
+  options: "nolock,vers=4.0"
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+
+
+
