@@ -10,6 +10,7 @@ from RestrictedPython.PrintCollector import PrintCollector
 from .base_executor import ScriptExecutorInterface, CommandExecutorInterface
 from ..models.script_models import CommandResult, ExecutorContext
 from ..exceptions.executor_exceptions import SandboxException, ExecutorException
+from .sandbox_functions import create_sandbox_functions
 
 
 class SandboxScriptExecutor(ScriptExecutorInterface):
@@ -96,6 +97,9 @@ class SandboxScriptExecutor(ScriptExecutorInterface):
         # 创建异步命令执行包装器
         async_wrapper = AsyncExecuteCommandWrapper(self.command_executor, self)
 
+        # 创建函数式API
+        sandbox_functions = create_sandbox_functions(async_wrapper)
+
         # 自定义迭代器解包函数
         def safe_iter_unpack_sequence(seq, spec, pad=None):
             """安全的序列解包函数"""
@@ -133,6 +137,9 @@ class SandboxScriptExecutor(ScriptExecutorInterface):
             'dict': dict,
             'get': lambda obj, key, default=None: obj.get(key, default) if hasattr(obj, 'get') else default,
         }
+
+        # 添加函数式API到环境中
+        env.update(sandbox_functions)
 
         return env
 
