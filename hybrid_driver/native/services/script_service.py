@@ -16,7 +16,7 @@ from ..utils.variable_replacer import VariableReplacer
 from ..utils.result_merger import ResultMerger
 from ..executors.http_executor import HttpCommandExecutor
 from ..executors.sandbox_executor import SandboxScriptExecutor
-from ..exceptions.executor_exceptions import ScriptExecutionException, NetworkException
+from ..exceptions.executor_exceptions import ExecutorException, ScriptExecutionException
 
 
 class ScriptExecutionService:
@@ -99,15 +99,13 @@ class ScriptExecutionService:
             # 8. 构建最终结果
             final_result = self._build_script_result(sandbox_executor)
             return final_result
-
-        except ScriptExecutionException as e:
-            print(f"[ERROR] Script execution failed for request {req_id}: {e}")
-            return e.result
         except Exception as e:
             error_msg = f"Script execution failed: {e}"
             print(f"[ERROR] Request {req_id} failed: {error_msg}")
-            error_result = CommandResult(code=1, message=error_msg)
-            raise ScriptExecutionException(error_msg, error_result) from e
+            error_result = e.result if isinstance(e, ExecutorException) else None
+            if not error_result:
+                error_result = CommandResult(code=1, message=error_msg)
+            return error_result
 
     def _build_script_result(self, executor: SandboxScriptExecutor) -> CommandResult:
         """
