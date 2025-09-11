@@ -6,7 +6,7 @@ metadata:
   labels:
     app: chrome-node
 spec:
-  replicas: 2  # 从 6 增加到 8，基于新的资源设置
+  replicas: 1  # 从 6 增加到 8，基于新的资源设置
   selector:
     matchLabels:
       app: chrome-node
@@ -23,7 +23,7 @@ spec:
       schedulerName: default-scheduler
       containers:
       - name: chrome-node
-        image: chrome-tinyproxy-node:latest
+        image: chrome-tinyproxy-node:1.0.8
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5555
@@ -51,13 +51,13 @@ spec:
           value: "true"
         # 透明代理配置 - 使用容器内 tinyproxy
         - name: PROXY_HOST
-          value: "101.96.145.103"
+          value: "192.168.1.46"
         - name: PROXY_PORT
-          value: "51004"
-        - name: PROXY_USERNAME
-          value: "vgmpgv"
-        - name: PROXY_PASSWORD
-          value: "1bk79g9y"
+          value: "7897"
+        # - name: PROXY_USERNAME
+        #   value: "vgmpgv"
+        # - name: PROXY_PASSWORD
+        #   value: "1bk79g9y"
         - name: HTTP_PROXY
           value: "http://127.0.0.1:8888"
         - name: HTTPS_PROXY
