@@ -6,7 +6,7 @@ metadata:
   labels:
     app: chrome-node
 spec:
-  replicas: 8  # 从 6 增加到 8，基于新的资源设置
+  replicas: 2  # 从 6 增加到 8，基于新的资源设置
   selector:
     matchLabels:
       app: chrome-node
@@ -42,7 +42,7 @@ spec:
         - name: SE_NODE_DELETE_SESSION_ON_UI
           value: "true"
         - name: SE_NODE_MAX_SESSIONS
-          value: "2"
+          value: "1"
         - name: SE_NODE_OVERRIDE_MAX_SESSIONS
           value: "true"
         - name: SE_VNC_NO_PASSWORD
@@ -50,6 +50,14 @@ spec:
         - name: SE_NOVNC_NO_PASSWORD
           value: "true"
         # 透明代理配置 - 使用容器内 tinyproxy
+        - name: PROXY_HOST
+          value: "101.96.145.103"
+        - name: PROXY_PORT
+          value: "51004"
+        - name: PROXY_USERNAME
+          value: "vgmpgv"
+        - name: PROXY_PASSWORD
+          value: "1bk79g9y"
         - name: HTTP_PROXY
           value: "http://127.0.0.1:8888"
         - name: HTTPS_PROXY
@@ -64,11 +72,11 @@ spec:
           value: "600"
         resources:
           requests:
-            cpu: "100m"           # 从 150m 减少到 100m，最大化并发能力
-            memory: "300Mi"       # 从 400Mi 减少到 300Mi，优化内存使用
+            cpu: "600m"           # CPU请求资源
+            memory: "800Mi"       # 内存请求资源
           limits:
-            cpu: "250m"           # 从 300m 减少到 250m，避免过度占用
-            memory: "600Mi"       # 从 800Mi 减少到 600Mi，合理的内存限制
+            cpu: "1000m"          # 1核CPU限制
+            memory: "1.5Gi"       # 内存限制
         volumeMounts:
         - name: chrome-nas
           mountPath: /opt/chrome_user_data
