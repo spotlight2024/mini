@@ -7,6 +7,8 @@ metadata:
     app: selenium-hub
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: selenium-hub
@@ -15,9 +17,9 @@ spec:
       labels:
         app: selenium-hub
     spec:
-      hostNetwork: true
-      nodeSelector:
-        kubernetes.io/hostname: selenium-cluster-control-plane
+      # hostNetwork: true  # 移除 hostNetwork 以避免网络连接问题
+      # nodeSelector:
+      #   kubernetes.io/hostname: selenium-cluster-control-plane
       containers:
       - name: selenium-hub
         image: selenium/hub:latest
