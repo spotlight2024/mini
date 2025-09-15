@@ -1,6 +1,7 @@
 """
 ActionChains包装器 - 支持链式调用和复杂交互
 """
+from cgitb import reset
 import time
 import logging
 from typing import Optional, Union, List, Tuple, Any
@@ -128,6 +129,7 @@ class ActionChainsWrapper:
         """执行所有动作"""
         self.actions.perform()
         self.log("✅ 执行所有动作完成")
+        self.reset_actions()
         return self
     
     def reset_actions(self) -> 'ActionChainsWrapper':

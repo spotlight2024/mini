@@ -40,7 +40,7 @@ def create_jd_session_concurrent(session_id, start_barrier):
     # 用户特定的存储路径 - 让 Chrome 自己创建目录，添加时间戳确保唯一性
     import time
     timestamp = int(time.time() * 1000)  # 毫秒时间戳
-    user_data_dir = f"/opt/chrome_user_data/chrome/session_{session_id}_{timestamp}_gongcong"
+    user_data_dir = f"/opt/chrome_user_data/chrome/session_{session_id}_gongcong"
     
     log_with_timestamp(f"📁 会话 {session_id}: 使用用户数据目录: {user_data_dir}")
     
@@ -78,7 +78,7 @@ def create_jd_session_concurrent(session_id, start_barrier):
     # 设置页面加载超时
     chrome_options.add_argument('--page-load-strategy=eager')  # 使用eager策略，不等待所有资源
     
-    chrome_options.page_load_strategy = 'eager'   # 关键
+    chrome_options.page_load_strategy = 'none'   # 关键
 
     try:
         # 记录开始连接时间

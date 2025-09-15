@@ -66,7 +66,7 @@ class WebDriverManager:
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--headless')
+        # chrome_options.add_argument('--headless')
         
         # 用户数据目录
         user_data_dir = f"/opt/chrome_user_data/chrome/session_{self.session_id}_{self.site_config['site_name']}"
