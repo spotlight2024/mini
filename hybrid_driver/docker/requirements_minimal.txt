@@ -1,0 +1,41 @@
+# 核心 Web 框架
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+starlette==0.27.0
+
+# HTTP 客户端
+requests==2.31.0
+httpx==0.25.2
+
+# 文件处理
+python-multipart==0.0.6
+aiofiles==23.2.1
+
+# 配置管理
+python-dotenv==1.0.0
+
+# 日志
+loguru==0.7.2
+
+# WebDriver 相关
+selenium==4.15.2
+webdriver-manager==4.0.1
+
+# 设备管理
+adbutils==2.9.4
+
+# Appium
+Appium-Python-Client==3.1.0
+
+# 图像处理
+Pillow==10.1.0
+
+# 加密
+cryptography==41.0.7
+
+# 其他工具
+psutil==5.9.6
+
+# 网络接口（使用预编译版本）
+netifaces==0.11.0

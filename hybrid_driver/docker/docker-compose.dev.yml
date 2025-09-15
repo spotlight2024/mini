@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  #==================
+  # 开发环境 SpotLight API 服务
+  #==================
+  spotlight-api-dev:
+    build:
+      context: ../../
+      dockerfile: hybrid_driver/docker/Dockerfile
+    container_name: spotlight-api-dev
+    ports:
+      - "10001:10001"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - API_HOST=0.0.0.0
+      - API_PORT=10001
+      - LOG_LEVEL=DEBUG
+      - API_RELOAD=true
+      - WEBDRIVER_MODE=local
+    volumes:
+      # 开发环境：挂载源代码目录，支持热重载
+      - ../../hybrid_driver:/app/hybrid_driver
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./cache:/app/cache
+    restart: unless-stopped
+    command: ["python", "hybrid_driver/start_api_server.py", "--host", "0.0.0.0", "--port", "10001", "--reload"]
