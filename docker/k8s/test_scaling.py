@@ -102,7 +102,7 @@ def create_session_concurrent(session_id, start_barrier):
         log_with_timestamp(error_msg)
         return error_msg
 
-def test_concurrent_scaling(concurrent_count=5):
+def test_concurrent_scaling(concurrent_count=10):
     """测试并发扩容功能 - 真正并发版本"""
     log_with_timestamp(f"🚀 开始测试 Selenium Grid 并发扩容功能...")
     log_with_timestamp(f"📊 并发数: {concurrent_count}")
@@ -152,4 +152,4 @@ def test_concurrent_scaling(concurrent_count=5):
 
 if __name__ == "__main__":
     # 设置并发数为 10
-    test_concurrent_scaling(concurrent_count=6)
+    test_concurrent_scaling(concurrent_count=8)

@@ -41,18 +41,18 @@ spec:
         - name: SE_SESSION_QUEUE_TIMEOUT
           value: "300"
         - name: SE_NEW_SESSION_THREAD_POOL_SIZE
-          value: "50"
+          value: "200"
         - name: SE_LOG_LEVEL
           value: "INFO"
         # - name: JAVA_OPTS
         #   value: "-Djava.util.logging.config.file=/opt/selenium/logging.properties -Djava.util.logging.ConsoleHandler.level=ALL -Djava.util.logging.FileHandler.level=ALL"
         - name: SE_OPTS
-          value: "--max-threads 50 --log-level ALL --log-encoding UTF-8"
+          value: "--max-threads 200 --log-encoding UTF-8"
         resources:
           requests:
-            cpu: "500m"
-            memory: "512Mi"
+            cpu: "2000m"
+            memory: "2Gi"
           limits:
-            cpu: "1"
-            memory: "1Gi"
+            cpu: "4000m"
+            memory: "4Gi"
 
