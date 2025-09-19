@@ -64,14 +64,14 @@ echo -e "${GREEN}✅ 集群连接正常${NC}"
 
 echo "[3/9] 加载必要的 Docker 镜像到 kind 集群"
 echo "   加载 chrome-tinyproxy-node 镜像..."
-if docker images | grep -q "chrome-tinyproxy-node.*latest"; then
-    kind load docker-image chrome-tinyproxy-node:latest --name "${CLUSTER_NAME}"
-    echo -e "${GREEN}✅ chrome-tinyproxy-node 镜像加载完成${NC}"
-else
-    echo -e "${RED}❌ chrome-tinyproxy-node:latest 镜像不存在${NC}"
-    echo "   请先构建镜像: docker build -t chrome-tinyproxy-node:latest .."
-    exit 1
-fi
+# if docker images | grep -q "chrome-tinyproxy-node.*latest"; then
+kind load docker-image chrome-tinyproxy-node:latest --name "${CLUSTER_NAME}"
+echo -e "${GREEN}✅ chrome-tinyproxy-node 镜像加载完成${NC}"
+# else
+#     echo -e "${RED}❌ chrome-tinyproxy-node:latest 镜像不存在${NC}"
+#     echo "   请先构建镜像: docker build -t chrome-tinyproxy-node:latest .."
+#     exit 1
+# fi
 
 echo "   加载 selenium/hub 镜像..."
 if docker images | grep -q "selenium/hub.*latest"; then

@@ -6,7 +6,7 @@ metadata:
   labels:
     app: chrome-node
 spec:
-  replicas: 8   # 单个高配置节点
+  replicas: 4   # 单个高配置节点
   selector:
     matchLabels:
       app: chrome-node
@@ -23,7 +23,7 @@ spec:
       schedulerName: default-scheduler
       containers:
       - name: chrome-node
-        image: chrome-tinyproxy-node:1.0.8
+        image: chrome-tinyproxy-node:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5555
@@ -49,40 +49,72 @@ spec:
           value: "true"
         - name: SE_NOVNC_NO_PASSWORD
           value: "true"
-        # 透明代理配置 - 使用容器内 tinyproxy
-        - name: PROXY_HOST
-          value: "192.168.1.30"
-        - name: PROXY_PORT
-          value: "7897"
-        # - name: PROXY_USERNAME
-        #   value: "vgmpgv"
-        # - name: PROXY_PASSWORD
-        #   value: "1bk79g9y"
+        # 代理配置 - 指向tinyproxy sidecar (端口3128避免与chrome-node内tinyproxy冲突)
         - name: HTTP_PROXY
-          value: "http://127.0.0.1:8888"
+          value: "http://127.0.0.1:3128"
         - name: HTTPS_PROXY
-          value: "http://127.0.0.1:8888"
+          value: "http://127.0.0.1:3128"
         - name: http_proxy
-          value: "http://127.0.0.1:8888"
+          value: "http://127.0.0.1:3128"
         - name: https_proxy
-          value: "http://127.0.0.1:8888"
+          value: "http://127.0.0.1:3128"
         - name: SE_NODE_SESSION_TIMEOUT
           value: "600"
         - name: SE_SESSION_REQUEST_TIMEOUT
           value: "600"
         resources:
           requests:
-            cpu: "100m"         # 4C8G服务器，8个节点，每个节点100m CPU
+            cpu: "500m"         # 4C8G服务器，8个节点，每个节点100m CPU
             memory: "500Mi"     # 每个节点500Mi内存
           limits:
             cpu: "1000m"        # 每个节点最大1000m CPU
-            memory: "2Gi"       # 每个节点最大2Gi内存
+            memory: "1Gi"       # 每个节点最大2Gi内存
         volumeMounts:
+        - name: proxy-config
+          mountPath: /shared/config
+        - name: shared-scripts
+          mountPath: /shared/scripts
         - name: chrome-nas
           mountPath: /opt/chrome_user_data
         - name: dshm
           mountPath: /dev/shm
+          
+      # tinyproxy Sidecar容器 - 高性能代理服务
+      - name: proxy-sidecar
+        image: vimagick/tinyproxy:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3128
+          name: proxy
+        # env:
+        # - name: DEFAULT_PROXY_HOST
+        #   value: "61.132.231.167"
+        # - name: DEFAULT_PROXY_PORT
+        #   value: "62008"
+        # - name: DEFAULT_PROXY_USERNAME
+        #   value: "vgmpgv"
+        # - name: DEFAULT_PROXY_PASSWORD
+        #   value: "1bk79g9y"
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+        volumeMounts:
+        - name: proxy-config
+          mountPath: /shared/config
+        - name: shared-scripts
+          mountPath: /shared/scripts
+          readOnly: true
+        # 使用chrome-node容器中的脚本
+        command: ["/bin/sh", "/shared/scripts/tinyproxy-sidecar.sh"]
       volumes:
+      - name: proxy-config
+        emptyDir: {}
+      - name: shared-scripts
+        emptyDir: {}  # 用于共享脚本文件
       - name: chrome-nas
         persistentVolumeClaim:
           claimName: chrome-nas-pvc
