@@ -10,7 +10,7 @@ from hybrid_driver.api.models import APIResponse
 
 # 导入路由模块
 from hybrid_driver.api.routers import collect, device, element, mock, page, screenshot, restaurant
-from hybrid_driver.api import taobao_test_api
+from hybrid_driver.api.test import taobao_test_api
 from hybrid_driver.device_pool import DevicePool
 from hybrid_driver.log_config import get_logger
 from hybrid_driver.native import script_executor
