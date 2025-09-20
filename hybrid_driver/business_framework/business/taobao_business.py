@@ -6,8 +6,8 @@ from typing import Optional
 from pathlib import Path
 from selenium.webdriver.common.by import By
 
-from business.base_business import BaseBusiness
-from pages.taobao_pages import TaobaoHomePage, TaobaoSearchPage
+from hybrid_driver.business_framework.business.base_business import BaseBusiness
+from hybrid_driver.business_framework.pages.taobao_pages import TaobaoHomePage, TaobaoSearchPage
 from hybrid_driver.log_config import get_logger
 
 
@@ -90,7 +90,7 @@ class TaobaoBusiness(BaseBusiness):
         """执行业务流程"""
         return self.execute_search_business("logo.png")
     
-    def execute_image_search_with_actions(self, file_path: str = "logo.png") -> bool:
+    def execute_image_search_with_actions(self, file_path: str = "logo.png") -> tuple[bool, list[str]]:
         """使用ActionChains执行图片搜索业务"""
         try:
             # 获取ActionChains和WebDriverChain
@@ -133,17 +133,22 @@ class TaobaoBusiness(BaseBusiness):
             self.page_manager.wait_for_new_window()
             self.page_manager.switch_to_new_window("search_results")
 
-            # 9. 获取并打印商品标题
+            # 9. 获取商品标题列表
             self.logger.info("🔍 开始获取搜索结果中的商品标题...")
-            product_count = self.search_page.print_product_titles_to_log()
+            product_titles = self.search_page.get_product_titles()
             
-            # 10. 获取页面基本信息
-            chain.get_page_info()
-
+            if product_titles:
+                self.logger.info(f"✅ 成功获取到 {len(product_titles)} 个商品标题")
+                # 打印到日志（传入已获取的列表，避免重复获取）
+                self.search_page.print_product_titles_to_log(product_titles)
+            else:
+                self.logger.warning("⚠️ 未获取到商品标题")
             
+            # # 10. 获取页面基本信息
+            # chain.get_page_info()
 
-            return True
+            return True, product_titles or []
             
         except Exception as e:
             self.logger.error(f"图片搜索业务失败: {e}")
-            return False
+            return False, []

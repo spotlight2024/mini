@@ -45,7 +45,7 @@ def test_browser_proxy():
         print("\n🔍 测试1: 检查出口IP地址")
         print("-" * 40)
         
-        driver.get("https://qifu-api.baidubce.com/ip/local/geo/v1/district")
+        driver.get("https://ipinfo.io/json")
         
         # 等待页面加载
         time.sleep(3)

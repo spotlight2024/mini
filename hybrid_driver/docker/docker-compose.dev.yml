@@ -24,5 +24,6 @@ services:
       - ./logs:/app/logs
       - ./data:/app/data
       - ./cache:/app/cache
+      - ../../@web_screenshot:/app/@web_screenshot
     restart: unless-stopped
     command: ["python", "hybrid_driver/start_api_server.py", "--host", "0.0.0.0", "--port", "10001", "--reload"]

@@ -4,6 +4,8 @@ WebDriver链式调用封装类
 import time
 import json
 import logging
+import subprocess
+import requests
 from typing import Optional, Union, Any
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -36,13 +38,45 @@ class WebDriverChain:
     
     def check_ip_info(self) -> 'WebDriverChain':
         """检查IP信息"""
-        try:
-            self.driver.get('https://qifu-api.baidubce.com/ip/local/geo/v1/district')
-            body_text = self.driver.find_element(By.TAG_NAME, "body").text
-            ip_info = json.loads(body_text)
-            self.log(f"📄 IP信息: {ip_info}")
-        except Exception as e:
-            self.log(f"⚠️ IP检查异常: {e}")
+        
+        # 尝试多个IP检测服务
+        ip_services = [
+            'https://ipinfo.io/json',
+            'https://ipapi.co/json',
+            'http://ip-api.com/json'
+        ]
+        
+        for service_url in ip_services:
+            try:
+                self.log(f"🌐 正在获取IP信息: {service_url}")
+                
+                # 方法1: 使用requests库
+                try:
+                    response = requests.get(service_url, timeout=10)
+                    if response.status_code == 200:
+                        ip_info = response.json()
+                        self.log(f"📄 IP信息: {ip_info}")
+                        return self
+                except Exception as e:
+                    self.log(f"⚠️ requests请求失败: {e}")
+                
+                # 方法2: 使用curl命令作为备用
+                try:
+                    result = subprocess.run(['curl', '-s', '--max-time', '10', service_url], 
+                                          capture_output=True, text=True, timeout=15)
+                    if result.returncode == 0 and result.stdout.strip():
+                        ip_info = json.loads(result.stdout)
+                        self.log(f"📄 IP信息: {ip_info}")
+                        return self
+                    else:
+                        self.log(f"⚠️ curl命令失败: {result.stderr}")
+                except Exception as e:
+                    self.log(f"⚠️ curl执行失败: {e}")
+                    
+            except Exception as e:
+                self.log(f"⚠️ IP检查异常 ({service_url}): {e}")
+        
+        self.log("❌ 所有IP检测方法都无法使用")
         return self
     
     def wait_for_element(self, by: Union[str, By], value: str, timeout: int = 10, description: str = "") -> Optional[WebElement]:

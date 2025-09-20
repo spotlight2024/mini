@@ -96,7 +96,7 @@ environment:
 curl http://localhost:4444/status
 
 # 测试代理IP
-docker compose exec chrome-node-1 curl -s https://qifu-api.baidubce.com/ip/local/geo/v1/district
+docker compose exec chrome-node-1 curl -s https://ipinfo.io/json
 ```
 
 ## 🔧 多节点扩展
@@ -177,7 +177,7 @@ driver = webdriver.Remote(
 )
 
 # 检查IP
-driver.get("https://qifu-api.baidubce.com/ip/local/geo/v1/district")
+driver.get("https://ipinfo.io/json")
 print(driver.find_element("tag name", "body").text)
 
 # 访问目标网站

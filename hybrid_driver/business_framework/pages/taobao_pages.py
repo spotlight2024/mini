@@ -6,7 +6,7 @@ from typing import Optional
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from pages.base_page import BasePage
+from hybrid_driver.business_framework.pages.base_page import BasePage
 from hybrid_driver.log_config import get_logger
 
 
@@ -143,13 +143,7 @@ class TaobaoSearchPage(BasePage):
     def get_product_titles(self) -> list:
         """获取商品标题列表"""
         try:
-            # 等待页面加载完成
-            # self.wait_for_page_load(2)
-            
-            # 额外等待商品元素加载
-            import time
-            time.sleep(3)  # 给商品列表更多时间加载
-            
+
             # 方法1：通过商品卡片获取标题
             titles = []
             
@@ -157,7 +151,7 @@ class TaobaoSearchPage(BasePage):
             product_links = self.driver.find_elements(By.CSS_SELECTOR, "a[data-spm-act-id]")
             self.logger.info(f"找到 {len(product_links)} 个商品链接")
             
-            for i, link in enumerate(product_links[:10]):  # 限制获取前10个商品
+            for i, link in enumerate(product_links):  # 获取所有商品
                 try:
                     # 在链接内查找标题文本
                     title_elements = link.find_elements(By.CSS_SELECTOR, "span")
@@ -196,10 +190,12 @@ class TaobaoSearchPage(BasePage):
             self.logger.error(f"获取商品标题失败: {e}")
             return []
     
-    def print_product_titles_to_log(self) -> int:
-        """获取并打印商品标题到日志"""
+    def print_product_titles_to_log(self, titles: list = None) -> int:
+        """打印商品标题到日志"""
         try:
-            titles = self.get_product_titles()
+            # 如果没有传入titles，则获取一次
+            if titles is None:
+                titles = self.get_product_titles()
             
             if titles:
                 self.logger.info("=" * 60)

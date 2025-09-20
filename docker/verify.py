@@ -31,7 +31,7 @@ def verify_proxy():
         
         # 检查代理IP
         print("🌐 检查出口IP...")
-        driver.get("https://qifu-api.baidubce.com/ip/local/geo/v1/district")
+        driver.get("https://ipinfo.io/json")
         time.sleep(2)
         
         body_text = driver.find_element(By.TAG_NAME, "body").text

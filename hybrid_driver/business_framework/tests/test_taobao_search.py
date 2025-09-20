@@ -6,7 +6,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
-from business.taobao_business import TaobaoBusiness
+from hybrid_driver.business_framework.business.taobao_business import TaobaoBusiness
 from hybrid_driver.log_config import get_logger
 
 

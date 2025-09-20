@@ -123,7 +123,7 @@ SUCCESS=false
 while [ $ATTEMPT -le $MAX_ATTEMPTS ] && [ "$SUCCESS" = false ]; do
     log "   Attempt $ATTEMPT/$MAX_ATTEMPTS..."
     
-    if docker compose exec "$CONTAINER" curl -s --max-time 10 --proxy http://127.0.0.1:8888 https://qifu-api.baidubce.com/ip/local/geo/v1/district > /dev/null 2>&1; then
+    if docker compose exec "$CONTAINER" curl -s --max-time 10 --proxy http://127.0.0.1:8888 https://ipinfo.io/json > /dev/null 2>&1; then
         SUCCESS=true
         log "✅ Proxy connectivity test passed"
         break
@@ -141,14 +141,14 @@ fi
 
 # 6. Get actual exit IP
 log "🔍 Getting actual exit IP..."
-ACTUAL_IP=$(docker compose exec "$CONTAINER" curl -s --max-time 15 --proxy http://127.0.0.1:8888 https://qifu-api.baidubce.com/ip/local/geo/v1/district | python3 -c "import sys,json; print(json.load(sys.stdin)['ip'])" 2>/dev/null || echo "Failed to get IP")
+ACTUAL_IP=$(docker compose exec "$CONTAINER" curl -s --max-time 15 --proxy http://127.0.0.1:8888 https://ipinfo.io/json | python3 -c "import sys,json; print(json.load(sys.stdin)['ip'])" 2>/dev/null || echo "Failed to get IP")
 
 if [ "$ACTUAL_IP" != "Failed to get IP" ]; then
     log "✅ Proxy switch successful!"
     log "   New exit IP: $ACTUAL_IP"
     
     # Get location info
-    LOCATION_INFO=$(docker compose exec "$CONTAINER" curl -s --max-time 15 --proxy http://127.0.0.1:8888 https://qifu-api.baidubce.com/ip/local/geo/v1/district | python3 -c "import sys,json; data=json.load(sys.stdin); print(f\"{data.get('data', {}).get('prov', 'Unknown')} {data.get('data', {}).get('city', 'Unknown')} {data.get('data', {}).get('isp', 'Unknown')}\")" 2>/dev/null || echo "Unknown location")
+    LOCATION_INFO=$(docker compose exec "$CONTAINER" curl -s --max-time 15 --proxy http://127.0.0.1:8888 https://ipinfo.io/json | python3 -c "import sys,json; data=json.load(sys.stdin); print(f\"{data.get('region', 'Unknown')} {data.get('city', 'Unknown')} {data.get('org', 'Unknown')}\")" 2>/dev/null || echo "Unknown location")
     log "   Location: $LOCATION_INFO"
 else
     error "❌ Failed to get exit IP"

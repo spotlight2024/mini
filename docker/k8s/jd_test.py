@@ -104,7 +104,7 @@ def create_jd_session_concurrent(session_id, start_barrier):
         browser_start_time = time.time()
 
 
-        driver.get('https://qifu-api.baidubce.com/ip/local/geo/v1/district')
+        driver.get('https://ipinfo.io/json')
 
         try:
             body_text = driver.find_element(By.TAG_NAME, "body").text

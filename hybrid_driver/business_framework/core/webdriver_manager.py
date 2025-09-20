@@ -22,6 +22,7 @@ class WebDriverManager:
         self.site_config = site_config
         self.driver = None
         self.page_manager = None
+        self.chrome_options = None  # 存储chrome选项，可被外部修改
         self.logger = get_logger(f"WebDriverManager-{session_id}")
     
     def create_driver(self) -> webdriver.Remote:
@@ -40,10 +41,14 @@ class WebDriverManager:
             # android_process=self.site_config.get('android_process', 'com.tencent.mm:appbrand0')
         )
         
+        # 如果还没有Chrome选项，则创建默认配置
+        if self.chrome_options is None:
+            self.chrome_options = self._create_chrome_options()
+        
         # 创建WebDriver
         self.driver = webdriver.Remote(
             command_executor=self.site_config['hub_url'],
-            options=self._create_chrome_options()
+            options=self.chrome_options
         )
         
         # 设置超时
@@ -52,7 +57,7 @@ class WebDriverManager:
         self.driver.file_detector = LocalFileDetector()
         
         # 创建页面管理器
-        from core.page_manager import PageManager
+        from hybrid_driver.business_framework.core.page_manager import PageManager
         self.page_manager = PageManager(self.driver, self.session_id)
         
         self.logger.info("WebDriver创建成功")
@@ -69,7 +74,7 @@ class WebDriverManager:
         # chrome_options.add_argument('--headless')
         
         # 用户数据目录
-        user_data_dir = f"/opt/chrome_user_data/chrome/session_{self.session_id}_{self.site_config['site_name']}"
+        user_data_dir = f"/opt/chrome_user_data/chrome/session_{self.session_id}/{self.site_config['site_name']}"
         chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
         
         # 性能优化
@@ -98,6 +103,12 @@ class WebDriverManager:
         chrome_options.page_load_strategy = 'eager'
         
         return chrome_options
+    
+    def prepare_chrome_options(self) -> Options:
+        """准备Chrome选项（基于默认配置），返回options对象供外部修改"""
+        if self.chrome_options is None:
+            self.chrome_options = self._create_chrome_options()
+        return self.chrome_options
     
     def quit(self):
         """关闭WebDriver"""

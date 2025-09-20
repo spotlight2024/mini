@@ -51,7 +51,8 @@ def create_session_concurrent(session_id, start_barrier):
     
     # 动态代理配置 - 每个会话使用不同的代理IP进行测试
     proxy_configs = [
-        {"ip": "180.158.94.91", "port": "40013","username":"vgmpgv","password":"1bk79g9y"}
+        # {"ip": "180.158.94.91", "port": "40013","username":"vgmpgv","password":"1bk79g9y"}
+        {"ip": "192.168.1.78", "port": "7897"}
     ]
     
     # 根据会话ID选择代理配置

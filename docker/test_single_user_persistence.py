@@ -45,7 +45,7 @@ def test_proxy_functionality():
         
         # 1. 验证代理IP
         print("\n🔍 步骤1: 验证代理IP...")
-        driver.get("https://qifu-api.baidubce.com/ip/local/geo/v1/district")
+        driver.get("https://ipinfo.io/json")
         print(f"driver.capabilities: {driver.capabilities}")
         time.sleep(3)
         
