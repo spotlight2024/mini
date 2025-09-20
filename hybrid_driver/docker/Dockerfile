@@ -1,6 +1,9 @@
 # 轻量级 SpotLight Hybrid Driver API 容器
 FROM python:3.10-slim
 
+# 设置时区为Asia/Shanghai
+ENV TZ=Asia/Shanghai
+
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
@@ -19,8 +22,12 @@ RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
     gcc \
     g++ \
     make \
+    tzdata \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# 创建时区链接
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # 设置工作目录
 WORKDIR /app

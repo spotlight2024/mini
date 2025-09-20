@@ -16,6 +16,8 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=10001
       - LOG_LEVEL=INFO
+      # 时区设置
+      - TZ=Asia/Shanghai
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:10001/health"]

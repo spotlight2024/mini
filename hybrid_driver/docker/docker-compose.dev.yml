@@ -18,6 +18,8 @@ services:
       - LOG_LEVEL=DEBUG
       - API_RELOAD=true
       - WEBDRIVER_MODE=local
+      # 时区设置
+      - TZ=Asia/Shanghai
     volumes:
       # 开发环境：挂载源代码目录，支持热重载
       - ../../hybrid_driver:/app/hybrid_driver
