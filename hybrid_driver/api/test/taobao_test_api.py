@@ -4,7 +4,6 @@
 """
 import time
 import uuid
-import requests
 import os
 import asyncio
 from datetime import datetime
@@ -14,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from hybrid_driver.business_framework.business.taobao_business import TaobaoBusiness
 from hybrid_driver.log_config import get_logger
+from hybrid_driver.proxy.proxy_provider import get_proxy_config_for_selenium, ProxyProviderNames
 
 # 创建路由器
 router = APIRouter(prefix="/test/taobao", tags=["淘宝搜索测试"])
@@ -45,52 +45,22 @@ def log_with_timestamp(message: str, session_id: int = None):
     logger.info(log_message)
 
 
-def get_proxy_ip():
-    """从天气IP接口获取代理IP"""
-    try:
-        url = "http://api.tianqiip.com/getip"
-        params = {
-            "secret": "c9kekh2mxxnqoopd",
-            "num": 1,
-            "type": "json",
-            "region": "310100",
-            "port": 1,
-            "time": 3,
-            "ts": 1,
-            "ys": 1,
-            "cs": 1,
-            "mr": 1,
-            "sign": "698f352df781e920dbbd40ebb7a54e53"
-        }
-        
-        response = requests.get(url, params=params, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("code") == 1000 and data.get("data"):
-                proxy_info = data["data"][0]
-                return {
-                    "ip": proxy_info["ip"],
-                    "port": proxy_info["port"],
-                    "prov": proxy_info.get("prov", ""),
-                    "city": proxy_info.get("city", ""),
-                    "expire": proxy_info.get("expire", "")
-                }
-        return None
-    except Exception as e:
-        logger.error(f"获取代理IP失败: {e}")
-        return None
 
 
-def get_proxy_credentials():
-    """获取代理认证信息"""
-    return {
-        "username": "vgmpgv",
-        "password": "1bk79g9y"
-    }
-
-
-def sync_taobao_search_task(uid: str, image_path: str, timeout: int) -> TaobaoSearchResponse:
-    """同步执行淘宝搜索任务"""
+def sync_taobao_search_task(uid: str, image_path: str, timeout: int, proxy_provider: str = ProxyProviderNames.TIANQI) -> TaobaoSearchResponse:
+    """
+    同步执行淘宝搜索任务
+    
+    Args:
+        uid: 用户ID
+        image_path: 图片路径
+        timeout: 超时时间
+        proxy_provider: 代理提供者名称，可选值：
+            - ProxyProviderNames.TIANQI: 天启代理（默认）
+            - ProxyProviderNames.JULIANG: 巨量代理
+            - "tianqi": 天启代理（字符串形式）
+            - "juliang": 巨量代理（字符串形式）
+    """
     session_id = uid
 
     snapshot_id = session_id + "_" + uuid.uuid4().hex
@@ -103,8 +73,10 @@ def sync_taobao_search_task(uid: str, image_path: str, timeout: int) -> TaobaoSe
         
         # 处理图片路径
         if not os.path.isabs(image_path):
+            # 从api/test目录查找test_img目录
             api_dir = os.path.dirname(os.path.abspath(__file__))
-            full_image_path = os.path.join(api_dir, image_path)
+            test_img_dir = os.path.join(api_dir, "test_img")
+            full_image_path = os.path.join(test_img_dir, image_path)
         else:
             full_image_path = image_path
         
@@ -133,23 +105,17 @@ def sync_taobao_search_task(uid: str, image_path: str, timeout: int) -> TaobaoSe
         taobao_business = TaobaoBusiness(session_id)
         
         # 获取代理配置
-        logger.info(f"[会话{session_id}] 获取代理IP配置...")
-        proxy_ip_info = get_proxy_ip()
-        proxy_credentials = get_proxy_credentials()
-        
-        if proxy_ip_info:
-            logger.info(f"[会话{session_id}] 获取到代理IP: {proxy_ip_info['ip']}:{proxy_ip_info['port']} ({proxy_ip_info['prov']}-{proxy_ip_info['city']})")
-            
+        logger.info(f"[会话{session_id}] 获取代理IP配置，使用提供者: {proxy_provider}")
+        proxy_config = get_proxy_config_for_selenium(proxy_provider)
+
+        if proxy_config:
+            logger.info(f"[会话{session_id}] 获取到代理IP: {proxy_config['ip']}:{proxy_config['port']} ({proxy_config.get('region', 'unknown')})")
+
             # 配置Chrome代理选项
             chrome_options = taobao_business.get_chrome_options()
-            chrome_options.set_capability("se:proxyConfig", {
-                "ip": str(proxy_ip_info["ip"]), 
-                "port": str(proxy_ip_info["port"]), 
-                "username": str(proxy_credentials["username"]), 
-                "password": str(proxy_credentials["password"])
-            })
-            
-            logger.info(f"[会话{session_id}] 代理配置完成: {proxy_ip_info['ip']}:{proxy_ip_info['port']}")
+            chrome_options.set_capability("se:proxyConfig", proxy_config)
+
+            logger.info(f"[会话{session_id}] 代理配置完成: {proxy_config['ip']}:{proxy_config['port']}")
         else:
             logger.warning(f"[会话{session_id}] 未能获取代理IP，使用直连")
         
@@ -208,7 +174,11 @@ def sync_taobao_search_task(uid: str, image_path: str, timeout: int) -> TaobaoSe
         error_msg = f"淘宝搜索执行失败: {str(e)}"
         end_time = datetime.now()
         logger.error(f"[会话{session_id}] {error_msg}")
-        taobao_business.get_driver().save_screenshot(screenshot_path)
+        try:
+            if 'taobao_business' in locals() and taobao_business:
+                taobao_business.get_driver().save_screenshot(screenshot_path)
+        except:
+            pass
     
         return TaobaoSearchResponse(
             success=False,
@@ -229,7 +199,7 @@ def sync_taobao_search_task(uid: str, image_path: str, timeout: int) -> TaobaoSe
     finally:
         # 清理资源
         try:
-            if taobao_business:
+            if 'taobao_business' in locals() and taobao_business:
                 # time.sleep(90)
                 taobao_business.cleanup()
                 logger.info(f"[会话{session_id}] 资源清理完成")
@@ -240,7 +210,8 @@ def sync_taobao_search_task(uid: str, image_path: str, timeout: int) -> TaobaoSe
 async def taobao_search(
     uid: str,
     image_path: str = "logo.png",
-    timeout: int = 120
+    timeout: int = 120,
+    proxy_provider: str = ProxyProviderNames.TIANQI
 ):
     """
     执行淘宝图片搜索测试（异步接口，直接返回结果）
@@ -248,8 +219,11 @@ async def taobao_search(
     - **uid**: 用户ID（必需）
     - **image_path**: 搜索图片路径
     - **timeout**: 超时时间（秒）
+    - **proxy_provider**: 代理提供者，可选值：
+        - "tianqi": 天启代理（默认）
+        - "juliang": 巨量代理
     """
-    logger.info(f"[用户{uid}] 开始淘宝搜索请求")
+    logger.info(f"[用户{uid}] 开始淘宝搜索请求，使用代理: {proxy_provider}")
     
     # 使用线程池执行同步任务，避免阻塞事件循环
     loop = asyncio.get_event_loop()
@@ -258,7 +232,8 @@ async def taobao_search(
         sync_taobao_search_task,
         uid,
         image_path,
-        timeout
+        timeout,
+        proxy_provider
     )
     
     logger.info(f"[用户{uid}] 淘宝搜索请求完成")
