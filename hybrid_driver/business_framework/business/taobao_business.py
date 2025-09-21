@@ -100,6 +100,8 @@ class TaobaoBusiness(BaseBusiness):
             if not actions or not chain:
                 raise RuntimeError("ActionChains或WebDriverChain未初始化")
             
+            time.sleep(3)
+
             # 1. 检查IP信息
             chain.check_ip_info()
             

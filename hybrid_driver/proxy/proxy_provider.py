@@ -253,6 +253,31 @@ class JuLiangProxyProvider(ProxyProvider):
         return True
 
 
+class KuaiProxyProvider(ProxyProvider):
+    """快代理提供者"""
+
+    def __init__(self):
+        self.provider_name = "kuai"
+
+    def get_proxy_config(self) -> Optional[ProxyConfig]:
+        """直接返回固定的快代理IP，无需账号密码"""
+        logger.info("直接返回固定快代理IP: i307.kdltpspro.com:15818（无需账号密码）")
+        return ProxyConfig(
+            ip="i307.kdltpspro.com",
+            port=15818,
+            username="",
+            password="",
+            provider=self.provider_name,
+            region="",
+            expire=""
+        )
+
+    def get_provider_name(self) -> str:
+        return self.provider_name
+
+    def is_available(self) -> bool:
+        """检查快代理服务是否可用"""
+        return True
 class CustomProxyProvider(ProxyProvider):
     """自定义代理提供者 - 用于扩展其他代理源"""
 
@@ -326,6 +351,9 @@ def initialize_proxy_providers():
     juliang_provider = JuLiangProxyProvider()
     proxy_manager.register_provider("juliang", juliang_provider)
 
+    kuai_provider = KuaiProxyProvider()
+    proxy_manager.register_provider("kuai", kuai_provider)
+
     # 可以在这里注册其他代理提供者
     # custom_provider = CustomProxyProvider({"name": "my_provider"})
     # proxy_manager.register_provider("my_provider", custom_provider)
@@ -360,6 +388,7 @@ class ProxyProviderNames:
     """代理提供者名称常量"""
     TIANQI = "tianqi"
     JULIANG = "juliang"
+    KUAI = "kuai"
     CUSTOM = "custom"
 
 
