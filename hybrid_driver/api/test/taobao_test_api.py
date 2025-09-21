@@ -109,7 +109,7 @@ def sync_taobao_search_task(uid: str, image_path: str, timeout: int, proxy_provi
         proxy_config = get_proxy_config_for_selenium(proxy_provider)
 
         if proxy_config:
-            logger.info(f"[会话{session_id}] 获取到代理IP: {proxy_config['ip']}:{proxy_config['port']} ({proxy_config.get('region', 'unknown')})")
+            logger.info(f"[会话{session_id}] 获取到代理IP: {proxy_config}")
 
             # 配置Chrome代理选项
             chrome_options = taobao_business.get_chrome_options()
