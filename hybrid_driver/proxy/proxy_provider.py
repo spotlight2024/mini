@@ -256,27 +256,128 @@ class JuLiangProxyProvider(ProxyProvider):
 class KuaiProxyProvider(ProxyProvider):
     """快代理提供者"""
 
-    def __init__(self):
+    def __init__(self, secret_id: str = "oq6karwfp5s5jaac1q77", signature: str = "xlq77b3ol6v6q2f0qj1pnt82wphtnbpi"):
+        self.secret_id = secret_id
+        self.signature = signature
+        self.base_url = "https://dps.kdlapi.com/api/getdps"
         self.provider_name = "kuai"
 
     def get_proxy_config(self) -> Optional[ProxyConfig]:
-        """直接返回固定的快代理IP，无需账号密码"""
-        logger.info("直接返回固定快代理IP: i307.kdltpspro.com:15818（无需账号密码）")
-        return ProxyConfig(
-            ip="i307.kdltpspro.com",
-            port=15818,
-            username="",
-            password="",
-            provider=self.provider_name,
-            region="",
-            expire=""
-        )
+        """从快代理接口获取代理配置"""
+        try:
+            # 构建请求参数
+            params = {
+                "secret_id": self.secret_id,
+                "signature": self.signature,
+                "num": 1,
+                "format": "json",
+                "sep": 1,
+                "f_loc": 1,
+                "f_citycode": 1,
+                "f_et": 1,
+                "f_carrier": 1,
+                "area": "北京"
+            }
+
+            logger.info(f"调用快代理API获取代理配置: {self.base_url}")
+
+            # 使用urllib3直接请求，避免系统代理干扰
+            import urllib3
+            from urllib.parse import urlencode
+            http = urllib3.PoolManager()
+            url = f"{self.base_url}?{urlencode(params)}"
+            response = http.request('GET', url, timeout=10.0)
+
+            # 将urllib3响应转换为requests-like对象
+            class MockResponse:
+                def __init__(self, urllib3_response):
+                    self.status_code = urllib3_response.status
+                    self.text = urllib3_response.data.decode('utf-8')
+
+                def json(self):
+                    import json
+                    return json.loads(self.text)
+
+            response = MockResponse(response)
+
+            logger.info(f"快代理API响应状态码: {response.status_code}")
+
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"快代理API响应数据: {data}")
+
+                # 检查响应格式 - 根据实际API返回结构
+                if data.get("code") == 0 and data.get("data") and data["data"].get("proxy_list"):
+                    proxy_list = data["data"]["proxy_list"]
+                    if not proxy_list:
+                        logger.error("快代理返回的代理列表为空")
+                        return None
+                    
+                    proxy_info = proxy_list[0]
+                    logger.info(f"获取到代理信息: {proxy_info}")
+
+                    # 解析代理信息字符串格式: "IP:PORT,地区,城市代码,过期时间,运营商"
+                    # 实际格式: "58.19.54.141:20098,北京市,110000,300,移动"
+                    proxy_parts = proxy_info.split(',')
+                    
+                    if len(proxy_parts) >= 5:
+                        try:
+                            # 解析IP和端口
+                            ip_port = proxy_parts[0].split(':')
+                            if len(ip_port) != 2:
+                                raise ValueError(f"IP端口格式不正确: {proxy_parts[0]}")
+                            
+                            ip = ip_port[0].strip()
+                            port = int(ip_port[1].strip())
+                            
+                            # 解析其他信息
+                            region = proxy_parts[1].strip()  # 地区
+                            city_code = proxy_parts[2].strip()  # 城市代码
+                            expire_seconds = int(proxy_parts[3].strip())  # 过期时间（秒）
+                            carrier = proxy_parts[4].strip()  # 运营商
+                            
+                            # 计算过期时间
+                            from datetime import datetime, timedelta
+                            expire_time = datetime.now() + timedelta(seconds=expire_seconds)
+                            expire_str = expire_time.strftime("%Y-%m-%d %H:%M:%S")
+
+                            logger.info(f"解析代理信息 - IP: {ip}, Port: {port}, Region: {region}, CityCode: {city_code}, Carrier: {carrier}, Expire: {expire_str}")
+
+                            return ProxyConfig(
+                                ip=ip,
+                                port=port,
+                                username="",  # 快代理无需用户名密码
+                                password="",
+                                provider=self.provider_name,
+                                region=f"{region}({carrier})",
+                                expire=expire_str
+                            )
+                        except (ValueError, IndexError) as e:
+                            logger.error(f"解析代理信息失败: {e}, 原始数据: {proxy_info}")
+                            return None
+                    else:
+                        logger.error(f"快代理返回的代理信息格式不正确，期望5个字段，实际{len(proxy_parts)}个: {proxy_info}")
+                        return None
+                else:
+                    logger.error(f"快代理API返回错误: {data}")
+                    return None
+            else:
+                logger.error(f"快代理API请求失败，状态码: {response.status_code}, 响应: {response.text}")
+                return None
+
+        except Exception as e:
+            logger.error(f"快代理获取失败: {e}")
+            import traceback
+            logger.error(f"详细错误信息: {traceback.format_exc()}")
+            return None
 
     def get_provider_name(self) -> str:
         return self.provider_name
 
     def is_available(self) -> bool:
         """检查快代理服务是否可用"""
+        # 在网络环境受限时，假设服务可用
+        # 实际使用时可以根据需要调整此逻辑
         return True
 class CustomProxyProvider(ProxyProvider):
     """自定义代理提供者 - 用于扩展其他代理源"""

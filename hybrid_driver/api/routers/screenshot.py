@@ -46,6 +46,7 @@ def list_screenshot_categories():
         categories = defaultdict(list)
         total_files = 0
         
+        # 1. 扫描根目录下的直接文件（兼容旧格式）
         for filename in os.listdir(screenshot_dir):
             if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
                 file_path = os.path.join(screenshot_dir, filename)
@@ -56,9 +57,30 @@ def list_screenshot_categories():
                 categories[category].append({
                     'name': filename,
                     'size': file_size,
-                    'mtime': file_mtime
+                    'mtime': file_mtime,
+                    'path': f"/@web_screenshot/{filename}"
                 })
                 total_files += 1
+        
+        # 2. 扫描category子目录（新格式）
+        category_dir = os.path.join(screenshot_dir, "category")
+        if os.path.exists(category_dir):
+            for uid in os.listdir(category_dir):
+                uid_path = os.path.join(category_dir, uid)
+                if os.path.isdir(uid_path):
+                    for filename in os.listdir(uid_path):
+                        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                            file_path = os.path.join(uid_path, filename)
+                            file_size = os.path.getsize(file_path)
+                            file_mtime = os.path.getmtime(file_path)
+                            
+                            categories[uid].append({
+                                'name': filename,
+                                'size': file_size,
+                                'mtime': file_mtime,
+                                'path': f"/@web_screenshot/category/{uid}/{filename}"
+                            })
+                            total_files += 1
         
         # 按目录名称排序
         sorted_categories = sorted(categories.items())
@@ -137,18 +159,37 @@ def list_category_screenshots(category: str):
             return HTMLResponse("<h1>截图目录不存在</h1>")
         
         files = []
-        for filename in os.listdir(screenshot_dir):
-            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                file_category = get_category_from_filename(filename)
-                if file_category == category:
-                    file_path = os.path.join(screenshot_dir, filename)
+        
+        # 1. 检查是否是新的uid分类目录
+        category_dir = os.path.join(screenshot_dir, "category", category)
+        if os.path.exists(category_dir) and os.path.isdir(category_dir):
+            # 新格式：直接从category/{uid}目录读取
+            for filename in os.listdir(category_dir):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                    file_path = os.path.join(category_dir, filename)
                     file_size = os.path.getsize(file_path)
                     file_mtime = os.path.getmtime(file_path)
                     files.append({
                         'name': filename,
                         'size': file_size,
-                        'mtime': file_mtime
+                        'mtime': file_mtime,
+                        'path': f"/@web_screenshot/category/{category}/{filename}"
                     })
+        else:
+            # 旧格式：从根目录扫描，按文件名分类
+            for filename in os.listdir(screenshot_dir):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                    file_category = get_category_from_filename(filename)
+                    if file_category == category:
+                        file_path = os.path.join(screenshot_dir, filename)
+                        file_size = os.path.getsize(file_path)
+                        file_mtime = os.path.getmtime(file_path)
+                        files.append({
+                            'name': filename,
+                            'size': file_size,
+                            'mtime': file_mtime,
+                            'path': f"/@web_screenshot/{filename}"
+                        })
         
         # 按修改时间倒序排列
         files.sort(key=lambda x: x['mtime'], reverse=True)
@@ -198,13 +239,14 @@ def list_category_screenshots(category: str):
         for file_info in files:
             mtime_str = datetime.datetime.fromtimestamp(file_info['mtime']).strftime('%Y-%m-%d %H:%M:%S')
             size_str = f"{file_info['size'] / 1024:.1f} KB" if file_info['size'] > 1024 else f"{file_info['size']} B"
+            file_path = file_info.get('path', f"/@web_screenshot/{file_info['name']}")
             
             html += f"""
             <tr>
-                <td><a href="/@web_screenshot/{file_info['name']}" class="file-link" target="_blank">{file_info['name']}</a></td>
+                <td><a href="{file_path}" class="file-link" target="_blank">{file_info['name']}</a></td>
                 <td>{size_str}</td>
                 <td>{mtime_str}</td>
-                <td><img src="/@web_screenshot/{file_info['name']}" class="preview" alt="预览" onclick="openModal('/@web_screenshot/{file_info['name']}')"></td>
+                <td><img src="{file_path}" class="preview" alt="预览" onclick="openModal('{file_path}')"></td>
             </tr>"""
         
         html += """
@@ -254,16 +296,40 @@ def list_all_screenshots():
             return HTMLResponse("<h1>截图目录不存在</h1>")
         
         files = []
+        
+        # 1. 扫描根目录下的直接文件（旧格式）
         for filename in os.listdir(screenshot_dir):
             if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
                 file_path = os.path.join(screenshot_dir, filename)
                 file_size = os.path.getsize(file_path)
                 file_mtime = os.path.getmtime(file_path)
+                category = get_category_from_filename(filename)
                 files.append({
                     'name': filename,
                     'size': file_size,
-                    'mtime': file_mtime
+                    'mtime': file_mtime,
+                    'category': category,
+                    'path': f"/@web_screenshot/{filename}"
                 })
+        
+        # 2. 扫描category子目录（新格式）
+        category_dir = os.path.join(screenshot_dir, "category")
+        if os.path.exists(category_dir):
+            for uid in os.listdir(category_dir):
+                uid_path = os.path.join(category_dir, uid)
+                if os.path.isdir(uid_path):
+                    for filename in os.listdir(uid_path):
+                        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                            file_path = os.path.join(uid_path, filename)
+                            file_size = os.path.getsize(file_path)
+                            file_mtime = os.path.getmtime(file_path)
+                            files.append({
+                                'name': filename,
+                                'size': file_size,
+                                'mtime': file_mtime,
+                                'category': uid,
+                                'path': f"/@web_screenshot/category/{uid}/{filename}"
+                            })
         
         # 按修改时间倒序排列
         files.sort(key=lambda x: x['mtime'], reverse=True)
@@ -315,15 +381,16 @@ def list_all_screenshots():
         for file_info in files:
             mtime_str = datetime.datetime.fromtimestamp(file_info['mtime']).strftime('%Y-%m-%d %H:%M:%S')
             size_str = f"{file_info['size'] / 1024:.1f} KB" if file_info['size'] > 1024 else f"{file_info['size']} B"
-            category = get_category_from_filename(file_info['name'])
+            category = file_info.get('category', get_category_from_filename(file_info['name']))
+            file_path = file_info.get('path', f"/@web_screenshot/{file_info['name']}")
             
             html += f"""
             <tr>
-                <td><a href="/@web_screenshot/{file_info['name']}" class="file-link" target="_blank">{file_info['name']}</a></td>
+                <td><a href="{file_path}" class="file-link" target="_blank">{file_info['name']}</a></td>
                 <td><span class="category-badge">{category}</span></td>
                 <td>{size_str}</td>
                 <td>{mtime_str}</td>
-                <td><img src="/@web_screenshot/{file_info['name']}" class="preview" alt="预览" onclick="openModal('/@web_screenshot/{file_info['name']}')"></td>
+                <td><img src="{file_path}" class="preview" alt="预览" onclick="openModal('{file_path}')"></td>
             </tr>"""
         
         html += """
