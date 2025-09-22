@@ -6,7 +6,7 @@ metadata:
   labels:
     app: chrome-node
 spec:
-  replicas: 4   # 单个高配置节点
+  replicas: 1   # 单个高配置节点
   selector:
     matchLabels:
       app: chrome-node
@@ -49,6 +49,9 @@ spec:
           value: "true"
         - name: SE_NOVNC_NO_PASSWORD
           value: "true"
+        # 设置时区为中国上海时间
+        - name: TZ
+          value: "Asia/Shanghai"
         # 代理配置 - 指向tinyproxy sidecar (端口3128避免与chrome-node内tinyproxy冲突)
         - name: HTTP_PROXY
           value: "http://127.0.0.1:3128"
@@ -86,6 +89,10 @@ spec:
         ports:
         - containerPort: 3128
           name: proxy
+        # 设置时区为中国上海时间
+        env:
+        - name: TZ
+          value: "Asia/Shanghai"
         # env:
         # - name: DEFAULT_PROXY_HOST
         #   value: "61.132.231.167"
@@ -95,6 +102,10 @@ spec:
         #   value: "vgmpgv"
         # - name: DEFAULT_PROXY_PASSWORD
         #   value: "1bk79g9y"
+        # 以root用户运行tinyproxy，解决/dev/stdout权限问题
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
         resources:
           requests:
             cpu: "50m"

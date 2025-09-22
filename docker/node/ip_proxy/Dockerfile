@@ -3,10 +3,15 @@ FROM selenium/node-chrome:138.0.7204.157-chromedriver-138.0.7204.157-grid-4.34.0
 
 USER root
 
+# 设置时区为中国上海时间
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # 安装必要工具 (保留您的业务逻辑需求)
 RUN apt-get update && apt-get install -y \
     curl \
     sudo \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # 配置sudo无密码权限 (保留业务逻辑)

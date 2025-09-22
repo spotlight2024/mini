@@ -102,8 +102,11 @@ class TaobaoBusiness(BaseBusiness):
             
             time.sleep(3)
 
-            # 1. 检查IP信息
-            chain.check_ip_info()
+            # 等待代理切换生效
+            self.logger.info("⏳ 等待代理切换生效...")
+            
+            # 2. 使用driver验证IP（通过指定API）
+            chain.verify_ip_with_driver()
             
             # 2. 导航到淘宝首页
             chain.navigate_to('https://www.taobao.com/')

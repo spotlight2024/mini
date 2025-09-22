@@ -53,8 +53,8 @@ generate_config() {
 # Generated at: $(date)
 
 # 基础配置
-User nobody
-Group nogroup
+User root
+Group root
 Port 3128
 
 # 日志配置 - 输出到stdout便于kubectl logs查看
