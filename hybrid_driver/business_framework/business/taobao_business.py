@@ -142,12 +142,12 @@ class TaobaoBusiness(BaseBusiness):
             self.logger.info("🔍 开始获取搜索结果中的商品标题...")
             product_titles = self.search_page.get_product_titles()
             
-            if product_titles:
-                self.logger.info(f"✅ 成功获取到 {len(product_titles)} 个商品标题")
-                # 打印到日志（传入已获取的列表，避免重复获取）
-                self.search_page.print_product_titles_to_log(product_titles)
-            else:
-                self.logger.warning("⚠️ 未获取到商品标题")
+            # if product_titles:
+            #     self.logger.info(f"✅ 成功获取到 {len(product_titles)} 个商品标题")
+            #     # 打印到日志（传入已获取的列表，避免重复获取）
+            #     self.search_page.print_product_titles_to_log(product_titles)
+            # else:
+            #     self.logger.warning("⚠️ 未获取到商品标题")
             
             # # 10. 获取页面基本信息
             # chain.get_page_info()
@@ -156,4 +156,5 @@ class TaobaoBusiness(BaseBusiness):
             
         except Exception as e:
             self.logger.error(f"图片搜索业务失败: {e}")
-            return False, []
+            # 对于Selenium相关的超时和连接异常，重新抛出以便上层处理
+            raise e

@@ -160,7 +160,7 @@ class TaobaoSearchPage(BasePage):
                         # 过滤掉空文本和太短的文本
                         if text and len(text) > 5 and not text.isdigit():
                             titles.append(text)
-                            self.logger.info(f"商品 {i+1} 标题: {text}")
+                            # self.logger.info(f"商品 {i+1} 标题: {text}")
                             break  # 找到第一个有效标题就跳出
                 except Exception as e:
                     self.logger.warning(f"获取第 {i+1} 个商品标题失败: {e}")
@@ -179,7 +179,7 @@ class TaobaoSearchPage(BasePage):
                         any('\u4e00' <= char <= '\u9fff' for char in text) and
                         not any(char in text for char in ['¥', '$', '￥', '元', '件', '个'])):
                         titles.append(text)
-                        self.logger.info(f"备用方法找到标题: {text}")
+                        # self.logger.info(f"备用方法找到标题: {text}")
                         if len(titles) >= 10:  # 限制数量
                             break
             

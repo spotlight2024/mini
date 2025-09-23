@@ -125,3 +125,4 @@ class PerformanceMonitor:
 # 全局性能配置实例
 performance_config = PerformanceConfig()
 performance_monitor = PerformanceMonitor(performance_config)
+

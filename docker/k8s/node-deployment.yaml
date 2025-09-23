@@ -6,7 +6,7 @@ metadata:
   labels:
     app: chrome-node
 spec:
-  replicas: 1   # 单个高配置节点
+  replicas: 4   # 单个高配置节点
   selector:
     matchLabels:
       app: chrome-node

@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field, validator
 
+from hybrid_driver.business_framework.business import taobao_business
 from hybrid_driver.business_framework.business.taobao_business import TaobaoBusiness
 from hybrid_driver.log_config import get_logger
 from hybrid_driver.proxy.proxy_provider import get_proxy_config_for_selenium, ProxyProviderNames
@@ -234,6 +235,7 @@ class TaobaoSearchService:
             
             # 8. 保存截图
             screenshot_url = await self._save_screenshot(business, session_id, uid)
+
             
             # 9. 构建成功响应
             return TaobaoSearchResponse(
@@ -261,6 +263,14 @@ class TaobaoSearchService:
             return self._create_error_response(
                 request, session_id, start_time, e.error_code, str(e), metrics
             )
+            
+        except Exception as selenium_e:
+            # Selenium相关异常（从业务层传播上来的）
+            if any(keyword in str(selenium_e).lower() for keyword in ['timeout', 'renderer', 'webdriver', 'session']):
+                self.logger.error(f"{log_context} Selenium异常: {selenium_e}", exc_info=True)
+                return self._create_error_response(
+                    request, session_id, start_time, "SELENIUM_ERROR", str(selenium_e), metrics
+                )
             
         except Exception as e:
             # 未知异常，记录详细信息

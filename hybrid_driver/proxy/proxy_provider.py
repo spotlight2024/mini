@@ -156,7 +156,7 @@ class TianQiProxyProvider(ProxyProvider):
 class JuLiangProxyProvider(ProxyProvider):
     """巨量代理提供者"""
 
-    def __init__(self, trade_no: str = "1550102436789257", sign: str = "df2aefd1b9008a76edb52554cf122500"):
+    def __init__(self, trade_no: str = "1597453925722295", sign: str = "f8583e284c7d6e30042861cc05923fc9"):
         self.trade_no = trade_no
         self.sign = sign
         self.base_url = "http://v2.api.juliangip.com/company/dynamic/getips"
@@ -165,12 +165,10 @@ class JuLiangProxyProvider(ProxyProvider):
     def get_proxy_config(self) -> Optional[ProxyConfig]:
         """从巨量接口获取代理配置"""
         try:
-            # 构建请求参数
+            # 构建请求参数（使用新的API参数格式）
             params = {
-                "auth_type": 2,
                 "auto_white": 1,
                 "city": "北京",
-                "filter": 1,
                 "ip_remain": 1,
                 "num": 1,
                 "pt": 1,
@@ -206,26 +204,24 @@ class JuLiangProxyProvider(ProxyProvider):
                 data = response.json()
                 logger.info(f"巨量API响应数据: {data}")
 
-                # 检查响应格式
+                # 检查响应格式（适配新的API响应结构）
                 if data.get("code") == 200 and data.get("data") and data["data"].get("proxy_list"):
                     proxy_info = data["data"]["proxy_list"][0]
                     logger.info(f"获取到代理信息: {proxy_info}")
 
-                    # 从API响应中提取信息
+                    # 从API响应中提取信息（新格式）
                     ip = proxy_info["ip"]
                     port = proxy_info["port"]  # 巨量API返回的是字符串
-                    http_user = proxy_info["http_user"]
-                    http_pass = proxy_info["http_pass"]
                     ip_remain = proxy_info.get("ip_remain", 0)
                     real_ip = proxy_info.get("real_ip", "")
 
-                    logger.info(f"解析代理信息 - IP: {ip}, Port: {port}, User: {http_user}, Remain: {ip_remain}")
+                    logger.info(f"解析代理信息 - IP: {ip}, Port: {port}, Remain: {ip_remain}, Real IP: {real_ip}")
 
                     return ProxyConfig(
                         ip=ip,
                         port=int(port),  # 转换为整数类型
-                        username=http_user,
-                        password=http_pass,
+                        username=None,  # 新API格式可能不需要用户名密码
+                        password=None,
                         provider=self.provider_name,
                         region="北京",
                         expire=f"剩余{ip_remain}秒"
