@@ -35,7 +35,7 @@ source venv/bin/activate  # Linux/macOS
 venv\Scripts\activate     # Windows
 
 # 安装依赖
-pip install -r requirements.txt
+poetry install --with dev
 ```
 
 ### 1.3 环境检查
@@ -304,7 +304,7 @@ docker compose -f docker-compose.dev.yml down
 git pull origin main
 
 # 2. 更新依赖（如果有变化）
-pip install -r requirements.txt
+poetry install --with dev
 
 # 3. 重启服务
 ./scripts/spotlight.sh restart
@@ -322,7 +322,7 @@ curl http://localhost:10001/health
 |------|------|----------|
 | 端口被占用 | `Address already in use` | `./scripts/spotlight.sh stop` 或 `lsof -ti:10001 \| xargs kill -9` |
 | 权限不足 | `Permission denied` | `chmod +x scripts/spotlight.sh` |
-| 依赖缺失 | `ModuleNotFoundError` | `pip install -r requirements.txt` |
+| 依赖缺失 | `ModuleNotFoundError` | `poetry install --with dev` |
 | 虚拟环境未激活 | `python3: command not found` | `source venv/bin/activate` |
 | 服务无法外网访问 | 只能本地访问 | 检查host是否为0.0.0.0，检查防火墙设置 |
 | 进程无法停止 | 脚本停止失败 | `ps aux \| grep uvicorn` 然后 `kill -9 <PID>` |
@@ -382,7 +382,7 @@ sestatus
 - `ENVIRONMENT`: 运行环境（development/production）
 
 ### 配置文件
-- `requirements.txt`: Python依赖包列表
+- `pyproject.toml` / `poetry.lock`: Python依赖与锁定列表
 - `docker-compose.dev.yml`: Docker开发环境配置
 - `docker-compose.api.yml`: Docker生产环境配置
 - `hybrid_driver/config/settings.py`: 应用配置文件

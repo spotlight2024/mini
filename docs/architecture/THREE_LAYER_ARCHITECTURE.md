@@ -507,7 +507,7 @@ git clone <repository-url>
 cd mini
 
 # 2. 安装依赖
-pip install -r requirements/requirements.txt
+poetry install --with dev
 
 # 3. 构建容器镜像
 cd docker
@@ -564,7 +564,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install -r requirements/requirements.txt
+          poetry install --with dev
       
       - name: Build containers
         run: |

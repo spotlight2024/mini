@@ -25,6 +25,9 @@ NC='\033[0m'
 IMAGE_NAME="spotlight-api"
 DEFAULT_TAG="latest"
 
+POETRY_BIN="${POETRY_BIN:-poetry}"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 # 获取命令
 CMD="${1:-}"
 shift 2>/dev/null || true
@@ -100,6 +103,15 @@ smart_environment_setup() {
     echo -e "${GREEN}✅ Python环境就绪${NC}"
   else
     echo -e "${YELLOW}⚠️  Python环境缺少依赖: ${missing_deps[*]}${NC}"
+    if command -v "$POETRY_BIN" &> /dev/null && [ -f "$PROJECT_ROOT/pyproject.toml" ]; then
+      echo -e "${BLUE}💡 检测到Poetry项目，将使用Poetry创建依赖环境${NC}"
+      python_ready=true
+      local poetry_python="$PROJECT_ROOT/.venv/bin/python"
+      if [ -x "$poetry_python" ]; then
+        python_cmd="$poetry_python"
+        venv_active=true
+      fi
+    fi
   fi
   
   # 智能选择启动方式
@@ -120,128 +132,29 @@ smart_environment_setup() {
 
 # 智能Python环境管理和依赖安装
 setup_python_environment() {
-  echo -e "${BLUE}🐍 智能Python环境管理...${NC}"
-  
-  local python_cmd=""
-  if command -v python3 &> /dev/null; then
-    python_cmd="python3"
-  elif command -v python &> /dev/null; then
-    python_cmd="python"
-  else
-    echo -e "${RED}❌ Python命令不可用${NC}"
-    return 1
-  fi
-  
-  # 检查虚拟环境
-  if [[ "$VIRTUAL_ENV" == "" ]]; then
-    echo -e "${YELLOW}⚠️  未检测到虚拟环境${NC}"
-    echo -e "${BLUE}💡 推荐: 创建虚拟环境确保依赖一致性${NC}"
-    
-    # 检查是否已有venv目录
-    if [ -d "venv" ]; then
-      echo -e "${BLUE}🔍 检测到现有venv目录，尝试激活...${NC}"
-      source venv/bin/activate
-      if [[ "$VIRTUAL_ENV" != "" ]]; then
-        echo -e "${GREEN}✅ 虚拟环境激活成功: $VIRTUAL_ENV${NC}"
-      else
-        echo -e "${YELLOW}⚠️  虚拟环境激活失败，重新创建${NC}"
-        rm -rf venv
-        create_virtual_environment "$python_cmd"
-      fi
-    else
-      echo -e "${YELLOW}是否要创建虚拟环境？(推荐: y)${NC}"
-      read -r response
-      if [[ "$response" =~ ^[Yy]$ ]] || [[ "$response" == "" ]]; then
-        create_virtual_environment "$python_cmd"
-      else
-        echo -e "${YELLOW}⚠️  将使用系统Python环境，可能存在依赖冲突${NC}"
-      fi
-    fi
-  else
-    echo -e "${GREEN}✅ 虚拟环境已激活: $VIRTUAL_ENV${NC}"
-  fi
-  
-  # 安装依赖
-  install_python_dependencies "$python_cmd"
-}
+  echo -e "${BLUE}🐍 使用Poetry管理Python环境...${NC}"
 
-# 创建虚拟环境
-create_virtual_environment() {
-  local python_cmd="$1"
-  echo -e "${BLUE}🔧 创建虚拟环境...${NC}"
-  
-  # 创建虚拟环境
-  $python_cmd -m venv venv
-  if [ $? -ne 0 ]; then
-    echo -e "${RED}❌ 虚拟环境创建失败${NC}"
+  if ! command -v "$POETRY_BIN" &> /dev/null; then
+    echo -e "${RED}❌ 未检测到Poetry，请参考 https://python-poetry.org/docs/ 安装${NC}"
     return 1
   fi
-  
-  # 激活虚拟环境
-  source venv/bin/activate
-  if [[ "$VIRTUAL_ENV" == "" ]]; then
-    echo -e "${RED}❌ 虚拟环境激活失败${NC}"
-    return 1
-  fi
-  
-  echo -e "${GREEN}✅ 虚拟环境创建并激活成功: $VIRTUAL_ENV${NC}"
-  
-  # 升级pip
-  echo -e "${BLUE}📦 升级pip...${NC}"
-  pip install --upgrade pip
-  
-  return 0
-}
 
-# 安装Python依赖
-install_python_dependencies() {
-  local python_cmd="$1"
-  echo -e "${BLUE}📦 安装Python依赖...${NC}"
-  
-  # 检查requirements.txt
-  if [ -f "requirements.txt" ]; then
-    echo -e "${BLUE}📋 检测到requirements.txt，安装完整依赖${NC}"
-    
-    # 使用国内镜像源安装
-    pip install --trusted-host pypi.tuna.tsinghua.edu.cn \
-      -i https://pypi.tuna.tsinghua.edu.cn/simple \
-      --retries 3 \
-      --timeout 300 \
-      -r requirements.txt
-    
-    if [ $? -eq 0 ]; then
-      echo -e "${GREEN}✅ 所有依赖安装完成${NC}"
-      return 0
-    else
-      echo -e "${YELLOW}⚠️  完整依赖安装失败，尝试核心依赖安装${NC}"
-    fi
+  if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
+    echo -e "${RED}❌ 未找到pyproject.toml，无法安装依赖${NC}"
+    return 1
   fi
-  
-  # 安装核心依赖
-  local core_deps=("fastapi" "uvicorn" "selenium" "pydantic" "requests")
-  echo -e "${BLUE}📦 安装核心依赖: ${core_deps[*]}${NC}"
-  
-  pip install --trusted-host pypi.tuna.tsinghua.edu.cn \
-    -i https://pypi.tuna.tsinghua.edu.cn/simple \
-    --retries 3 \
-    --timeout 300 \
-    "${core_deps[@]}"
-  
-  if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ 核心依赖安装完成${NC}"
+
+  echo -e "${BLUE}📘 Poetry 安装/同步依赖...${NC}"
+  pushd "$PROJECT_ROOT" > /dev/null
+  if "$POETRY_BIN" install --with dev --no-root --no-interaction; then
+    popd > /dev/null
+    echo -e "${GREEN}✅ 依赖安装完成${NC}"
     return 0
-  else
-    echo -e "${RED}❌ 依赖安装失败，尝试使用默认源...${NC}"
-    pip install --retries 3 --timeout 300 "${core_deps[@]}"
-    
-    if [ $? -eq 0 ]; then
-      echo -e "${GREEN}✅ 依赖安装完成${NC}"
-      return 0
-    else
-      echo -e "${RED}❌ 依赖安装完全失败${NC}"
-      return 1
-    fi
   fi
+  popd > /dev/null
+
+  echo -e "${RED}❌ Poetry 安装依赖失败${NC}"
+  return 1
 }
 
 # 检查端口占用
@@ -298,12 +211,16 @@ run_dev() {
   case $env_result in
     0)  # 本地Python环境
       echo -e "${GREEN}🎯 使用本地Python环境启动${NC}"
+      if ! setup_python_environment; then
+        echo -e "${RED}❌ 依赖安装失败，无法启动服务${NC}"
+        exit 1
+      fi
       check_port_availability "$port"
       
       echo -e "${BLUE}🚀 启动服务...${NC}"
       
       # 后台启动服务
-      nohup python3 -m uvicorn hybrid_driver.server_optimized:app \
+      nohup "$POETRY_BIN" run uvicorn hybrid_driver.server_optimized:app \
         --host "${host}" \
         --port "${port}" \
         --reload > uvicorn.log 2>&1 &
@@ -360,12 +277,16 @@ run_serve() {
   case $env_result in
     0)  # 本地Python环境
       echo -e "${GREEN}🎯 使用本地Python环境启动${NC}"
+      if ! setup_python_environment; then
+        echo -e "${RED}❌ 依赖安装失败，无法启动服务${NC}"
+        exit 1
+      fi
       check_port_availability "$port"
       
       echo -e "${BLUE}🚀 启动服务...${NC}"
       
       # 后台启动服务
-      nohup python3 -m uvicorn hybrid_driver.server_optimized:app \
+      nohup "$POETRY_BIN" run uvicorn hybrid_driver.server_optimized:app \
         --host "${host}" \
         --port "${port}" \
         --workers "${workers}" \
@@ -767,7 +688,6 @@ services:
       - ENVIRONMENT=development
     volumes:
       - ./hybrid_driver:/app/hybrid_driver
-      - ./requirements.txt:/app/requirements.txt
       - ./config:/app/config
     depends_on:
       selenium-hub:
@@ -807,48 +727,67 @@ create_spotlight_dockerfile() {
   echo -e "${BLUE}🔧 创建Dockerfile...${NC}"
   
   cat > Dockerfile.spotlight << 'EOF'
-FROM python:3.10-slim
+# SpotLight Hybrid Driver API container managed purely by Poetry
+FROM python:3.10-slim AS base
 
-# 设置工作目录
+ENV TZ=Asia/Shanghai \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    API_HOST=0.0.0.0 \
+    API_PORT=10001 \
+    PIP_TIMEOUT=300 \
+    PIP_DEFAULT_TIMEOUT=300 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+
+RUN sed -i 's/deb.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
+    sed -i 's/security.debian.org/mirrors.ustc.edu.cn/g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y \
+    curl \
+    gcc \
+    g++ \
+    make \
+    tzdata \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 WORKDIR /app
 
-# 设置环境变量
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-ENV PIP_NO_CACHE_DIR=1
-ENV PIP_TIMEOUT=300
-ENV PIP_DEFAULT_TIMEOUT=300
+FROM base AS builder
 
-# 安装系统依赖
-RUN apt-get update && apt-get install -y \
-    curl \
-    wget \
-    gnupg \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
+ENV POETRY_VERSION=2.2.1 \
+    POETRY_HOME=/opt/poetry \
+    PATH=/opt/poetry/bin:$PATH
 
-# 复制依赖文件
-COPY requirements.txt .
+RUN curl -sSL https://install.python-poetry.org | python3 - --version $POETRY_VERSION
 
-# 使用国内镜像源安装Python依赖
-RUN pip install --trusted-host pypi.tuna.tsinghua.edu.cn \
-    -i https://pypi.tuna.tsinghua.edu.cn/simple \
-    --retries 3 \
-    --timeout 300 \
-    -r requirements.txt
+COPY pyproject.toml poetry.lock ./
 
-# 复制应用代码
-COPY . .
+RUN poetry config virtualenvs.create false && \
+    poetry config installer.parallel true && \
+    poetry install --only main --no-root --no-interaction --no-ansi
 
-# 暴露端口
+FROM base AS runtime
+
+WORKDIR /app
+
+COPY --from=builder /usr/local /usr/local
+COPY pyproject.toml poetry.lock ./
+COPY hybrid_driver/ ./hybrid_driver/
+
+RUN useradd -m -u 1000 spotlight && \
+    mkdir -p logs data cache && \
+    chown -R spotlight:spotlight /app
+
+USER spotlight
+
 EXPOSE 10001
 
-# 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:10001/health || exit 1
 
-# 启动命令
-CMD ["python", "-m", "uvicorn", "hybrid_driver.start_api_server:app", "--host", "0.0.0.0", "--port", "10001", "--reload"]
+CMD ["python", "hybrid_driver/start_api_server.py", "--host", "0.0.0.0", "--port", "10001"]
 EOF
 
   echo -e "${GREEN}✅ Dockerfile.spotlight 创建完成${NC}"
@@ -1045,7 +984,7 @@ restart_local_service() {
   local port="${PORT:-${API_PORT_DEFAULT:-10001}}"
   
   # 后台启动服务
-  nohup python3 -m uvicorn hybrid_driver.server_optimized:app \
+  nohup "$POETRY_BIN" run uvicorn hybrid_driver.server_optimized:app \
     --host "${host}" \
     --port "${port}" \
     --reload > uvicorn.log 2>&1 &

@@ -25,7 +25,7 @@
 ├─────────────────────────────────────────────────────────┤
 │  🐍 Python环境                                         │
 │  ├── 虚拟环境: venv/                                   │
-│  ├── 依赖管理: requirements/requirements.txt            │
+│  ├── 依赖管理: pyproject.toml / poetry.lock            │
 │  └── 启动方式: scripts/spotlight.sh                    │
 ├─────────────────────────────────────────────────────────┤
 │  🔧 核心服务                                           │
@@ -52,7 +52,7 @@
 │  🔧 容器化服务                                         │
 │  ├── 基础镜像: python:3.12-slim                        │
 │  ├── 系统依赖: build-essential, android-tools-adb      │
-│  ├── Python依赖: requirements/requirements.txt         │
+│  ├── Python依赖: pyproject.toml / poetry.lock         │
 │  ├── 应用代码: hybrid_driver/                          │
 │  ├── 端口暴露: 10001                                   │
 │  └── 健康检查: /health 端点                            │
@@ -103,7 +103,7 @@
 | ------------ | ------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------- |
 | 端口被占用   | `Address already in use`              | 使用`lsof -ti:10001 \| xargs kill -9`                      | [故障排除](../deployment-guide.md#故障排除)         |
 | 权限不足     | `Permission denied`                   | 执行`chmod +x scripts/spotlight.sh`                        | [故障排除](../deployment-guide.md#故障排除)         |
-| 依赖缺失     | `ModuleNotFoundError`                 | 重新安装依赖`pip install -r requirements/requirements.txt` | [环境准备](../deployment-guide.md#1-环境准备)       |
+| 依赖缺失     | `ModuleNotFoundError`                 | 重新安装依赖`poetry install --sync` | [环境准备](../deployment-guide.md#1-环境准备)       |
 | Docker未启动 | `Cannot connect to the Docker daemon` | 启动Docker Desktop或Docker服务                             | [Docker环境准备](../deployment-guide.md#1-环境准备) |
 | 构建失败     | `netifaces build failed`              | 确保Dockerfile包含`build-essential`                        | [Docker构建](../deployment-guide.md#2-构建镜像)     |
 

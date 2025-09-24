@@ -59,7 +59,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # 安装依赖
-pip install -r requirements/requirements.txt
+poetry install --with dev
 ```
 
 ### 2. 配置设置
@@ -348,7 +348,7 @@ chmod +x start.sh
 #### 3. 依赖问题
 ```bash
 # 重新安装依赖
-pip install --upgrade -r requirements/requirements.txt
+poetry install --with dev
 
 # 清理缓存
 ./start.sh clean
@@ -481,7 +481,7 @@ docker system prune -f
 git pull origin main
 
 # 更新依赖
-pip install --upgrade -r requirements/requirements.txt
+poetry install --with dev
 
 # 重建容器
 cd docker

@@ -57,7 +57,7 @@ chmod +x start.sh shell/*.sh
 
 ```bash
 # 安装依赖
-pip install -r requirements.txt
+poetry install --with dev
 
 # 给脚本添加执行权限
 chmod +x start.sh shell/*.sh

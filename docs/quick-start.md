@@ -15,12 +15,10 @@
 ```bash
 # 1. 克隆项目
 git clone <repository-url>
-cd spot_light
+cd mini
 
 # 2. 安装依赖
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-pip install -r requirements/requirements.txt
+poetry install --with dev
 
 # 3. 一键启动
 chmod +x scripts/spotlight.sh
@@ -32,7 +30,7 @@ chmod +x scripts/spotlight.sh
 ```bash
 # 1. 克隆项目
 git clone <repository-url>
-cd spot_light
+cd mini
 
 # 2. 一键启动
 chmod +x scripts/spotlight.sh
@@ -102,22 +100,25 @@ export LOG_LEVEL=info
 # 无需重新构建镜像
 
 # 查看日志
-docker compose -f docker-compose.dev.yml logs -f
+docker compose -f hybrid_driver/docker/docker-compose.dev.yml logs -f
 
 # 停止服务
-docker compose -f docker-compose.dev.yml down
+docker compose -f hybrid_driver/docker/docker-compose.dev.yml down
 ```
 
 ### 生产部署（功能开发中）
 ```bash
 # 使用统一启动脚本
-./scripts/spotlight.sh update --tag v1.0.0
+docker build -f hybrid_driver/docker/Dockerfile -t <registry>/spotlight-api:vX.Y.Z .
+docker push <registry>/spotlight-api:vX.Y.Z
 
-# 查看状态
-./scripts/spotlight.sh status
+# 更新线上环境（Compose 为例）
+docker compose -f hybrid_driver/docker/docker-compose.api.yml pull
+docker compose -f hybrid_driver/docker/docker-compose.api.yml up -d
 
-# 查看日志
-./scripts/spotlight.sh logs docker
+# 或 K8s
+# kubectl set image deployment/spotlight-api spotlight-api=<registry>/spotlight-api:vX.Y.Z
+# kubectl rollout status deployment/spotlight-api
 ```
 
 ## 🆘 快速故障排除

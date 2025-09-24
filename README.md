@@ -47,6 +47,16 @@ cd mini
 curl http://localhost:10001/health
 ```
 
+### 📦 依赖管理（Poetry）
+
+项目使用 Poetry 统一管理依赖和虚拟环境，推荐在首次克隆后执行：
+
+```bash
+poetry install --with dev
+```
+
+Poetry 会按照 `pyproject.toml` 创建本地 `.venv/`，后续可通过 `poetry run <cmd>` 或 `poetry shell` 运行命令。
+
 ### 🚀 一键启动
 
 ```bash
@@ -79,6 +89,30 @@ open http://localhost:10001/docs
 # 部署状态检查
 ./scripts/check-deployment.sh
 ```
+
+### 🛠️ 本地开发流程
+
+1. 安装 Poetry（参考 https://python-poetry.org/docs/#installation）。
+2. 在项目根目录执行 `poetry install --with dev` 安装依赖并创建 `.venv`。
+3. 本地热重载：`./scripts/spotlight.sh dev` 或直接运行 `poetry run uvicorn hybrid_driver.server_optimized:app --host 0.0.0.0 --port 10001 --reload`。
+4. 运行测试：`poetry run pytest`。
+5. 停止服务：`./scripts/spotlight.sh stop`。
+
+### 🧑‍🤝‍🧑 Docker 开发流程
+
+- 启动挂载源码的开发容器：`docker compose -f hybrid_driver/docker/docker-compose.dev.yml up --build`.
+- 修改宿主机的 `hybrid_driver/` 代码即可触发容器热重载。
+- 查看日志：`docker compose -f hybrid_driver/docker/docker-compose.dev.yml logs -f`.
+- 停止开发容器：`docker compose -f hybrid_driver/docker/docker-compose.dev.yml down`.
+
+### 🚢 发布上线流程
+
+1. `poetry version <patch|minor|major>` 更新版本号并提交。
+2. 执行 `poetry install --with dev`、`poetry run pytest` 完成验证。
+3. 构建镜像：`docker build -f hybrid_driver/docker/Dockerfile -t <registry>/spotlight-api:vX.Y.Z .`.
+4. 推送镜像：`docker push <registry>/spotlight-api:vX.Y.Z`（可附带 `latest`/环境标签）。
+5. 在线上 Compose/K8s 将镜像 tag 更新为 `vX.Y.Z`，执行 `docker compose up -d` 或 `kubectl set image ...` 完成滚动发布。
+6. 发布后访问 `/health`、关键 API，并监控日志/告警；若异常直接切回上一镜像 tag。
 
 ### 🔧 常用命令
 
@@ -202,54 +236,46 @@ response = requests.post("http://localhost:10001/element/find", json={
 ### 容器化架构概览
 
 ```
-mini/docker/
-├── Dockerfile.spotlight              # 🆕 生产环境镜像
-├── docker-compose.dev.yml            # 🆕 开发环境编排
-├── docker-compose.api.yml            # 🆕 生产环境编排
-├── Dockerfile.custom-selenium-chrome # 自定义 Selenium 镜像
-├── docker-compose.custom-selenium.yml # 基础容器编排
-├── docker-compose.custom-selenium-adb.yml # 带 ADB 的容器编排
-├── docker-compose.adb-proxy.yml     # ADB 代理服务
-├── scripts/
-│   ├── custom_startup.sh            # 自定义启动脚本
-│   ├── adb_init.sh                 # ADB 初始化脚本
-│   └── proxy/                      # 代理服务
-│       ├── adb_proxy.py            # ADB 代理实现
-│       └── README.md               # 代理服务文档
-└── build-adb-image.sh              # 镜像构建脚本
+hybrid_driver/docker/
+├── Dockerfile                     # API 服务镜像（Poetry 多阶段）
+├── docker-compose.dev.yml         # 开发编排（挂载源码 + 热重载）
+├── docker-compose.yml             # 生产/测试编排示例
+├── scripts/                       # 构建与维护脚本
+│   └── build.sh 等工具
+├── data/  logs/  cache/           # 开发态持久化目录
+└── README.md                      # 容器使用说明
 ```
 
 ### 🆕 最新容器化特性
 
 #### 1. 生产环境镜像
-- **Dockerfile.spotlight**: 专门为生产环境优化的镜像
-- **多阶段构建**: 优化镜像大小和安全性
-- **健康检查**: 完整的容器健康监控
-- **环境变量**: 灵活的配置管理
+- **Dockerfile**: 多阶段构建，builder 层通过 Poetry 安装依赖，runtime 层保持精简
+- **健康检查**: 内置 `/health` 探针，便于 Compose/K8s 监控
+- **配置灵活**: 支持 `API_HOST`、`API_PORT`、`LOG_LEVEL` 等环境变量
 
 #### 2. 开发环境支持
 ```yaml
-# docker-compose.dev.yml
+# hybrid_driver/docker/docker-compose.dev.yml
 services:
   spotlight-api-dev:
     build:
-      context: .
-      dockerfile: Dockerfile.spotlight
+      context: ../../
+      dockerfile: hybrid_driver/docker/Dockerfile
     volumes:
-      # 代码挂载，支持热重载
-      - ./hybrid_driver:/app/hybrid_driver
-      - ./requirements:/app/requirements
-    command: ["uvicorn", "hybrid_driver.server_optimized:app", "--reload"]
+      - ../../hybrid_driver:/app/hybrid_driver  # 代码挂载，热重载
+      - ./logs:/app/logs
+      - ./data:/app/data
+    environment:
+      - API_RELOAD=true
+    command: ["python", "hybrid_driver/start_api_server.py", "--host", "0.0.0.0", "--port", "10001", "--reload"]
 ```
 
 #### 3. 生产环境部署
 ```yaml
-# docker-compose.api.yml
+# hybrid_driver/docker/docker-compose.yml
 services:
   spotlight-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.spotlight
+    image: <registry>/spotlight-api:vX.Y.Z
     environment:
       - ENVIRONMENT=production
       - LOG_LEVEL=info

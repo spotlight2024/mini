@@ -113,15 +113,12 @@ venv\Scripts\activate     # Windows
 ### 3. 安装Python依赖
 
 ```bash
-# 升级pip
-pip install --upgrade pip
-
 # 安装依赖
 cd script
-pip install -r requirements.txt
+poetry install --with dev
 
 # 验证安装
-python -c "import selenium; print('Selenium installed successfully')"
+poetry run python -c "import selenium; print('Selenium installed successfully')"
 ```
 
 ### 4. 配置环境变量
@@ -240,7 +237,7 @@ nohup uvicorn server:app --host 0.0.0.0 --port 8000 --workers 4 > logs/uvicorn.l
 #### 使用Gunicorn
 ```bash
 # 安装Gunicorn
-pip install gunicorn
+poetry add --group deploy gunicorn
 
 # 运行服务
 gunicorn server:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
@@ -315,10 +312,10 @@ RUN apt-get update && apt-get install -y android-tools-adb \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
-COPY script/requirements.txt .
+COPY pyproject.toml poetry.lock ./
 
 # 安装Python依赖
-RUN pip install --no-cache-dir -r requirements.txt
+RUN poetry install --with dev --no-root --no-interaction
 
 # 复制应用代码
 COPY script/ .
@@ -668,7 +665,7 @@ cp -r script script_backup_$(date +%Y%m%d)
 git pull origin main
 
 # 更新依赖
-pip install -r requirements.txt --upgrade
+poetry install --with dev
 
 # 重启服务
 sudo systemctl restart spotlight

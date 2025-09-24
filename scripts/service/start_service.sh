@@ -1,13 +1,15 @@
 #!/bin/bash
 
-# SpotLight 服务启动脚本
+# SpotLight 服务启动脚本（Poetry 原生流程）
 # 使用方法: ./start_service.sh
+
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 HYBRID_DRIVER_DIR="$PROJECT_ROOT/hybrid_driver"
+POETRY_BIN="${POETRY_BIN:-poetry}"
 
-# 显示帮助信息
 show_help() {
     echo "SpotLight 服务启动脚本"
     echo ""
@@ -24,44 +26,36 @@ show_help() {
     echo "  $0 -p 8003      # 指定端口"
 }
 
-# 检查项目目录
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    show_help
+    exit 0
+fi
+
 if [ ! -d "$HYBRID_DRIVER_DIR" ]; then
     echo "❌ 错误: hybrid_driver目录不存在: $HYBRID_DRIVER_DIR"
     exit 1
 fi
 
-# 检查Python环境
-if ! command -v python3 &> /dev/null; then
-    echo "❌ 错误: 未找到python3"
+if ! command -v "$POETRY_BIN" &> /dev/null; then
+    echo "❌ 错误: 未检测到 Poetry，可通过 'pipx install poetry' 或官方脚本安装"
     exit 1
 fi
 
-# 检查虚拟环境
-if [ -d "$PROJECT_ROOT/.venv" ]; then
-    echo "🔧 激活虚拟环境..."
-    source "$PROJECT_ROOT/.venv/bin/activate"
+if [ ! -f "$PROJECT_ROOT/pyproject.toml" ]; then
+    echo "❌ 错误: 未找到 pyproject.toml，无法继续"
+    exit 1
 fi
 
-# 检查依赖
-echo "📦 检查依赖..."
-cd "$HYBRID_DRIVER_DIR"
-if [ ! -f "requirements.txt" ]; then
-    echo "⚠️  警告: 未找到requirements.txt，尝试使用项目根目录的requirements.txt"
-    if [ -f "$PROJECT_ROOT/requirements/requirements.txt" ]; then
-        pip install -r "$PROJECT_ROOT/requirements/requirements.txt"
-    fi
-else
-    pip install -r requirements.txt
-fi
+echo "📦 使用 Poetry 安装依赖..."
+cd "$PROJECT_ROOT"
+"$POETRY_BIN" install --with dev --no-root --no-interaction
 
-# 创建日志目录
 mkdir -p "$PROJECT_ROOT/logs"
 
-# 启动服务
 echo "🚀 启动 SpotLight 服务..."
 echo "📍 项目根目录: $PROJECT_ROOT"
 echo "📍 服务目录: $HYBRID_DRIVER_DIR"
 echo "📍 日志目录: $PROJECT_ROOT/logs"
 
 cd "$HYBRID_DRIVER_DIR"
-python3 main.py 
+"$POETRY_BIN" run python main.py
