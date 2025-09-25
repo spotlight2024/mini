@@ -22,7 +22,8 @@ def create_taobao_session_with_actions(session_id: int, start_barrier: threading
     log_with_timestamp(f"🚀 会话 {session_id}: 开始创建...")
     
     # 创建淘宝业务实例
-    taobao_business = TaobaoBusiness(session_id)
+    user_id = f"test_user_{session_id}"
+    taobao_business = TaobaoBusiness(session_id, user_id)
     
     try:
         # 记录开始连接时间

@@ -14,7 +14,7 @@ from hybrid_driver.log_config import get_logger
 class RestaurantBusiness(BaseBusiness):
     """餐厅业务类 - 处理餐厅信息提取"""
     
-    def __init__(self, session_id: str):
+    def __init__(self, session_id: str, user_id: str):
         # 餐厅应用配置
         site_config = {
             'site_name': 'restaurant_app',
@@ -29,7 +29,7 @@ class RestaurantBusiness(BaseBusiness):
             'android_package': 'com.tencent.mm',
             'android_process': 'com.tencent.mm:appbrand0'
         }
-        super().__init__(site_config, session_id)
+        super().__init__(site_config, session_id, user_id)
     
     def execute_business_flow(self) -> bool:
         """执行餐厅业务流程"""

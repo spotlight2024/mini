@@ -102,7 +102,7 @@ def sync_taobao_search_task(uid: str, image_path: str, timeout: int, proxy_provi
             )
         
         # 创建淘宝业务实例
-        taobao_business = TaobaoBusiness(session_id)
+        taobao_business = TaobaoBusiness(session_id, uid)
         
         # 获取代理配置
         logger.info(f"[会话{session_id}] 获取代理IP配置，使用提供者: {proxy_provider}")

@@ -22,14 +22,15 @@ from hybrid_driver.log_config import get_logger
 class BaseBusiness:
     """业务基类 - 定义通用业务逻辑"""
     
-    def __init__(self, site_config: Dict[str, Any], session_id: str):
+    def __init__(self, site_config: Dict[str, Any], session_id: str, user_id: str):
         self.site_config = site_config
         self.session_id = session_id
+        self.user_id = user_id
         self.webdriver_manager = None
         self.page_manager = None
         self.action_chains = None
         self.webdriver_chain = None
-        self.logger = get_logger(f"BaseBusiness-{session_id}")
+        self.logger = get_logger(f"BaseBusiness-{user_id}-{session_id}")
         self._human_mouse = None
         
         # 立即创建 WebDriverManager（但不创建driver）
@@ -37,7 +38,11 @@ class BaseBusiness:
     
     def _prepare_webdriver_manager(self) -> 'BaseBusiness':
         """准备 WebDriverManager（但不创建driver）"""
-        self.webdriver_manager = WebDriverManager(self.session_id, self.site_config)
+        self.webdriver_manager = WebDriverManager(
+            self.session_id,
+            self.site_config,
+            self.user_id,
+        )
         return self
     
     def initialize(self) -> 'BaseBusiness':

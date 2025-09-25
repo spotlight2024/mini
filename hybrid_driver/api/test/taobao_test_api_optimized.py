@@ -183,10 +183,13 @@ class TaobaoSearchService:
             return None
     
     def _create_business_instance(
-        self, session_id: str, site_overrides: Optional[Dict[str, Any]] = None
+        self,
+        session_id: str,
+        user_id: str,
+        site_overrides: Optional[Dict[str, Any]] = None,
     ) -> TaobaoBusiness:
         """创建业务实例"""
-        return TaobaoBusiness(session_id, site_overrides=site_overrides)
+        return TaobaoBusiness(session_id, user_id, site_overrides=site_overrides)
     
     async def _execute_search_with_timeout(self, business: TaobaoBusiness, 
                                          image_path: str, timeout: int) -> tuple[bool, List[str]]:
@@ -235,7 +238,7 @@ class TaobaoSearchService:
                 site_overrides = None
                 self.logger.info(f"{log_context} 人类化行为配置: 默认模式")
 
-            business = self._create_business_instance(session_id, site_overrides)
+            business = self._create_business_instance(session_id, uid, site_overrides)
             
             # 4. 配置代理
             if proxy_config:

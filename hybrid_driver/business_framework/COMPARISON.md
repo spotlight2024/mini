@@ -266,7 +266,7 @@ if __name__ == "__main__":
 ### 新业务框架使用方式
 ```python
 # 1. 创建业务实例
-taobao_business = TaobaoBusiness(session_id=1)
+        taobao_business = TaobaoBusiness(session_id=1, user_id="demo_user")
 
 # 2. 初始化
 taobao_business.initialize()
@@ -301,7 +301,7 @@ def create_jd_session_with_actions(session_id, start_barrier):
     pass
 
 # 新方式
-taobao_business = TaobaoBusiness(session_id)
+    taobao_business = TaobaoBusiness(session_id, user_id=f"demo_user_{session_id}")
 taobao_business.initialize()
 success = taobao_business.execute_image_search_with_actions()
 ```

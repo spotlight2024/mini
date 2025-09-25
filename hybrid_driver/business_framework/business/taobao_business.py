@@ -14,7 +14,7 @@ from hybrid_driver.log_config import get_logger
 class TaobaoBusiness(BaseBusiness):
     """淘宝业务类"""
     
-    def __init__(self, session_id: str, site_overrides: Optional[Dict[str, Any]] = None):
+    def __init__(self, session_id: str, user_id: str, site_overrides: Optional[Dict[str, Any]] = None):
         # 淘宝网站配置
         site_config = {
             'site_name': 'taobao',
@@ -29,7 +29,7 @@ class TaobaoBusiness(BaseBusiness):
         }
         if site_overrides:
             site_config.update(site_overrides)
-        super().__init__(site_config, session_id)
+        super().__init__(site_config, session_id, user_id)
         self.home_page = None
         self.search_page = None
     

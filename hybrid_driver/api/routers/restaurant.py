@@ -51,7 +51,7 @@ async def extract_restaurants(req: ExtractRestaurantsRequest):
             )
         
         # 创建餐厅业务实例（不需要初始化，直接使用现有的driver）
-        restaurant_business = RestaurantBusiness(req.serial_id)
+        restaurant_business = RestaurantBusiness(req.serial_id, req.serial_id)
         
         # 使用设备的driver
         web_executor = device.get_web_driver()

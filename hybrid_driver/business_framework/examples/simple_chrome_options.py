@@ -19,7 +19,7 @@ def example_basic_usage():
     print("🔧 示例1: 直接操作chrome_options对象")
     
     # 创建业务实例
-    taobao_business = TaobaoBusiness("example_session_1")
+    taobao_business = TaobaoBusiness("example_session_1", "demo_user")
     
     # 直接获取chrome_options对象
     chrome_options = taobao_business.get_chrome_options()
@@ -38,7 +38,7 @@ def example_conditional_config():
     """条件配置示例"""
     print("\n🔧 示例2: 根据条件配置")
     
-    taobao_business = TaobaoBusiness("example_session_2")
+    taobao_business = TaobaoBusiness("example_session_2", "demo_user")
     chrome_options = taobao_business.get_chrome_options()
     
     # 根据需要添加配置
@@ -81,5 +81,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 

@@ -1,6 +1,7 @@
 """
 WebDriver管理器 - 统一管理Driver生命周期
 """
+import json
 import time
 import logging
 from typing import Optional, Dict, Any
@@ -19,13 +20,21 @@ logger = get_logger(__name__)
 class WebDriverManager:
     """WebDriver管理器 - 统一管理Driver生命周期"""
     
-    def __init__(self, session_id: str, site_config: Dict[str, Any]):
+    def __init__(self, session_id: str, site_config: Dict[str, Any], user_id: str):
         self.session_id = session_id
         self.site_config = site_config
+        self.user_id = user_id
         self.driver = None
         self.page_manager = None
         self.chrome_options = None  # 存储chrome选项，可被外部修改
-        self.logger = get_logger(f"WebDriverManager-{session_id}")
+        self.logger = get_logger(f"WebDriverManager-{user_id}-{session_id}")
+        self._sanitized_user_id = self._sanitize_identifier(user_id)
+
+    def _sanitize_identifier(self, value: str) -> str:
+        """确保ID可安全用于文件路径或日志"""
+        import re
+
+        return re.sub(r"[^0-9A-Za-z._-]", "_", value)
     
     def create_driver(self) -> webdriver.Remote:
         """创建WebDriver"""
@@ -34,7 +43,7 @@ class WebDriverManager:
         # 创建ConnectConfig
         config = ConnectConfig(
             serial_id=f"session_{self.session_id}",
-            user_id=f"user_{self.session_id}",
+            user_id=str(self.user_id),
             webdriver_mode=self.site_config.get('webdriver_mode', 'remote'),
             remote_url=self.site_config.get('hub_url'),
             browser_version=self.site_config.get('browser_version', '138'),
@@ -52,8 +61,10 @@ class WebDriverManager:
             command_executor=self.site_config['hub_url'],
             options=self.chrome_options
         )
-        
-        self.logger.info(f"gongcong111 stealthenium: {self.chrome_options.to_capabilities()}")
+        capabilities_json = json.dumps(
+            self.chrome_options.to_capabilities(), ensure_ascii=False, indent=2
+        )
+        self.logger.info("gongcong111 stealthenium: {}", capabilities_json)
 
         stealth(
             self.driver,
@@ -88,7 +99,9 @@ class WebDriverManager:
         # chrome_options.add_argument('--headless')
         
         # 用户数据目录
-        user_data_dir = f"/opt/chrome_user_data/chrome/session_{self.session_id}/{self.site_config['site_name']}"
+        user_data_dir = (
+            f"/opt/chrome_user_data/chrome/session_{self._sanitized_user_id}/{self.site_config['site_name']}"
+        )
         chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
         
         # 性能优化

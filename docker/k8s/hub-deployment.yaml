@@ -44,6 +44,8 @@ spec:
           value: "200"
         - name: SE_LOG_LEVEL
           value: "INFO"
+        - name: SE_NODE_DELETE_SESSION_ON_UI
+          value: "true"
         # - name: JAVA_OPTS
         #   value: "-Djava.util.logging.config.file=/opt/selenium/logging.properties -Djava.util.logging.ConsoleHandler.level=ALL -Djava.util.logging.FileHandler.level=ALL"
         - name: SE_OPTS

@@ -86,7 +86,7 @@ business_framework/
 from business_framework.business.taobao_business import TaobaoBusiness
 
 # 创建淘宝业务实例
-taobao_business = TaobaoBusiness(session_id=1)
+taobao_business = TaobaoBusiness(session_id="run_1", user_id="demo_user")
 
 try:
     # 初始化

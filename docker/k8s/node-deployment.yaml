@@ -39,8 +39,6 @@ spec:
           value: "4442"
         - name: SE_EVENT_BUS_SUBSCRIBE_PORT
           value: "4443"
-        - name: SE_NODE_DELETE_SESSION_ON_UI
-          value: "true"
         - name: SE_NODE_MAX_SESSIONS
           value: "1"
         - name: SE_NODE_OVERRIDE_MAX_SESSIONS
