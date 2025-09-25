@@ -100,7 +100,7 @@ class TaobaoBusiness(BaseBusiness):
             if not actions or not chain:
                 raise RuntimeError("ActionChains或WebDriverChain未初始化")
             
-            time.sleep(3)
+            # time.sleep(3)
 
             # 等待代理切换生效
             self.logger.info("⏳ 等待代理切换生效...")

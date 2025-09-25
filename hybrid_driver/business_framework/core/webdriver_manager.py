@@ -10,6 +10,8 @@ from selenium.webdriver.remote.file_detector import LocalFileDetector
 
 from hybrid_driver.api.models import ConnectConfig
 from hybrid_driver.log_config import get_logger
+from stealthenium import stealth
+
 
 logger = get_logger(__name__)
 
@@ -51,6 +53,18 @@ class WebDriverManager:
             options=self.chrome_options
         )
         
+        self.logger.info(f"gongcong111 stealthenium: {self.chrome_options.to_capabilities()}")
+
+        stealth(
+            self.driver,
+            languages=["zh-CN", "zh", "en", "ja", "zh-TW"],
+            vendor="Google Inc.",
+            platform="Linux x86_64",
+            webgl_vendor="Intel Inc.",
+            renderer="Intel Iris OpenGL Engine",
+            fix_hairline=True,
+        )
+
         # 设置超时
         self.driver.set_page_load_timeout(self.site_config.get('page_load_timeout', 30))
         self.driver.implicitly_wait(self.site_config.get('implicit_wait', 10))

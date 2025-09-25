@@ -385,9 +385,13 @@ class CustomProxyProvider(ProxyProvider):
     def get_proxy_config(self) -> Optional[ProxyConfig]:
         """从自定义接口获取代理配置"""
         try:
-            # 这里可以实现自定义的代理获取逻辑
-            # 例如调用其他API、从数据库读取、从配置文件读取等
-            raise NotImplementedError("CustomProxyProvider需要实现具体的获取逻辑")
+            return ProxyConfig(
+                ip="192.168.1.42",
+                port="7897",
+                username="",
+                password="",
+                provider=self.provider_name
+            )
         except Exception as e:
             logger.error(f"自定义代理获取失败: {e}")
             return None
@@ -450,6 +454,9 @@ def initialize_proxy_providers():
 
     kuai_provider = KuaiProxyProvider()
     proxy_manager.register_provider("kuai", kuai_provider)
+
+    custom_provider = CustomProxyProvider({"name": "custom"})
+    proxy_manager.register_provider("custom", custom_provider)
 
     # 可以在这里注册其他代理提供者
     # custom_provider = CustomProxyProvider({"name": "my_provider"})

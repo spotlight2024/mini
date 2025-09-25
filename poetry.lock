@@ -2070,6 +2070,29 @@ url = "http://mirrors.cloud.aliyuncs.com/pypi/simple"
 reference = "aliyun"
 
 [[package]]
+name = "stealthenium"
+version = "1.1.1"
+description = "A wrapper to make python selenium stealthy."
+optional = false
+python-versions = ">=3, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+groups = ["main"]
+files = [
+    {file = "stealthenium-1.1.1-py3-none-any.whl", hash = "sha256:0aa525d09a81c15e633882adaac2f70b124d21c2c3db2fd17cf443a2dcdeb70f"},
+    {file = "stealthenium-1.1.1.tar.gz", hash = "sha256:0db691632c9e899d17f7f1123f204de500df8b2c88a6cd25fb5bb1a09eadddb9"},
+]
+
+[package.dependencies]
+selenium = "*"
+
+[package.extras]
+test = ["pytest"]
+
+[package.source]
+type = "legacy"
+url = "http://mirrors.cloud.aliyuncs.com/pypi/simple"
+reference = "aliyun"
+
+[[package]]
 name = "tomli"
 version = "2.2.1"
 description = "A lil' TOML parser"
@@ -2554,4 +2577,4 @@ reference = "aliyun"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "b1b91d42a14626b2a59bd8fe3d6a3f9190057375cb1dd9568e63f8e906220901"
+content-hash = "8ffcf02296ba08c1055611ee93321e608834aec8ba1aefdaa3b4baaab53fd200"
