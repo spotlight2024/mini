@@ -1,15 +1,21 @@
 """
 业务基类 - 定义通用业务逻辑
 """
-import time
 import logging
-from typing import Optional, Dict, Any
 from pathlib import Path
+import time
+from typing import Any, Dict, Optional
 
-from hybrid_driver.business_framework.core.webdriver_manager import WebDriverManager
+from hybrid_driver.business_framework.core.action_chains_wrapper import (
+    ActionChainsWrapper,
+)
 from hybrid_driver.business_framework.core.page_manager import PageManager
-from hybrid_driver.business_framework.core.action_chains_wrapper import ActionChainsWrapper
 from hybrid_driver.business_framework.core.webdriver_chain import WebDriverChain
+from hybrid_driver.business_framework.core.human_actions import (
+    HumanMouse,
+    HumanMouseConfig,
+)
+from hybrid_driver.business_framework.core.webdriver_manager import WebDriverManager
 from hybrid_driver.log_config import get_logger
 
 
@@ -24,6 +30,7 @@ class BaseBusiness:
         self.action_chains = None
         self.webdriver_chain = None
         self.logger = get_logger(f"BaseBusiness-{session_id}")
+        self._human_mouse = None
         
         # 立即创建 WebDriverManager（但不创建driver）
         self._prepare_webdriver_manager()
@@ -43,9 +50,29 @@ class BaseBusiness:
         self.page_manager = self.webdriver_manager.page_manager
         
         # 创建ActionChains和WebDriverChain
-        self.action_chains = ActionChainsWrapper(self.webdriver_manager.driver, self.session_id)
-        self.webdriver_chain = WebDriverChain(self.webdriver_manager.driver, self.session_id)
-        
+        human_config = self.site_config.get("human_actions")
+        human_config_obj = HumanMouseConfig.from_dict(human_config)
+        human_mouse = None
+        if human_config_obj.enabled:
+            human_mouse = HumanMouse(
+                self.webdriver_manager.driver,
+                human_config_obj,
+                logger=self.logger,
+            )
+
+        self.action_chains = ActionChainsWrapper(
+            self.webdriver_manager.driver,
+            self.session_id,
+            human_mouse=human_mouse,
+        )
+        self.webdriver_chain = WebDriverChain(
+            self.webdriver_manager.driver,
+            self.session_id,
+            human_action_config=human_config,
+            human_mouse=human_mouse,
+        )
+        self._human_mouse = human_mouse
+
         return self
     
     def cleanup(self) -> 'BaseBusiness':

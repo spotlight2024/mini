@@ -1,34 +1,63 @@
 """
 WebDriver链式调用封装类
 """
-import time
 import json
 import logging
 import subprocess
+import time
+from typing import Any, Dict, Optional, Union
+
 from loguru import logger
 import requests
-from typing import Optional, Union, Any
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support import wait
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support import wait
 
+from hybrid_driver.business_framework.core.human_actions import (
+    HumanMouse,
+    HumanMouseConfig,
+)
 from hybrid_driver.log_config import get_logger
 
 
 class WebDriverChain:
     """WebDriver链式调用封装类"""
     
-    def __init__(self, driver: WebDriver, session_id: str):
+    def __init__(
+        self,
+        driver: WebDriver,
+        session_id: str,
+        human_action_config: Optional[Dict[str, Any]] = None,
+        human_mouse: Optional[HumanMouse] = None,
+    ):
         self.driver = driver
         self.session_id = session_id
         self.logger = get_logger(f"WebDriverChain-{session_id}")
+        config = HumanMouseConfig.from_dict(human_action_config)
+        if human_mouse and human_mouse.enabled:
+            self._human_mouse = human_mouse
+            self._human_config = human_mouse.config
+        elif config.enabled:
+            self._human_mouse = HumanMouse(driver, config, logger=self.logger)
+            self._human_config = config
+        else:
+            self._human_mouse = None
+            self._human_config = config
     
-    def log(self, message: str) -> 'WebDriverChain':
+    def log(self, message: str, level: str = "INFO") -> 'WebDriverChain':
         """带时间戳的日志输出"""
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        self.logger.info(f"[{timestamp}] {message}")
+        level_upper = level.upper()
+        if level_upper == "DEBUG":
+            self.logger.debug(f"[{timestamp}] {message}")
+        elif level_upper == "WARNING":
+            self.logger.warning(f"[{timestamp}] {message}")
+        elif level_upper == "ERROR":
+            self.logger.error(f"[{timestamp}] {message}")
+        else:
+            self.logger.info(f"[{timestamp}] {message}")
         return self
     
     def navigate_to(self, url: str) -> 'WebDriverChain':
@@ -47,7 +76,7 @@ class WebDriverChain:
             
             # 获取页面内容
             page_source = self.driver.page_source
-            self.log(f"📄 页面源码长度: {len(page_source)} 字符")
+            self.log(f"📄 页面源码长度: {len(page_source)} 字符", level="DEBUG")
             
             # 尝试解析JSON响应
             try:
@@ -57,7 +86,7 @@ class WebDriverChain:
                 if json_match:
                     json_str = json_match.group()
                     ip_data = json.loads(json_str)
-                    self.log(f"✅ 成功解析IP数据: {ip_data}")
+                    self.log(f"✅ 成功解析IP数据: {ip_data}", level="DEBUG")
                     
                     # 提取IP信息
                     if 'data' in ip_data and 'ip' in ip_data['data']:
@@ -68,20 +97,20 @@ class WebDriverChain:
                         self.driver_ip = current_ip
                         return self
                     else:
-                        self.log(f"⚠️ 未找到IP字段，完整响应: {ip_data}")
+                        self.log(f"⚠️ 未找到IP字段，完整响应: {ip_data}", level="WARNING")
                 else:
-                    self.log(f"⚠️ 页面中未找到JSON格式数据")
-                    self.log(f"📄 页面内容预览: {page_source[:500]}...")
+                    self.log(f"⚠️ 页面中未找到JSON格式数据", level="WARNING")
+                    self.log(f"📄 页面内容预览: {page_source[:200]}...", level="DEBUG")
                     
             except json.JSONDecodeError as e:
-                self.log(f"⚠️ JSON解析失败: {e}")
-                self.log(f"📄 原始页面内容: {page_source}")
+                self.log(f"⚠️ JSON解析失败: {e}", level="WARNING")
+                self.log(f"📄 原始页面内容: {page_source[:200]}...", level="DEBUG")
             except Exception as e:
-                self.log(f"⚠️ 数据解析异常: {e}")
-                self.log(f"📄 页面内容: {page_source}")
+                self.log(f"⚠️ 数据解析异常: {e}", level="WARNING")
+                self.log(f"📄 页面内容: {page_source[:200]}...", level="DEBUG")
                 
         except Exception as e:
-            self.log(f"❌ IP验证异常: {e}")
+            self.log(f"❌ IP验证异常: {e}", level="ERROR")
             
         return self
     
@@ -91,10 +120,10 @@ class WebDriverChain:
             element = wait.WebDriverWait(self.driver, timeout).until(
                 EC.presence_of_element_located((by, value))
             )
-            self.log(f"✅ 找到元素: {description or f'{by}={value}'}")
+            self.log(f"✅ 找到元素: {description or f'{by}={value}'}", level="DEBUG")
             return element
         except Exception as e:
-            self.log(f"❌ 未找到元素 {description or f'{by}={value}'}: {e}")
+            self.log(f"❌ 未找到元素 {description or f'{by}={value}'}: {e}", level="ERROR")
             raise e
     
     def wait_for_clickable(self, by: Union[str, By], value: str, timeout: int = 10, description: str = "") -> Optional[WebElement]:
@@ -103,16 +132,19 @@ class WebDriverChain:
             element = wait.WebDriverWait(self.driver, timeout).until(
                 EC.element_to_be_clickable((by, value))
             )
-            self.log(f"✅ 元素可点击: {description or f'{by}={value}'}")
+            self.log(f"✅ 元素可点击: {description or f'{by}={value}'}", level="DEBUG")
             return element
         except Exception as e:
-            self.log(f"❌ 元素不可点击 {description or f'{by}={value}'}: {e}")
+            self.log(f"❌ 元素不可点击 {description or f'{by}={value}'}: {e}", level="ERROR")
             raise e
     
     def click_element(self, by: Union[str, By], value: str, description: str = "") -> 'WebDriverChain':
         """点击元素"""
         element = self.wait_for_clickable(by, value, description=description)
-        element.click()
+        if self._human_mouse:
+            self._human_mouse.click(element, description or f"{by}={value}")
+        else:
+            element.click()
         self.log(f"✅ 成功点击: {description or f'{by}={value}'}")
         return self
     
@@ -121,7 +153,7 @@ class WebDriverChain:
         element = self.wait_for_element(by, value, description=description)
         
         # 显示隐藏的file input
-        self.log(f"🔧 显示隐藏的file input...")
+        self.log("🔧 显示隐藏的file input...")
         self.driver.execute_script("""
             arguments[0].style.display='block';
             arguments[0].style.visibility='visible';
@@ -137,7 +169,10 @@ class WebDriverChain:
     def wait_and_click(self, by: Union[str, By], value: str, timeout: int = 15, description: str = "") -> 'WebDriverChain':
         """等待并点击元素"""
         element = self.wait_for_clickable(by, value, timeout, description)
-        element.click()
+        if self._human_mouse:
+            self._human_mouse.click(element, description or f"{by}={value}")
+        else:
+            element.click()
         self.log(f"✅ 等待并点击成功: {description or f'{by}={value}'}")
         return self
     

@@ -116,6 +116,48 @@ watch -n 5 'kubectl -n selenium-grid get scaledobject'
 watch -n 5 'kubectl -n selenium-grid top pods'
 ```
 
+### Kubernetes Dashboard
+
+> Dashboard 清单位于 `docker/k8s/kubernetes-dashboard.yaml` 与 `docker/k8s/kubernetes-dashboard-admin.yaml`，默认部署在 `kubernetes-dashboard` 命名空间，镜像版本与清单保持一致（`kubernetesui/dashboard:v2.7.0`、`kubernetesui/metrics-scraper:v1.0.8`）。以下命令默认在 `docker/k8s` 目录执行，若在仓库根目录请补上相对路径。
+
+1. **准备镜像**（离线或 kind 集群时可先拉取并导入）：
+   ```bash
+   docker pull kubernetesui/dashboard:v2.7.0
+   docker pull kubernetesui/metrics-scraper:v1.0.8
+
+   # kind 集群名可以通过 `kind get clusters` 查看
+   kind load docker-image kubernetesui/dashboard:v2.7.0 --name selenium-cluster
+   kind load docker-image kubernetesui/metrics-scraper:v1.0.8 --name selenium-cluster
+   ```
+2. **部署组件**：
+   ```bash
+   kubectl apply -f kubernetes-dashboard.yaml
+   ```
+3. **创建登录账号**（可按需调整权限）：
+   ```bash
+   kubectl apply -f kubernetes-dashboard-admin.yaml
+   # 生成登录用 token
+   kubectl -n kubernetes-dashboard create token dashboard-admin
+   ```
+4. **访问方式**：
+   ```bash
+   # 在集群节点或通过 SSH 端口转发保持运行
+   kubectl proxy --address=127.0.0.1 --port=8001
+   ```
+   - 本地浏览器访问 `http://127.0.0.1:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/#/`
+   - 选择 **Token** 登录，粘贴上一步生成的令牌
+   - 记得在 Dashboard 左上角切换到业务命名空间（如 `selenium-grid` 或选择 All namespaces）
+
+5. **常见问题**：
+   - Dashboard Pod CrashLoopBackOff：检查镜像是否已导入/可拉取，或使用 `kubectl describe pod -n kubernetes-dashboard kubernetes-dashboard-<suffix>` 查看原因
+   - 浏览器无法直接访问服务器 `127.0.0.1:8001`：使用 SSH 隧道 `ssh -L 8001:127.0.0.1:8001 <user>@<server-ip>` 后再访问本地地址
+
+6. **卸载**：
+   ```bash
+   kubectl delete -f kubernetes-dashboard-admin.yaml
+   kubectl delete -f kubernetes-dashboard.yaml
+   ```
+
 ## 🧹 环境管理
 
 ### 清理环境
@@ -285,4 +327,3 @@ kubectl -n selenium-grid rollout undo deployment/chrome-node --to-revision=2  # 
 
 *最后更新时间: 2024年12月*
 *维护团队: 运维团队*
-

@@ -2,7 +2,7 @@
 淘宝业务类 - 实现淘宝网站的各种业务逻辑
 """
 import time
-from typing import Optional
+from typing import Optional, Dict, Any
 from pathlib import Path
 from selenium.webdriver.common.by import By
 
@@ -14,7 +14,7 @@ from hybrid_driver.log_config import get_logger
 class TaobaoBusiness(BaseBusiness):
     """淘宝业务类"""
     
-    def __init__(self, session_id: str):
+    def __init__(self, session_id: str, site_overrides: Optional[Dict[str, Any]] = None):
         # 淘宝网站配置
         site_config = {
             'site_name': 'taobao',
@@ -27,6 +27,8 @@ class TaobaoBusiness(BaseBusiness):
             'browser_version': '138',
             'platform_name': 'linux'
         }
+        if site_overrides:
+            site_config.update(site_overrides)
         super().__init__(site_config, session_id)
         self.home_page = None
         self.search_page = None

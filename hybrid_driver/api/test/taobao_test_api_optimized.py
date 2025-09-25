@@ -64,6 +64,22 @@ class PerformanceMetrics:
 
 # ==================== Pydantic 模型 ====================
 
+class HumanActionsSettings(BaseModel):
+    """人类化行为配置"""
+
+    min_steps: Optional[int] = Field(default=None, description="最小轨迹分段数")
+    max_steps: Optional[int] = Field(default=None, description="最大轨迹分段数")
+    min_step_duration_ms: Optional[int] = Field(default=None, description="单段最小持续时间(ms)")
+    max_step_duration_ms: Optional[int] = Field(default=None, description="单段最大持续时间(ms)")
+    min_pause: Optional[float] = Field(default=None, description="段间最小停顿(秒)")
+    max_pause: Optional[float] = Field(default=None, description="段间最大停顿(秒)")
+    path_jitter: Optional[float] = Field(default=None, description="轨迹抖动幅度")
+    target_jitter: Optional[float] = Field(default=None, description="落点随机抖动")
+    overshoot_chance: Optional[float] = Field(default=None, description="过冲概率")
+    overshoot_range: Optional[List[float]] = Field(default=None, description="过冲距离范围")
+    seed: Optional[int] = Field(default=None, description="随机种子")
+
+
 class TaobaoSearchRequest(BaseModel):
     """淘宝搜索请求模型"""
     uid: str = Field(..., description="用户ID", min_length=1, max_length=100)
@@ -72,6 +88,10 @@ class TaobaoSearchRequest(BaseModel):
     proxy_provider: ProxyProviderType = Field(default=ProxyProviderType.TIANQI, description="代理提供者")
     enable_cache: bool = Field(default=False, description="是否启用缓存（已禁用代理缓存）")
     max_retries: int = Field(default=3, description="最大重试次数", ge=0, le=10)
+    human_actions: Optional[HumanActionsSettings] = Field(
+        default=None,
+        description="人类化行为配置（不传则保持默认快速模式）",
+    )
     
     @validator('image_path')
     def validate_image_path(cls, v):
@@ -162,9 +182,11 @@ class TaobaoSearchService:
             self.logger.error(f"获取代理配置失败: {e}")
             return None
     
-    def _create_business_instance(self, uid: str) -> TaobaoBusiness:
+    def _create_business_instance(
+        self, session_id: str, site_overrides: Optional[Dict[str, Any]] = None
+    ) -> TaobaoBusiness:
         """创建业务实例"""
-        return TaobaoBusiness(uid)
+        return TaobaoBusiness(session_id, site_overrides=site_overrides)
     
     async def _execute_search_with_timeout(self, business: TaobaoBusiness, 
                                          image_path: str, timeout: int) -> tuple[bool, List[str]]:
@@ -203,7 +225,17 @@ class TaobaoSearchService:
             metrics.proxy_fetch_time = time.time() - proxy_start
             
             # 3. 创建业务实例
-            business = self._create_business_instance(uid)
+            if request.human_actions:
+                human_action_settings = request.human_actions.model_dump(exclude_none=True)
+                human_action_settings["enabled"] = True
+                site_overrides = {"human_actions": human_action_settings}
+                self.logger.info(f"{log_context} 人类化行为配置: {human_action_settings}")
+            else:
+                human_action_settings = None
+                site_overrides = None
+                self.logger.info(f"{log_context} 人类化行为配置: 默认模式")
+
+            business = self._create_business_instance(session_id, site_overrides)
             
             # 4. 配置代理
             if proxy_config:
