@@ -32,6 +32,11 @@ spec:
           name: vnc
         - containerPort: 7900
           name: novnc
+        - containerPort: 5557
+          name: metrics
+        envFrom:
+        - configMapRef:
+            name: selenium-observability
         env:
         - name: SE_EVENT_BUS_HOST
           value: selenium-hub
@@ -63,6 +68,10 @@ spec:
           value: "600"
         - name: SE_SESSION_REQUEST_TIMEOUT
           value: "600"
+        - name: SE_ENABLE_PROMETHEUS_ENDPOINT
+          value: "true"
+        - name: SE_PROMETHEUS_PORT
+          value: "5557"
         resources:
           requests:
             cpu: "500m"         # 4C8G服务器，8个节点，每个节点100m CPU

@@ -5,6 +5,43 @@
 
 set -e
 
+usage() {
+    cat <<'EOF'
+Usage: ./cleanup.sh [options]
+
+Options:
+  --skip-kind-delete   保留 kind 集群，跳过交互式删除提示
+  --delete-kind        无需确认直接删除 kind 集群
+  --help               显示此帮助
+
+默认行为会在清理完命名空间后询问是否删除 kind 集群。
+EOF
+}
+
+SKIP_KIND_PROMPT=false
+AUTO_DELETE_KIND=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --skip-kind-delete)
+            SKIP_KIND_PROMPT=true
+            ;;
+        --delete-kind)
+            AUTO_DELETE_KIND=true
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -29,31 +66,39 @@ if ! kubectl cluster-info &> /dev/null; then
     exit 1
 fi
 
-echo -e "${YELLOW}[1/8] 🚀 删除 KEDA ScaledObject...${NC}"
+echo -e "${YELLOW}[1/11] 🚀 删除 KEDA ScaledObject...${NC}"
 kubectl delete -f keda-metricsapi-scaledobject.yaml --ignore-not-found || true
 echo -e "${GREEN}✅ KEDA ScaledObject 已删除${NC}"
 
-echo -e "${YELLOW}[2/8] 📊 删除 Grid Metrics Exporter...${NC}"
+echo -e "${YELLOW}[2/11] 📊 删除 Grid Metrics Exporter...${NC}"
 kubectl delete -f grid-metrics-exporter.yaml --ignore-not-found || true
 kubectl delete -f grid-metrics-exporter-configmap.yaml --ignore-not-found || true
 echo -e "${GREEN}✅ Grid Metrics Exporter 已删除${NC}"
 
-echo -e "${YELLOW}[3/8] 🌐 删除 Chrome Node Deployment...${NC}"
+echo -e "${YELLOW}[3/11] 🔭 删除 OpenTelemetry Collector...${NC}"
+kubectl delete -f otel-collector.yaml --ignore-not-found || true
+echo -e "${GREEN}✅ OpenTelemetry Collector 已删除${NC}"
+
+echo -e "${YELLOW}[4/11] 🌐 删除 Chrome Node Deployment...${NC}"
 kubectl delete -f node-deployment.yaml --ignore-not-found || true
 echo -e "${GREEN}✅ Chrome Node Deployment 已删除${NC}"
 
-echo -e "${YELLOW}[4/8] 🎯 删除 Hub Deployment 和 Service...${NC}"
+echo -e "${YELLOW}[5/11] 🎯 删除 Hub Deployment 和 Service...${NC}"
 kubectl delete -f hub-deployment.yaml --ignore-not-found || true
 kubectl delete -f hub-service.yaml --ignore-not-found || true
 echo -e "${GREEN}✅ Hub Deployment 和 Service 已删除${NC}"
 
-echo -e "${YELLOW}[5/8] 💾 删除 NAS 存储配置...${NC}"
+echo -e "${YELLOW}[6/11] 📝 删除 Selenium 观察性配置...${NC}"
+kubectl delete -f selenium-observability-configmap.yaml --ignore-not-found || true
+echo -e "${GREEN}✅ 观察性配置已删除${NC}"
+
+echo -e "${YELLOW}[7/11] 💾 删除 NAS 存储配置...${NC}"
 kubectl delete -f chrome-nas-pvc.yaml --ignore-not-found || true
 kubectl delete -f chrome-nas-pv.yaml --ignore-not-found || true
 kubectl delete -f chrome-nas-storageclass.yaml --ignore-not-found || true
 echo -e "${GREEN}✅ NAS 存储配置已删除${NC}"
 
-echo -e "${YELLOW}[6/8] 🚀 删除 KEDA 系统...${NC}"
+echo -e "${YELLOW}[8/11] 🚀 删除 KEDA 系统...${NC}"
 if kubectl get namespace keda &> /dev/null; then
     if command -v helm &> /dev/null; then
         echo "   卸载 KEDA..."
@@ -70,12 +115,16 @@ else
     echo -e "${GREEN}✅ KEDA 未安装${NC}"
 fi
 
-echo -e "${YELLOW}[7/8] 🗂️  删除所有相关资源...${NC}"
+echo -e "${YELLOW}[9/11] 🗂️  删除所有相关资源...${NC}"
 # 强制删除所有 Pod、Service、Deployment
 kubectl -n ${NS} delete all --all --force --grace-period=0 --ignore-not-found || true
 echo -e "${GREEN}✅ 所有资源已删除${NC}"
 
-echo -e "${YELLOW}[8/8] 🏷️  删除命名空间...${NC}"
+echo -e "${YELLOW}[10/11] 🔄 卸载 Jaeger...${NC}"
+kubectl delete -f jaeger.yaml --ignore-not-found || true
+echo -e "${GREEN}✅ Jaeger 已卸载${NC}"
+
+echo -e "${YELLOW}[11/11] 🏷️  删除命名空间...${NC}"
 kubectl delete namespace ${NS} --ignore-not-found || true
 echo -e "${GREEN}✅ 命名空间已删除${NC}"
 
@@ -86,14 +135,22 @@ echo -e "${GREEN}✅ 清理完成！${NC}"
 echo ""
 echo -e "${BLUE}🔍 检查 kind 集群状态...${NC}"
 if kubectl get nodes &> /dev/null; then
-    echo -e "${YELLOW}是否删除 kind 集群？(y/N): ${NC}"
-    read -r ans || true
-    if [[ "${ans:-N}" == "y" || "${ans:-N}" == "Y" ]]; then
+    if ${AUTO_DELETE_KIND}; then
         echo -e "${YELLOW}删除 kind 集群...${NC}"
         kind delete cluster --name selenium-cluster || true
         echo -e "${GREEN}✅ kind 集群已删除${NC}"
+    elif ${SKIP_KIND_PROMPT}; then
+        echo -e "${GREEN}✅ kind 集群保留（跳过删除提示）${NC}"
     else
-        echo -e "${GREEN}✅ kind 集群保留${NC}"
+        echo -e "${YELLOW}是否删除 kind 集群？(y/N): ${NC}"
+        read -r ans || true
+        if [[ "${ans:-N}" == "y" || "${ans:-N}" == "Y" ]]; then
+            echo -e "${YELLOW}删除 kind 集群...${NC}"
+            kind delete cluster --name selenium-cluster || true
+            echo -e "${GREEN}✅ kind 集群已删除${NC}"
+        else
+            echo -e "${GREEN}✅ kind 集群保留${NC}"
+        fi
     fi
 else
     echo -e "${GREEN}✅ 没有检测到 kind 集群${NC}"
@@ -103,13 +160,15 @@ echo ""
 echo -e "${BLUE}📋 清理总结:${NC}"
 echo -e "${GREEN}✅ KEDA ScaledObject${NC}"
 echo -e "${GREEN}✅ Grid Metrics Exporter${NC}"
+echo -e "${GREEN}✅ OpenTelemetry Collector${NC}"
 echo -e "${GREEN}✅ Chrome Node Deployment${NC}"
 echo -e "${GREEN}✅ Hub Deployment 和 Service${NC}"
+echo -e "${GREEN}✅ Selenium 观察性配置${NC}"
 echo -e "${GREEN}✅ NAS 存储配置${NC}"
 echo -e "${GREEN}✅ KEDA 系统${NC}"
+echo -e "${GREEN}✅ Jaeger${NC}"
 echo -e "${GREEN}✅ 所有相关资源${NC}"
 echo -e "${GREEN}✅ 命名空间${NC}"
 
 echo ""
 echo -e "${GREEN}✨ 环境清理完成，可以重新运行 ./deploy.sh 进行部署！${NC}"
-

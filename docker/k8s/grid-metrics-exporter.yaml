@@ -20,12 +20,16 @@ spec:
         image: python:3.11-slim
         imagePullPolicy: IfNotPresent
         env:
-        - name: HUB_URL
-          value: "http://selenium-hub:4444"
+        - name: HUB_STATUS_URL
+          value: "http://selenium-hub:4444/status"
+        - name: HUB_GRAPHQL_URL
+          value: "http://selenium-hub:4444/graphql"
         - name: BUFFER
           value: "2"
         - name: PORT
           value: "8080"
+        - name: TIMEOUT
+          value: "5"
         command: ["python","/app/exporter.py"]
         ports:
         - containerPort: 8080
@@ -45,6 +49,8 @@ kind: Service
 metadata:
   name: grid-metrics-exporter
   namespace: selenium-grid
+  labels:
+    app: grid-metrics-exporter
 spec:
   selector:
     app: grid-metrics-exporter
@@ -52,7 +58,4 @@ spec:
   - name: http
     port: 8080
     targetPort: 8080
-
-
-
 

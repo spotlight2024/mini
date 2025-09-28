@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: monitoring
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.57
+        args:
+          - "--memory.max-traces=20000"
+          - "--query.base-path=/"
+        env:
+          - name: COLLECTOR_OTLP_ENABLED
+            value: "true"
+          - name: COLLECTOR_OTLP_GRPC_HOST_PORT
+            value: ":4317"
+          - name: COLLECTOR_OTLP_HTTP_HOST_PORT
+            value: ":4318"
+        ports:
+          - containerPort: 16686
+            name: http-ui
+          - containerPort: 4317
+            name: otlp-grpc
+          - containerPort: 4318
+            name: otlp-http
+          - containerPort: 14250
+            name: grpc
+          - containerPort: 14268
+            name: collector-http
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http-ui
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http-ui
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: monitoring
+  labels:
+    app: jaeger
+spec:
+  selector:
+    app: jaeger
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: otlp-grpc
+    - name: otlp-http
+      port: 4318
+      targetPort: otlp-http
+    - name: grpc
+      port: 14250
+      targetPort: grpc
+    - name: collector-http
+      port: 14268
+      targetPort: collector-http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-query
+  namespace: monitoring
+  labels:
+    app: jaeger
+spec:
+  type: ClusterIP
+  selector:
+    app: jaeger
+  ports:
+    - name: http-ui
+      port: 16686
+      targetPort: http-ui
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jaeger-allow-tracing
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app: jaeger
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - port: 4317
+        - port: 4318
+        - port: 16686
+  policyTypes:
+    - Ingress

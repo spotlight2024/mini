@@ -1,0 +1,59 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: selenium-hub
+  namespace: monitoring
+  labels:
+    app: selenium-hub
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - selenium-grid
+  selector:
+    matchLabels:
+      app: selenium-hub
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: selenium-node
+  namespace: monitoring
+  labels:
+    app: chrome-node
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - selenium-grid
+  selector:
+    matchLabels:
+      app: chrome-node
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: selenium-grid-exporter
+  namespace: monitoring
+  labels:
+    app: grid-metrics-exporter
+    release: monitoring
+spec:
+  namespaceSelector:
+    matchNames:
+      - selenium-grid
+  selector:
+    matchLabels:
+      app: grid-metrics-exporter
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics

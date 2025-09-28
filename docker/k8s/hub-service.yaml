@@ -25,4 +25,7 @@ spec:
     targetPort: 4444
     nodePort: 30444
     protocol: TCP
-
+  - name: metrics
+    port: 5557
+    targetPort: 5557
+    protocol: TCP

@@ -3,6 +3,60 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
+usage() {
+    cat <<'EOF'
+Usage: ./deploy.sh [options]
+
+Options:
+  --cleanup-first          部署前执行 cleanup.sh（保留 kind 集群）
+  --skip-image-load        不自动 kind load 镜像，需提前手动导入
+  --load-image IMAGE       额外指定需要导入的镜像，可重复使用
+  --port-forward           部署完成后自动执行 kubectl port-forward 暴露 Grafana/Prometheus
+  --expose-nodeport        通过宿主机 iptables 将 NodePort (32000/32001) 暴露到宿主机 80/90（需要 root）
+  --help                   显示帮助
+
+示例：
+  ./deploy.sh --cleanup-first --skip-image-load
+EOF
+}
+
+CLEANUP_FIRST=false
+LOAD_IMAGES=true
+EXTRA_IMAGES=()
+ENABLE_PORT_FORWARD=false
+ENABLE_NODEPORT_EXPOSE=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --cleanup-first)
+            CLEANUP_FIRST=true
+            ;;
+        --skip-image-load)
+            LOAD_IMAGES=false
+            ;;
+        --load-image)
+            shift || { echo "Missing argument for --load-image" >&2; usage; exit 1; }
+            EXTRA_IMAGES+=("$1")
+            ;;
+        --port-forward)
+            ENABLE_PORT_FORWARD=true
+            ;;
+        --expose-nodeport)
+            ENABLE_NODEPORT_EXPOSE=true
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            usage
+            exit 1
+            ;;
+    esac
+    shift || break
+done
+
 echo "🚀 部署 Selenium Grid on Kubernetes..."
 
 # 颜色定义
@@ -34,6 +88,18 @@ fi
 
 echo -e "${GREEN}✅ 环境检查通过${NC}"
 
+if ${CLEANUP_FIRST}; then
+    echo "[0/9] 预清理历史资源"
+    if kind get clusters | grep -q "${CLUSTER_NAME}"; then
+        echo "   检测到现有 kind 集群，导出 kubeconfig 并执行 cleanup..."
+        kind export kubeconfig --name "${CLUSTER_NAME}"
+        "${HERE}/cleanup.sh" --skip-kind-delete
+    else
+        echo "   未发现名为 ${CLUSTER_NAME} 的 kind 集群，跳过 cleanup"
+    fi
+    echo ""
+fi
+
 echo "[2/9] 检查并创建 kind 集群"
 if kind get clusters | grep -q "${CLUSTER_NAME}"; then
     echo "   集群 ${CLUSTER_NAME} 已存在，正在连接..."
@@ -62,35 +128,88 @@ if ! kubectl cluster-info &> /dev/null; then
 fi
 echo -e "${GREEN}✅ 集群连接正常${NC}"
 
-echo "[3/9] 加载必要的 Docker 镜像到 kind 集群"
-echo "   加载 chrome-tinyproxy-node 镜像..."
-# if docker images | grep -q "chrome-tinyproxy-node.*latest"; then
-kind load docker-image chrome-tinyproxy-node:latest --name "${CLUSTER_NAME}"
-echo -e "${GREEN}✅ chrome-tinyproxy-node 镜像加载完成${NC}"
-# else
-#     echo -e "${RED}❌ chrome-tinyproxy-node:latest 镜像不存在${NC}"
-#     echo "   请先构建镜像: docker build -t chrome-tinyproxy-node:latest .."
-#     exit 1
-# fi
+if ${LOAD_IMAGES}; then
+    echo "[3/9] 加载必要的 Docker 镜像到 kind 集群"
 
-echo "   加载 selenium/hub 镜像..."
-if docker images | grep -q "selenium/hub.*latest"; then
-    kind load docker-image selenium/hub:latest --name "${CLUSTER_NAME}"
-    echo -e "${GREEN}✅ selenium/hub 镜像加载完成${NC}"
+    REQUIRED_IMAGES=("chrome-tinyproxy-node:latest")
+    OPTIONAL_IMAGES=(
+        "selenium/hub:latest"
+        "python:3.11-slim"
+        "ghcr.io/kedacore/keda:2.17.2"
+        "ghcr.io/kedacore/keda-admission-webhooks:2.17.2"
+        "ghcr.io/kedacore/keda-metrics-apiserver:2.17.2"
+    )
+
+    load_image() {
+        local image="$1"
+        local required="$2"
+        if ! docker image inspect "$image" >/dev/null 2>&1; then
+            if [[ "$required" == "true" ]]; then
+                echo -e "${RED}❌ 必需镜像 $image 不存在，请先构建/拉取并手动执行 kind load${NC}"
+                echo "   示例: docker pull $image && kind load docker-image $image --name ${CLUSTER_NAME}"
+                exit 1
+            else
+                echo -e "${YELLOW}⚠️  可选镜像 $image 不存在，将依赖集群自行拉取${NC}"
+                return
+            fi
+        fi
+
+        echo "   加载镜像: $image"
+        kind load docker-image "$image" --name "${CLUSTER_NAME}"
+    }
+
+    for image in "${REQUIRED_IMAGES[@]}"; do
+        load_image "$image" true
+    done
+
+    for image in "${OPTIONAL_IMAGES[@]}"; do
+        load_image "$image" false
+    done
+
+    for image in "${EXTRA_IMAGES[@]}"; do
+        load_image "$image" false
+    done
+
+    echo -e "${GREEN}✅ 镜像加载步骤完成${NC}"
 else
-    echo -e "${YELLOW}⚠️  selenium/hub:latest 镜像不存在，将尝试从 Docker Hub 拉取${NC}"
+    echo "[3/9] 跳过镜像加载 (使用 --skip-image-load)"
+    echo "   请确保下列镜像已手动导入 kind:"
+    echo "   - chrome-tinyproxy-node:latest (必需)"
+    echo "   - selenium/hub:latest"
+    echo "   - python:3.11-slim"
+    echo "   - ghcr.io/kedacore/keda:2.17.2 (及其子组件)"
 fi
 
-echo "   加载 python:3.11-slim 镜像..."
-if docker images | grep -q "python.*3.11-slim"; then
-    kind load docker-image python:3.11-slim --name "${CLUSTER_NAME}"
-    echo -e "${GREEN}✅ python:3.11-slim 镜像加载完成${NC}"
-else
-    echo -e "${YELLOW}⚠️  python:3.11-slim 镜像不存在，将尝试从 Docker Hub 拉取${NC}"
-fi
+# 函数: 配置 port-forward，运行在后台
+start_port_forward() {
+    local svc=$1
+    local local_port=$2
+    local target_port=$3
+    local log_file=$4
+    echo "   启动 port-forward: ${svc} -> localhost:${local_port}"
+    nohup kubectl -n monitoring port-forward --address 0.0.0.0 "svc/${svc}" "${local_port}:${target_port}" \
+        >"${log_file}" 2>&1 &
+    local pid=$!
+    echo "     PID=${pid}, logs=${log_file}"
+}
+
+# 函数: 利用 iptables 将 NodePort 暴露到宿主机固定端口
+expose_nodeport() {
+    local external_port=$1
+    local node_port=$2
+    local svc_name=$3
+    echo "   暴露 ${svc_name} NodePort ${node_port} -> 宿主机端口 ${external_port}"
+    sudo iptables -t nat -C PREROUTING -p tcp --dport "${external_port}" -j REDIRECT --to-port "${node_port}" 2>/dev/null || \
+        sudo iptables -t nat -A PREROUTING -p tcp --dport "${external_port}" -j REDIRECT --to-port "${node_port}"
+    sudo iptables -t nat -C OUTPUT -p tcp --dport "${external_port}" -j REDIRECT --to-port "${node_port}" 2>/dev/null || \
+        sudo iptables -t nat -A OUTPUT -p tcp --dport "${external_port}" -j REDIRECT --to-port "${node_port}"
+}
 
 echo "[4/9] 应用命名空间"
 kubectl apply -f "$HERE/namespace.yaml" | cat
+
+echo "[4.1/9] 配置 Selenium Logging & Tracing"
+kubectl apply -f "$HERE/selenium-observability-configmap.yaml" | cat
 
 echo "[5/9] 应用 NAS 存储配置"
 kubectl apply -f "$HERE/chrome-nas-storageclass.yaml" | cat
@@ -107,6 +226,12 @@ kubectl apply -f "$HERE/node-deployment.yaml" | cat
 echo "   部署指标导出器..."
 kubectl apply -f "$HERE/grid-metrics-exporter-configmap.yaml" | cat
 kubectl apply -f "$HERE/grid-metrics-exporter.yaml" | cat
+
+echo "   部署 OpenTelemetry Collector..."
+kubectl apply -f "$HERE/otel-collector.yaml" | cat
+
+echo "   部署 Jaeger 全量节点..."
+kubectl apply -f "$HERE/jaeger.yaml" | cat
 
 echo "[7/9] 等待部署完成"
 echo "   等待 Hub 就绪..."
@@ -226,5 +351,23 @@ echo -e "${GREEN}   清理环境: ./cleanup.sh${NC}"
 echo -e "${GREEN}   删除集群: kind delete cluster --name ${CLUSTER_NAME}${NC}"
 
 echo ""
-echo -e "${GREEN}✨ 现在可以运行测试脚本验证所有功能！${NC}"
+if ${ENABLE_PORT_FORWARD}; then
+    echo ""
+    echo "[10/9] 配置本地访问 (port-forward)"
+    start_port_forward monitoring-grafana 30080 80 /tmp/grafana-port-forward.log
+    start_port_forward monitoring-kube-prometheus-prometheus 30090 9090 /tmp/prometheus-port-forward.log
+    echo -e "${GREEN}✅ Grafana: http://127.0.0.1:30080 (admin/prom-operator)${NC}"
+    echo -e "${GREEN}✅ Prometheus: http://127.0.0.1:30090${NC}"
+fi
 
+if ${ENABLE_NODEPORT_EXPOSE}; then
+    echo ""
+    echo "[10/9] 配置宿主机端口映射 (NodePort)"
+    expose_nodeport 30080 32000 monitoring-grafana
+    expose_nodeport 30090 32001 monitoring-kube-prometheus-prometheus
+    echo -e "${GREEN}✅ Grafana: http://<宿主机IP>:30080 (admin/prom-operator)${NC}"
+    echo -e "${GREEN}✅ Prometheus: http://<宿主机IP>:30090${NC}"
+fi
+
+echo ""
+echo -e "${GREEN}✨ 现在可以运行测试脚本验证所有功能！${NC}"

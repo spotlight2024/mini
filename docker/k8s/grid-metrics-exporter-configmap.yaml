@@ -7,45 +7,230 @@ data:
   exporter.py: |
     import json
     import os
+    import time
+    from collections import Counter
     from http.server import BaseHTTPRequestHandler, HTTPServer
-    from urllib import request
+    from urllib import error, request
 
-    HUB_URL = os.getenv("HUB_URL", "http://selenium-hub:4444")
-    BUFFER = int(os.getenv("BUFFER", "10"))  # 从 5 增加到 10，提供更多缓冲
+    HUB_STATUS_URL = os.getenv("HUB_STATUS_URL", "http://selenium-hub:4444/status")
+    HUB_GRAPHQL_URL = os.getenv("HUB_GRAPHQL_URL", "http://selenium-hub:4444/graphql")
+    BUFFER = int(os.getenv("BUFFER", "10"))
+    PORT = int(os.getenv("PORT", "8080"))
+    TIMEOUT = float(os.getenv("TIMEOUT", "5"))
 
-    def fetch_active_sessions():
-        url = f"{HUB_URL}/graphql"
-        body = json.dumps({
-            "query": "{ grid { sessionCount } }"
-        }).encode("utf-8")
-        req = request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
-        with request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return int(data["data"]["grid"]["sessionCount"])
+    LAST_SCRAPE = {
+        "timestamp": 0.0,
+        "duration": 0.0,
+        "success": 0,
+        "error": ""
+    }
+
+    def fetch_status():
+        """Fetch grid status JSON from Selenium Hub."""
+        req = request.Request(HUB_STATUS_URL, headers={"Accept": "application/json"})
+        with request.urlopen(req, timeout=TIMEOUT) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        return payload["value"]
+
+    def fetch_queue_size():
+        """Fetch session queue size from Selenium Hub GraphQL endpoint."""
+        body = json.dumps({"query": "{ grid { sessionQueueSize sessionCount } }"}).encode("utf-8")
+        req = request.Request(
+            HUB_GRAPHQL_URL,
+            data=body,
+            headers={"Content-Type": "application/json"},
+        )
+        with request.urlopen(req, timeout=TIMEOUT) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        grid_data = payload.get("data", {}).get("grid", {})
+        return (
+            int(grid_data.get("sessionQueueSize", 0)),
+            int(grid_data.get("sessionCount", 0)),
+        )
+
+    def compute_metrics():
+        start = time.time()
+        data = fetch_status()
+        nodes = data.get("nodes", [])
+
+        queue_size, session_count = 0, 0
+        try:
+            queue_size, session_count = fetch_queue_size()
+        except Exception as exc:  # pylint: disable=broad-except
+            LAST_SCRAPE["error"] = f"queue_fetch_failed: {exc}"
+
+        total_nodes = len(nodes)
+        up_nodes = sum(1 for node in nodes if node.get("availability") == "UP")
+
+        browser_slots = Counter()
+        browser_busy = Counter()
+        node_slots = {}
+        node_busy = {}
+
+        for node in nodes:
+            node_id = node.get("id", "unknown")
+            slots = node.get("slots", [])
+            node_slots[node_id] = len(slots)
+            node_busy[node_id] = 0
+            for slot in slots:
+                stereotype = slot.get("stereotype", {})
+                browser = stereotype.get("browserName", "unknown")
+                browser_slots[browser] += 1
+                if slot.get("session"):
+                    browser_busy[browser] += 1
+                    node_busy[node_id] += 1
+
+        total_slots = sum(browser_slots.values())
+        busy_slots = sum(browser_busy.values())
+
+        LAST_SCRAPE.update(
+            timestamp=time.time(),
+            duration=time.time() - start,
+            success=1,
+            error="",
+        )
+
+        return {
+            "nodes": nodes,
+            "total_nodes": total_nodes,
+            "up_nodes": up_nodes,
+            "total_slots": total_slots,
+            "busy_slots": busy_slots,
+            "browser_slots": browser_slots,
+            "browser_busy": browser_busy,
+            "node_slots": node_slots,
+            "node_busy": node_busy,
+            "active_sessions": busy_slots,
+            "session_queue_size": queue_size,
+            "session_count": session_count,
+        }
+
+    def scrape_grid():
+        try:
+            return compute_metrics()
+        except Exception as exc:  # pylint: disable=broad-except
+            LAST_SCRAPE.update(
+                timestamp=time.time(),
+                duration=0.0,
+                success=0,
+                error=str(exc),
+            )
+            raise
+
+    def format_labels(label_map):
+        if not label_map:
+            return ""
+        parts = [f'{key}="{value}"' for key, value in sorted(label_map.items())]
+        return "{" + ",".join(parts) + "}"
+
+    def render_metrics(metrics):
+        lines = [
+            "# HELP selenium_grid_nodes_total Total number of registered Selenium Grid nodes.",
+            "# TYPE selenium_grid_nodes_total gauge",
+            f"selenium_grid_nodes_total {metrics['total_nodes']}",
+            "# HELP selenium_grid_nodes_up Number of nodes reporting availability=UP.",
+            "# TYPE selenium_grid_nodes_up gauge",
+            f"selenium_grid_nodes_up {metrics['up_nodes']}",
+            "# HELP selenium_grid_slots_total Total slots advertised by nodes.",
+            "# TYPE selenium_grid_slots_total gauge",
+            f"selenium_grid_slots_total {metrics['total_slots']}",
+            "# HELP selenium_grid_slots_busy Slots currently attached to active sessions.",
+            "# TYPE selenium_grid_slots_busy gauge",
+            f"selenium_grid_slots_busy {metrics['busy_slots']}",
+            "# HELP selenium_grid_sessions_active Active Selenium sessions across the grid.",
+            "# TYPE selenium_grid_sessions_active gauge",
+            f"selenium_grid_sessions_active {metrics['active_sessions']}",
+        ]
+
+        for browser, total in metrics["browser_slots"].items():
+            busy = metrics["browser_busy"].get(browser, 0)
+            labels = {"browser": browser}
+            lines.append("# HELP selenium_grid_browser_slots Allocated slots per browser.")
+            lines.append("# TYPE selenium_grid_browser_slots gauge")
+            lines.append(f"selenium_grid_browser_slots{format_labels(labels)} {total}")
+            lines.append("# HELP selenium_grid_browser_sessions Active sessions per browser.")
+            lines.append("# TYPE selenium_grid_browser_sessions gauge")
+            lines.append(f"selenium_grid_browser_sessions{format_labels(labels)} {busy}")
+
+        for node in metrics["nodes"]:
+            node_id = node.get("id", "unknown")
+            base_labels = {
+                "node_id": node_id,
+                "uri": node.get("uri", ""),
+                "availability": node.get("availability", "UNKNOWN"),
+            }
+            node_total = metrics["node_slots"].get(node_id, 0)
+            node_busy = metrics["node_busy"].get(node_id, 0)
+            lines.append("# HELP selenium_grid_node_slots Slots exposed by individual node.")
+            lines.append("# TYPE selenium_grid_node_slots gauge")
+            lines.append(f"selenium_grid_node_slots{format_labels(base_labels)} {node_total}")
+            lines.append("# HELP selenium_grid_node_sessions Active sessions on individual node.")
+            lines.append("# TYPE selenium_grid_node_sessions gauge")
+            lines.append(f"selenium_grid_node_sessions{format_labels(base_labels)} {node_busy}")
+
+        lines.extend([
+            "# HELP selenium_grid_scrape_success 1 if the most recent scrape succeeded.",
+            "# TYPE selenium_grid_scrape_success gauge",
+            f"selenium_grid_scrape_success {LAST_SCRAPE['success']}",
+            "# HELP selenium_session_queue_size Number of session requests currently queued.",
+            "# TYPE selenium_session_queue_size gauge",
+            f"selenium_session_queue_size {metrics['session_queue_size']}",
+            "# HELP selenium_grid_sessions_total Total sessions accepted by the grid.",
+            "# TYPE selenium_grid_sessions_total counter",
+            f"selenium_grid_sessions_total {metrics['session_count']}",
+            "# HELP selenium_grid_scrape_error_info Last scrape error message (1=present).",
+            "# TYPE selenium_grid_scrape_error_info gauge",
+            f"selenium_grid_scrape_error_info {1 if LAST_SCRAPE['error'] else 0}",
+            "# HELP selenium_grid_scrape_duration_seconds Time spent fetching Selenium status.",
+            "# TYPE selenium_grid_scrape_duration_seconds gauge",
+            f"selenium_grid_scrape_duration_seconds {LAST_SCRAPE['duration']}",
+            "# HELP selenium_grid_scrape_timestamp_seconds Unix timestamp of the last scrape attempt.",
+            "# TYPE selenium_grid_scrape_timestamp_seconds gauge",
+            f"selenium_grid_scrape_timestamp_seconds {LAST_SCRAPE['timestamp']}",
+        ])
+
+        return "\n".join(lines) + "\n"
 
     class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            if self.path.startswith("/value"):
+        def log_message(self, fmt, *args):  # pylint: disable=arguments-differ
+            return  # Silence default access logs
+
+        def do_GET(self):  # pylint: disable=invalid-name
+            if self.path.startswith("/metrics"):
                 try:
-                    active = fetch_active_sessions()
-                    desired = max(active + BUFFER, BUFFER)
+                    metrics = scrape_grid()
+                    body = render_metrics(metrics)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/plain; version=0.0.4")
+                    self.end_headers()
+                    self.wfile.write(body.encode("utf-8"))
+                except Exception as exc:  # pylint: disable=broad-except
+                    body = f"# scrape failed\nselenium_grid_scrape_success 0\n# {exc}\n"
+                    self.send_response(500)
+                    self.send_header("Content-Type", "text/plain; version=0.0.4")
+                    self.end_headers()
+                    self.wfile.write(body.encode("utf-8"))
+            elif self.path.startswith("/value"):
+                try:
+                    metrics = scrape_grid()
+                    desired = max(
+                        metrics["active_sessions"] + metrics["session_queue_size"] + BUFFER,
+                        BUFFER,
+                    )
                     payload = {"value": desired}
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
                     self.wfile.write(json.dumps(payload).encode("utf-8"))
-                except Exception as e:
+                except Exception as exc:  # pylint: disable=broad-except
                     self.send_response(500)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
-                    self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+                    self.wfile.write(json.dumps({"error": str(exc)}).encode("utf-8"))
             else:
                 self.send_response(404)
                 self.end_headers()
 
     if __name__ == "__main__":
-        port = int(os.getenv("PORT", "8080"))
-        server = HTTPServer(("0.0.0.0", port), Handler)
-        server.serve_forever()
-
-
+        httpd = HTTPServer(("0.0.0.0", PORT), Handler)
+        httpd.serve_forever()

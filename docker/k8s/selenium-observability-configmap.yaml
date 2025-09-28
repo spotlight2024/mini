@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: selenium-observability
+  namespace: selenium-grid
+  labels:
+    app: selenium-hub
+    component: observability
+    managed-by: manual
+  annotations:
+    description: Base logging and tracing configuration shared by Selenium Hub & Nodes
+    docs: https://www.selenium.dev/documentation/grid/advanced_features/
+data:
+  SE_LOG_LEVEL: INFO
+  SE_STRUCTURED_LOGS: "true"
+  SE_HTTP_LOGS: "true"
+  SE_ENABLE_TRACING: "true"
+  SE_OTEL_TRACES_EXPORTER: otlp
+  SE_OTEL_EXPORTER_ENDPOINT: http://otel-collector.monitoring.svc.cluster.local:4317
+  SE_OTEL_TRACES_SAMPLER: parentbased_always_on
+  SE_OTEL_TRACES_SAMPLER_ARG: "1.0"
+  SE_OTEL_JAVA_GLOBAL_AUTOCONFIGURE_ENABLED: "false"
