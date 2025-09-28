@@ -4,13 +4,12 @@ metadata:
   name: chrome-nas-storage
 provisioner: nas.csi.aliyun.com
 parameters:
-  server: "10127497f3-wws17.cn-beijing.nas.aliyuncs.com"
-  path: "/"
-  vers: "4.0"
-  options: "nolock,vers=4.0"
+  server: "01d50c71-ijxa.cn-beijing.extreme.nas.aliyuncs.com"
+  path: "/share"
+  vers: "3"
+  options: "vers=3,noacl,nolock,proto=tcp,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport"
 reclaimPolicy: Retain
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
-
 
 

@@ -12,12 +12,19 @@ spec:
   persistentVolumeReclaimPolicy: Retain
   storageClassName: chrome-nas-storage
   nfs:
-    server: 10127497f3-wws17.cn-beijing.nas.aliyuncs.com
-    path: /
+    server: 01d50c71-ijxa.cn-beijing.extreme.nas.aliyuncs.com
+    path: /share
     readOnly: false
   mountOptions:
+    - vers=3
+    - noacl
     - nolock
-    - vers=4.0
-
+    - proto=tcp
+    - rsize=1048576
+    - wsize=1048576
+    - hard
+    - timeo=600
+    - retrans=2
+    - noresvport
 
 

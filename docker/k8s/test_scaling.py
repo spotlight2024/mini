@@ -44,7 +44,7 @@ def create_session_concurrent(session_id, start_barrier, *, target_url=None, kee
     chrome_options.add_argument('--disable-gpu')
     
     # 用户特定的存储路径 - Chrome 会自动创建必要的子目录
-    chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
+    # chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
 
     chrome_options.add_experimental_option("useAutomationExtension", False)
     # 排除 enable-automation 这个 switch

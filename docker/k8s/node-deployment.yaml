@@ -68,17 +68,19 @@ spec:
           value: "600"
         - name: SE_SESSION_REQUEST_TIMEOUT
           value: "600"
+        - name: SE_NODE_HEARTBEAT_PERIOD
+          value: "15"
         - name: SE_ENABLE_PROMETHEUS_ENDPOINT
           value: "true"
         - name: SE_PROMETHEUS_PORT
           value: "5557"
         resources:
           requests:
-            cpu: "500m"         # 4C8G服务器，8个节点，每个节点100m CPU
-            memory: "500Mi"     # 每个节点500Mi内存
+            cpu: "50m"
+            memory: "500Mi"
           limits:
-            cpu: "1000m"        # 每个节点最大1000m CPU
-            memory: "1Gi"       # 每个节点最大2Gi内存
+            cpu: "200m"
+            memory: "600Mi"
         volumeMounts:
         - name: proxy-config
           mountPath: /shared/config
@@ -115,10 +117,10 @@ spec:
           runAsGroup: 0
         resources:
           requests:
-            cpu: "50m"
+            cpu: "25m"
             memory: "128Mi"
           limits:
-            cpu: "200m"
+            cpu: "100m"
             memory: "256Mi"
         volumeMounts:
         - name: proxy-config

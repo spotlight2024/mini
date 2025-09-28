@@ -53,6 +53,8 @@ spec:
           value: "true"
         - name: SE_PROMETHEUS_PORT
           value: "5557"
+        - name: SE_HEALTHCHECK_INTERVAL
+          value: "5"
         - name: SE_OPTS
           value: "--max-threads 200"
         resources:
