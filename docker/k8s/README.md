@@ -19,6 +19,7 @@
   - `maxReplicaCount = 100`：上限 100。
   - `pollingInterval = 2s`，`cooldownPeriod = 30s`：快速响应峰值，并在会话回落后 30 秒内收缩。
   - `SE_NODE_MAX_SESSIONS = 1`（如需每 Pod 多会话，注意同步调整指标计算公式）。
+  - `SE_HEALTHCHECK_INTERVAL = 5s`（Hub）+ `SE_NODE_HEARTBEAT_PERIOD = 15s`（Node）：新节点在 5 秒左右即可从 `DOWN` 切到 `UP`；心跳周期调低后 Hub 能更快剔除失联节点。
 
 ## 2. 先决条件
 - Kubernetes 1.20+ 集群，可使用 kind (`kind-config.yaml` 提供单节点配置)。
@@ -198,6 +199,72 @@ kubectl -n monitoring get secret monitoring-grafana -o jsonpath="{.data.admin-pa
   kubectl -n selenium-grid logs deploy/selenium-hub | jq .
   kubectl -n selenium-grid logs deploy/chrome-node | jq '.message'
   ```
+
+## 7. 自动扩缩容调优与排障
+
+> 这一节汇总了我们近期验证过的扩容/缩容策略、常见现象以及排查思路，方便在高压测试或生产环境中快速定位问题。
+
+### 7.1 当前扩缩容策略一览
+
+| 组件/参数 | 现有配置 | 说明 |
+|-----------|----------|------|
+| `grid-metrics-exporter` | `BUFFER=0`（`grid-metrics-exporter.yaml`） | `/value = active_sessions + queue_size`，不额外保留冗余节点；如需热备可改为 2/5，同时调低 `targetValue`。 |
+| KEDA `ScaledObject` | `targetValue=1`、`pollingInterval=2s`、`cooldownPeriod=30s`、`min=8`、`max=100` | 指标>1 时扩容，指标=0 时 30 秒后开始缩容；K8s HPA 还会应用默认的 5 分钟稳定窗口，实际完全缩回 8 需要 3~5 分钟。 |
+| Hub 健康检查 | `SE_HEALTHCHECK_INTERVAL=5s` | 新节点大约 5 秒即可从 `DOWN` 变为 `UP`。 |
+| Node 心跳 | `SE_NODE_HEARTBEAT_PERIOD=15s` | 探活更频繁，Hub 能更快剔除离线节点。 |
+
+### 7.2 常用命令
+
+```bash
+# 1) 查看当前期望副本 & HPA 状态
+kubectl -n selenium-grid describe hpa keda-hpa-chrome-node-autoscale-metrics
+
+# 2) 查看 KEDA ScaledObject 是否处于 Active/Ready
+kubectl -n selenium-grid get scaledobject chrome-node-autoscale-metrics -o yaml
+
+# 3) 直接查询扩容指标
+kubectl -n selenium-grid exec deploy/grid-metrics-exporter -- curl -s http://localhost:8080/value
+
+# 4) 统计 Running / Pending Pod 数
+kubectl -n selenium-grid get pods -l app=chrome-node --no-headers | awk '{print $3}' | sort | uniq -c
+
+# 5) 若有 Pending，查看调度失败原因
+kubectl -n selenium-grid describe pod <pending-pod-name>
+
+# 6) 查看 Hub `/status` 概览
+curl -s http://<hub-node-ip>:30444/status | jq '{total: (.value.nodes | length), up: (.value.nodes | map(select(.availability=="UP")) | length)}'
+```
+
+### 7.3 常见问题 & 解决方案
+
+| 现象 | 可能原因 | 处理建议 |
+|------|----------|----------|
+| `/value` 长期大于 0，但副本数没有增加 | 1) `grid-metrics-exporter` 异常；2) KEDA 未就绪；3) 集群资源不足（Pod Pending） | 1) `kubectl logs deploy/grid-metrics-exporter`；2) `kubectl get scaledobject` 看 `Ready/Active`；3) `kubectl describe pod` 检查是否 `Insufficient memory/CPU`，必要时扩容节点或调低 `requests`。 |
+| `kubectl get pods` 显示大量 `Pending` | 资源不足（最常见）或 PVC/网络异常 | 查看 `Events` 是否为 `Insufficient memory/cpu`；确认 NAS 绑定成功；对 kind 单节点集群建议把 `maxReplicaCount` 设置为机器可承受的上限。 |
+| 扩容后 Hub `/status` 仍显示 `DOWN` | 健康检查间隔未到 | 目前已将 `SE_HEALTHCHECK_INTERVAL` 降到 5 秒，默认 120 秒；如仍未变 `UP`，检查 Node 日志确认 `/status` 是否能被访问。 |
+| 缩容看起来很慢 | HPA 有 30s cooldown + 5 分钟稳定窗口 + Node 优雅退出 | 正常情况 3~5 分钟内会缩回 `minReplicaCount`。可通过 `kubectl describe hpa` 查看 `desiredReplicas` 是否在下降，或者修改 `ScaledObject` 的 `cooldownPeriod` / HPA 行为让缩容更激进。 |
+| 扩缩容完全无效 | 1) `/value` 一直是 0（未触发）；2) `ScaledObject`/KEDA 服务未运行；3) KEDA 镜像未拉取 | 参见上面的排查命令，必要时重新执行 `install-keda.sh` 并确保镜像已 `kind load`。 |
+
+### 7.4 调优建议
+
+- **预留冗余节点**：若业务希望提前准备 2~3 个空闲会话，可把 `BUFFER` 改为 2 并保持 `targetValue=1`，或增大 `minReplicaCount`。注意同时评估可用资源。
+- **限制最大副本**：在单节点 kind 环境内存只有 ~32Gi 时，建议把 `maxReplicaCount` 改成 40 左右，避免因大量 Pending Pod 影响观察。
+- **调整缩容行为**：KEDA 2.11+ 支持在 `ScaledObject` 中添加 `advanced.horizontalPodAutoscalerConfig.behavior` 自定义 HPA 行为，例如：
+  ```yaml
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 60
+          policies:
+          - type: Percent
+            value: 50
+            periodSeconds: 30
+  ```
+  这可以显著缩短缩容延迟，但要注意避免频繁抖动。
+- **监控指标**：在 Grafana 的 *Selenium Grid Overview* 看板中增加 `selenium_grid_nodes_up`、`selenium_session_queue_size`、`hpa_status_current_replicas` 等面板，实时观测扩缩容效果。
+
+将以上排障步骤与监控配合使用，可以让扩缩容过程透明可控，出现异常时也能快速定位问题。
   可在 ConfigMap 中调整 `SE_LOG_LEVEL`、`SE_STRUCTURED_LOGS`/`SE_HTTP_LOGS` 等参数并重新部署。
 
 - **Tracing 管道**：`otel-collector.yaml` 在 `monitoring` 命名空间部署 OpenTelemetry Collector，接收 Hub/Node 发送的 OTLP spans。
