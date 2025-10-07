@@ -138,6 +138,18 @@ if ${LOAD_IMAGES}; then
         "ghcr.io/kedacore/keda:2.17.2"
         "ghcr.io/kedacore/keda-admission-webhooks:2.17.2"
         "ghcr.io/kedacore/keda-metrics-apiserver:2.17.2"
+        "grafana/grafana:12.1.1"
+        "jaegertracing/all-in-one:1.57"
+        "otel/opentelemetry-collector:0.96.0"
+        "registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.6.2"
+        "docker.io/bats/bats:v1.4.1"
+        "quay.io/kiwigrid/k8s-sidecar:1.30.10"
+        "quay.io/prometheus/node-exporter:v1.9.1"
+        "quay.io/prometheus/alertmanager:v0.28.1"
+        "quay.io/prometheus/prometheus:v3.6.0"
+        "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.17.0"
+        "quay.io/prometheus-operator/prometheus-config-reloader:v0.85.0"
+        "quay.io/prometheus-operator/admission-webhook:v0.85.0"
     )
 
     load_image() {
