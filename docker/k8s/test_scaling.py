@@ -39,12 +39,12 @@ def create_session_concurrent(session_id, start_barrier, *, target_url=None, kee
     # 配置 Chrome 选项
     chrome_options = Options()
     chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--headless')
+    # chrome_options.add_argument('--headless')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-gpu')
     
     # 用户特定的存储路径 - Chrome 会自动创建必要的子目录
-    # chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
+    chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
 
     chrome_options.add_experimental_option("useAutomationExtension", False)
     # 排除 enable-automation 这个 switch
@@ -70,7 +70,7 @@ def create_session_concurrent(session_id, start_barrier, *, target_url=None, kee
         
         # 连接到 Selenium Grid（使用 localhost）
         driver = webdriver.Remote(
-            command_executor='http://172.16.1.129:30444/wd/hub',
+            command_executor='http://172.16.5.193:30444/wd/hub',
             options=chrome_options
         )
 
@@ -92,8 +92,9 @@ def create_session_concurrent(session_id, start_barrier, *, target_url=None, kee
             log_with_timestamp(f"⏳ 会话 {session_id}: 保持活跃 {keep_alive} 秒...")
             time.sleep(keep_alive)
         
-        # driver.get("https://www.jd.com/")
+        driver.get("https://www.doubao.com/chat")
 
+        log_with_timestamp(f"📄 会话 {session_id}: 页面标题: {driver.title}")
         # time.sleep(600)
         # 关闭会话
         driver.quit()
