@@ -48,6 +48,8 @@ spec:
           value: "1"
         - name: SE_NODE_OVERRIDE_MAX_SESSIONS
           value: "true"
+        - name: SE_NODE_DELETE_SESSION_ON_UI
+          value: "true"
         - name: SE_VNC_NO_PASSWORD
           value: "true"
         - name: SE_NOVNC_NO_PASSWORD

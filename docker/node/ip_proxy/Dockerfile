@@ -1,5 +1,5 @@
 # Chrome节点镜像 - 保留业务逻辑，代理由sidecar处理
-FROM selenium/node-chrome:138.0.7204.157-chromedriver-138.0.7204.157-grid-4.34.0-20250717
+FROM selenium/node-chrome:138.0.7204.183-chromedriver-138.0.7204.183-grid-4.38.0-20251101
 
 USER root
 

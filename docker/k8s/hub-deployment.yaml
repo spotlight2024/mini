@@ -22,7 +22,7 @@ spec:
       #   kubernetes.io/hostname: selenium-cluster-control-plane
       containers:
       - name: selenium-hub
-        image: selenium/hub:latest
+        image: selenium/hub:4.38.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 4444
@@ -47,8 +47,6 @@ spec:
           value: "300"
         - name: SE_NEW_SESSION_THREAD_POOL_SIZE
           value: "200"
-        - name: SE_NODE_DELETE_SESSION_ON_UI
-          value: "true"
         - name: SE_ENABLE_PROMETHEUS_ENDPOINT
           value: "true"
         - name: SE_PROMETHEUS_PORT
