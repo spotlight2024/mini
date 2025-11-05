@@ -11,7 +11,9 @@ metadata:
     description: Base logging and tracing configuration shared by Selenium Hub & Nodes
     docs: https://www.selenium.dev/documentation/grid/advanced_features/
 data:
-  SE_LOG_LEVEL: INFO
+  SE_LOG_LEVEL: FINE
+  SE_NODE_LOG_LEVEL: FINE
+  SE_DISTRIBUTOR_LOG_LEVEL: FINE
   SE_STRUCTURED_LOGS: "true"
   SE_HTTP_LOGS: "true"
   SE_ENABLE_TRACING: "true"
