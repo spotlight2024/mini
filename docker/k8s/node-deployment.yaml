@@ -78,11 +78,11 @@ spec:
           value: "5557"
         resources:
           requests:
-            cpu: "50m"
-            memory: "500Mi"
+            cpu: "500m"
+            memory: "1Gi"
           limits:
-            cpu: "200m"
-            memory: "600Mi"
+            cpu: "2000m"
+            memory: "2Gi"
         volumeMounts:
         - name: proxy-config
           mountPath: /shared/config
