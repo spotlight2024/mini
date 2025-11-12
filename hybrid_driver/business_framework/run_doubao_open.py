@@ -5,6 +5,8 @@
 import os
 import sys
 
+from loguru import logger
+
 
 def _prepare_sys_path():
     """确保可以直接运行脚本"""
@@ -38,7 +40,8 @@ def main():
         else:
             print("❌ 打开豆包首页失败")
     finally:
-        doubao_business.cleanup()
+        print("finish")
+        # doubao_business.cleanup()
 
 
 if __name__ == "__main__":

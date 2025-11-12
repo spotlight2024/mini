@@ -45,7 +45,6 @@ class DoubaoBusiness(BaseBusiness):
         try:
             self.home_page.navigate_to().wait_until_loaded()
             self.page_manager.register_main_page("doubao_home")
-            sleep(120)
             self.logger.info("豆包首页打开完成")
             return True
         except Exception as exc:

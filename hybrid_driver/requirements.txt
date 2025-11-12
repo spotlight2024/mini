@@ -1,6 +1,7 @@
 fastapi>=0.100.0
 uvicorn>=0.23.0
 selenium==4.33.0
+playwright==1.44.1
 pydantic>=2.0.0,<3.0.0
 webdriver-manager==4.0.2
 adbutils~=2.9.2

@@ -29,6 +29,7 @@ class WebDriverManager:
         self.chrome_options = None  # 存储chrome选项，可被外部修改
         self.logger = get_logger(f"WebDriverManager-{user_id}-{session_id}")
         self._sanitized_user_id = self._sanitize_identifier(user_id)
+        self._cdp_endpoint: Optional[str] = None
 
     def _sanitize_identifier(self, value: str) -> str:
         """确保ID可安全用于文件路径或日志"""
@@ -65,6 +66,14 @@ class WebDriverManager:
             self.chrome_options.to_capabilities(), ensure_ascii=False, indent=2
         )
         self.logger.info("gongcong111 stealthenium: {}", capabilities_json)
+
+        try:
+            caps = getattr(self.driver, "capabilities", {}) or {}
+            self._cdp_endpoint = caps.get("se:cdp")
+            if self._cdp_endpoint:
+                self.logger.info("Captured CDP endpoint: %s", self._cdp_endpoint)
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning("Unable to read CDP endpoint: %s", exc)
 
         stealth(
             self.driver,
@@ -143,3 +152,7 @@ class WebDriverManager:
             self.logger.info("关闭WebDriver")
             self.driver.quit()
             self.driver = None
+
+    def get_cdp_endpoint(self) -> Optional[str]:
+        """返回 Selenium 会话暴露的 CDP endpoint（若 Selenium Grid 支持）"""
+        return self._cdp_endpoint
