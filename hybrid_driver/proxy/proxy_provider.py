@@ -56,7 +56,7 @@ class ProxyProvider(ABC):
 class TianQiProxyProvider(ProxyProvider):
     """天启代理提供者"""
 
-    def __init__(self, secret: str = "c9kekh2mxxnqoopd", sign: str = "698f352df781e920dbbd40ebb7a54e53"):
+    def __init__(self, secret: str = "h29tx6vo", sign: str = "4196d6a8b05d2ff0313694831504c3f6"):
         self.secret = secret
         self.sign = sign
         self.base_url = "http://api.tianqiip.com/getip"
@@ -124,8 +124,8 @@ class TianQiProxyProvider(ProxyProvider):
                     return ProxyConfig(
                         ip=ip,
                         port=port,  # 保持数字类型，ProxyConfig会转换为字符串
-                        username="vgmpgv",  # 固定用户名
-                        password="1bk79g9y",  # 固定密码
+                        username="s9pi1p",  # 固定用户名
+                        password="qsavo2qn",  # 固定密码
                         provider=self.provider_name,
                         region=f"{prov}-{city}" if prov and city else prov or city,
                         expire=expire
@@ -386,7 +386,7 @@ class CustomProxyProvider(ProxyProvider):
         """从自定义接口获取代理配置"""
         try:
             return ProxyConfig(
-                ip="192.168.1.42",
+                ip="192.168.1.38",
                 port="7897",
                 username="",
                 password="",

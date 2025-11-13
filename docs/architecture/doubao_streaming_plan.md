@@ -42,6 +42,7 @@
   - MCP 工具 `doubao.search`：接受 `searchContent`，流式输出，最终返回 `CallToolResult`。
   - REST Endpoints（可选）：`POST /api/search`（阻塞式），`GET /api/search/stream`（SSE）。
 - **应用层**：FastAPI 负责挂载 MCP、暴露健康检查、预留鉴权扩展点。
+- **执行引擎选择**：通过 `engine` 参数或环境变量 `DOUBAO_DEFAULT_ENGINE` 切换 Playwright/Selenium，二者实现统一接口可互换。
 
 ## 模块拆分与职责
 - `hybrid_driver/services/doubao_stream_service.py`

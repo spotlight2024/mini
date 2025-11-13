@@ -1,7 +1,6 @@
 """
 豆包业务类 - 实现打开豆包页面的基础流程
 """
-from time import sleep
 from typing import Optional, Dict, Any
 
 from hybrid_driver.business_framework.business.base_business import BaseBusiness
@@ -22,6 +21,19 @@ class DoubaoBusiness(BaseBusiness):
             "webdriver_mode": "remote",
             "browser_version": "138",
             "platform_name": "linux",
+            "human_actions": {
+                "enabled": True,
+                "min_steps": 12,
+                "max_steps": 28,
+                "min_step_duration_ms": 14,
+                "max_step_duration_ms": 38,
+                "min_pause": 0.02,
+                "max_pause": 0.09,
+                "path_jitter": 0.8,
+                "target_jitter": 3.0,
+                "overshoot_chance": 0.25,
+                "overshoot_range": (1.5, 4.2),
+            },
         }
         if site_overrides:
             site_config.update(site_overrides)

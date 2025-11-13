@@ -40,8 +40,8 @@ def main():
         else:
             print("❌ 打开豆包首页失败")
     finally:
-        print("finish")
-        # doubao_business.cleanup()
+        # print("finish")
+        doubao_business.cleanup()
 
 
 if __name__ == "__main__":

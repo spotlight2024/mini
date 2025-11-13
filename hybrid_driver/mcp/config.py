@@ -5,35 +5,62 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
+
+from dotenv import dotenv_values
 
 
 class ConfigError(RuntimeError):
     """环境变量配置异常。"""
 
 
+_ENV_CACHE: Dict[str, str] | None = None
+
+
+def _load_env_values() -> Dict[str, str]:
+    global _ENV_CACHE
+    if _ENV_CACHE is not None:
+        return _ENV_CACHE
+
+    project_root = Path(__file__).resolve().parents[2]
+    env_file = project_root / ".env"
+    values: Dict[str, str] = {}
+    if env_file.exists():
+        raw_values = dotenv_values(str(env_file))
+        values = {key: value for key, value in raw_values.items() if isinstance(key, str) and isinstance(value, str)}
+    _ENV_CACHE = values
+    return _ENV_CACHE
+
+
+def _env_get(name: str, default: Optional[str] = None) -> Optional[str]:
+    values = _load_env_values()
+    if name in values:
+        return values[name]
+    return default
+
+
 def _bool_env(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
+    raw = _env_get(name)
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _float_env(name: str, default: float) -> float:
-    raw = os.getenv(name)
+    raw = _env_get(name)
     if raw is None:
         return default
     try:
         return float(raw)
     except ValueError as exc:  # noqa: B904
-        raise ConfigError(f"环境变量 {name} 必须是浮点数") from exc
+        raise ConfigError(f".env 配置 {name} 必须是浮点数") from exc
 
 
 def _int_env(name: str, default: Optional[int]) -> Optional[int]:
-    raw = os.getenv(name)
+    raw = _env_get(name)
     if raw is None:
         return default
     if not raw.strip():
@@ -41,11 +68,11 @@ def _int_env(name: str, default: Optional[int]) -> Optional[int]:
     try:
         return int(raw)
     except ValueError as exc:  # noqa: B904
-        raise ConfigError(f"环境变量 {name} 必须是整数") from exc
+        raise ConfigError(f".env 配置 {name} 必须是整数") from exc
 
 
 def _list_env(name: str, default: List[str]) -> List[str]:
-    raw = os.getenv(name)
+    raw = _env_get(name)
     if raw is None:
         return default
     parts = [item.strip() for item in raw.split(",")]
@@ -63,6 +90,9 @@ _DEFAULT_CHROME_ARGS = [
     "--disable-dev-shm-usage",
     "--enable-automation",
 ]
+_DEFAULT_MAX_CONCURRENT_SESSIONS = 2
+_DEFAULT_ENGINE = "selenium"
+_SUPPORTED_ENGINES = {"playwright", "selenium"}
 
 
 @dataclass(slots=True)
@@ -85,26 +115,48 @@ class DoubaoMCPConfig:
     cdp_port_override: int | None = None
     cdp_connect_timeout: float = 5.0
     sse_endpoint: str = _DEFAULT_SSE_ENDPOINT
+    max_concurrent_sessions: int = _DEFAULT_MAX_CONCURRENT_SESSIONS
+    proxy_provider: str | None = None
+    default_engine: str = _DEFAULT_ENGINE
 
     @classmethod
     def from_env(cls) -> "DoubaoMCPConfig":
-        remote_url = os.getenv("HYBRID_DRIVER_REMOTE_URL", _DEFAULT_REMOTE_URL)
-        base_url = os.getenv("DOUBAO_BASE_URL", _DEFAULT_BASE_URL)
-        input_selector = os.getenv("DOUBAO_INPUT_SELECTOR", _DEFAULT_INPUT_SELECTOR)
-        container_selector = os.getenv("DOUBAO_CONTAINER_SELECTOR", _DEFAULT_CONTAINER_SELECTOR)
+        remote_url = _env_get("HYBRID_DRIVER_REMOTE_URL", _DEFAULT_REMOTE_URL)
+        base_url = _env_get("DOUBAO_BASE_URL", _DEFAULT_BASE_URL)
+        input_selector = _env_get("DOUBAO_INPUT_SELECTOR", _DEFAULT_INPUT_SELECTOR)
+        container_selector = _env_get("DOUBAO_CONTAINER_SELECTOR", _DEFAULT_CONTAINER_SELECTOR)
         navigation_timeout = _float_env("DOUBAO_NAVIGATION_TIMEOUT", 30.0)
         response_timeout = _float_env("DOUBAO_RESPONSE_TIMEOUT", 45.0)
         poll_interval = _float_env("DOUBAO_POLL_INTERVAL", 0.4)
         chrome_arguments = _list_env("HYBRID_DRIVER_CHROME_ARGS", list(_DEFAULT_CHROME_ARGS))
         accept_insecure_certs = _bool_env("HYBRID_DRIVER_ACCEPT_INSECURE_CERTS", False)
         reuse_session = _bool_env("DOUBAO_REUSE_SESSION", False)
-        cdp_endpoint = os.getenv("DOUBAO_CDP_ENDPOINT")
-        cdp_host_override = os.getenv("DOUBAO_CDP_HOST_OVERRIDE")
+        cdp_endpoint = _env_get("DOUBAO_CDP_ENDPOINT")
+        cdp_host_override = _env_get("DOUBAO_CDP_HOST_OVERRIDE")
         cdp_port_override = _int_env("DOUBAO_CDP_PORT_OVERRIDE", None)
         cdp_connect_timeout = _float_env("DOUBAO_CDP_CONNECT_TIMEOUT", 5.0)
-        sse_endpoint = os.getenv("DOUBAO_SSE_ENDPOINT", _DEFAULT_SSE_ENDPOINT)
+        sse_endpoint = _env_get("DOUBAO_SSE_ENDPOINT", _DEFAULT_SSE_ENDPOINT)
+        max_concurrent_sessions = _int_env(
+            "DOUBAO_MAX_CONCURRENT_SESSIONS",
+            _DEFAULT_MAX_CONCURRENT_SESSIONS,
+        )
+        if max_concurrent_sessions is None:
+            max_concurrent_sessions = _DEFAULT_MAX_CONCURRENT_SESSIONS
+        if max_concurrent_sessions < 1:
+            raise ConfigError("DOUBAO_MAX_CONCURRENT_SESSIONS 必须大于等于 1")
 
-        capabilities_raw = os.getenv("HYBRID_DRIVER_REMOTE_CAPABILITIES")
+        proxy_provider_raw = _env_get("DOUBAO_PROXY_PROVIDER")
+        if proxy_provider_raw:
+            proxy_provider = proxy_provider_raw.strip().lower() or None
+        else:
+            proxy_provider = None
+
+        default_engine_raw = _env_get("DOUBAO_DEFAULT_ENGINE", _DEFAULT_ENGINE)
+        default_engine = (default_engine_raw or _DEFAULT_ENGINE).strip().lower()
+        if default_engine not in _SUPPORTED_ENGINES:
+            raise ConfigError(f"DOUBAO_DEFAULT_ENGINE 必须是 {_SUPPORTED_ENGINES}")
+
+        capabilities_raw = _env_get("HYBRID_DRIVER_REMOTE_CAPABILITIES")
         remote_capabilities: Dict[str, object] = {}
         if capabilities_raw:
             try:
@@ -129,6 +181,9 @@ class DoubaoMCPConfig:
             cdp_port_override=cdp_port_override,
             cdp_connect_timeout=cdp_connect_timeout,
             sse_endpoint=sse_endpoint,
+            max_concurrent_sessions=max_concurrent_sessions,
+            proxy_provider=proxy_provider,
+            default_engine=default_engine,
         )
 
     def to_dict(self) -> Dict[str, object]:
@@ -149,6 +204,9 @@ class DoubaoMCPConfig:
             "cdp_port_override": self.cdp_port_override,
             "cdp_connect_timeout": self.cdp_connect_timeout,
             "sse_endpoint": self.sse_endpoint,
+            "max_concurrent_sessions": self.max_concurrent_sessions,
+            "proxy_provider": self.proxy_provider,
+            "default_engine": self.default_engine,
         }
 
     def apply_cdp_override(self, endpoint: Optional[str]) -> Optional[str]:

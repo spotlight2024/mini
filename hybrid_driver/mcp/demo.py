@@ -17,7 +17,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = DoubaoMCPConfig.from_env()
-    automation = DoubaoPlaywrightAutomation(config)
+        automation = DoubaoPlaywrightAutomation(config)
     try:
         result = automation.search(args.query)
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))

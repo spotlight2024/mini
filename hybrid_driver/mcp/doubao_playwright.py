@@ -86,6 +86,10 @@ class PlaywrightResponse:
     streaming: bool = False
 
 
+class AutomationCancelled(Exception):
+    """Raised when upstream requests cancellation of the automation run."""
+
+
 class DoubaoPlaywrightAutomation:
     """Uses Playwright (connected via CDP or local launch) to automate Doubao."""
 
@@ -100,6 +104,7 @@ class DoubaoPlaywrightAutomation:
         self._chunk_listeners: list[Callable[[DoubaoChunk], None]] = []
         self._stream_sequence = 0
         self._last_full_text = ""
+        self._should_cancel: Callable[[], bool] = lambda: False
 
     # ------------------------------------------------------------------
     # context manager helpers
@@ -123,9 +128,18 @@ class DoubaoPlaywrightAutomation:
 
         self._chunk_listeners.append(listener)
 
+    def set_cancel_checker(self, checker: Callable[[], bool]) -> None:
+        """Install a callable that returns True when the automation should cancel."""
+
+        self._should_cancel = checker
+
     def _reset_stream_state(self) -> None:
         self._stream_sequence = 0
         self._last_full_text = ""
+
+    def _check_cancelled(self) -> None:
+        if self._should_cancel():
+            raise AutomationCancelled("automation cancelled by upstream request")
 
     def _emit_chunk(
         self,
@@ -179,6 +193,7 @@ class DoubaoPlaywrightAutomation:
         )
 
     def _ensure_page(self) -> None:
+        self._check_cancelled()
         if self._page:
             return
         self._pw = sync_playwright().start()
@@ -196,6 +211,7 @@ class DoubaoPlaywrightAutomation:
                     self._config.cdp_endpoint,
                     endpoint,
                 )
+            self._check_cancelled()
             timeout_ms = max(int(self._config.cdp_connect_timeout * 1000), 1000)
             LOGGER.info(
                 "Connecting Playwright over CDP: {} (timeout={}ms)",
@@ -223,14 +239,16 @@ class DoubaoPlaywrightAutomation:
     def _navigate(self) -> None:
         assert self._page
         stealth_sync(self._page)
-        LOGGER.info("Navigating to Doubao: %s", self._config.base_url)
+        LOGGER.info("Navigating to Doubao: {}", self._config.base_url)
+        self._check_cancelled()
         self._page.goto(self._config.base_url, wait_until="domcontentloaded", timeout=self._config.navigation_timeout * 1000)
         self._page.wait_for_timeout(500)
 
     def _input_query(self, query: str) -> None:
         assert self._page
-        LOGGER.info("Filling query length=%d", len(query))
+        LOGGER.info("Filling query = {}", query)
         locator = self._page.locator(self._config.input_selector)
+        self._check_cancelled()
         locator.wait_for(state="visible", timeout=self._config.navigation_timeout * 1000)
         locator.click()
         locator.fill(query)
@@ -248,7 +266,9 @@ class DoubaoPlaywrightAutomation:
                 "(selector) => { const btn = document.querySelector(selector); btn && btn.click(); }",
                 send_button_selector,
             )
-            return 
+            return
+        self._check_cancelled()
+        time.sleep(1.2)
         send_button.click()
 
     def _wait_for_answer(self) -> PlaywrightResponse:
@@ -257,6 +277,7 @@ class DoubaoPlaywrightAutomation:
         dom_last_cleaned = ""
         dom_stable_runs = 0
         while time.time() < timeout_at:
+            self._check_cancelled()
             dom_snapshot = self._read_answer_from_dom()
             if dom_snapshot:
                 current_text = dom_snapshot.text or ""
@@ -268,7 +289,7 @@ class DoubaoPlaywrightAutomation:
                             preview = chunk.replace("\n", " ").strip()
                             if len(preview) > 120:
                                 preview = f"{preview[:120]}..."
-                            LOGGER.debug("DOM chunk += len=%d preview=%s", len(chunk), preview)
+                            LOGGER.debug("DOM chunk += len={} preview={}", len(chunk), preview)
                     elif had_deletion:
                         LOGGER.debug("DOM 文本发生删除或重排，等待后续片段")
                     else:
@@ -290,11 +311,18 @@ class DoubaoPlaywrightAutomation:
 
     def search(self, query: str) -> DoubaoResult:
         self._reset_stream_state()
+        self._check_cancelled()
         self._ensure_page()
+        self._check_cancelled()
         self._navigate()
+        time.sleep(120)
+        self._check_cancelled()
         self._input_query(query)
+        self._check_cancelled()
         try:
             response = self._wait_for_answer()
+        except AutomationCancelled:
+            raise
         except Exception as exc:
             self._emit_error(str(exc))
             raise
@@ -359,7 +387,8 @@ class DoubaoPlaywrightAutomation:
         if not url.startswith(_COMPLETION_URL_PREFIX):
             return
         post_data = request.post_data or ""
-        LOGGER.info(f"gongcong :  ${post_data}")
+        if isinstance(post_data, str):
+            LOGGER.debug("捕获 Doubao completion 请求体，length={}", len(post_data))
         message_id = None
         local_message_id = None
         conversation_id = None
@@ -387,8 +416,8 @@ class DoubaoPlaywrightAutomation:
             return
         try:
             body_bytes = response.body()
-        except PlaywrightError as e:
-            LOGGER.warning("读取 Doubao completion 响应失败: url={}", e)
+        except PlaywrightError as exc:
+            LOGGER.warning("读取 Doubao completion 响应失败: url={} error={}", url, exc)
             return
         body_text = body_bytes.decode("utf-8", errors="ignore")
         preview = body_text.replace("\n", " ")[:200]
@@ -403,6 +432,7 @@ class DoubaoPlaywrightAutomation:
     def _read_answer_from_dom(self) -> Optional[PlaywrightResponse]:
         if not self._page:
             return None
+        self._check_cancelled()
         script = """
             (staticTokens) => {
                 const trim = (text) => (text || '').replace(/\u200b/g, '').trim();
@@ -427,6 +457,7 @@ class DoubaoPlaywrightAutomation:
             result = self._page.evaluate(script, list(_STATIC_TOKENS))
         except PlaywrightError:
             return None
+        self._check_cancelled()
         if not result:
             return None
         text = result.get('text', '')

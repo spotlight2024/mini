@@ -5,17 +5,25 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+import uuid
 from collections.abc import AsyncIterator
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Optional
 
 from hybrid_driver.business_framework.business.doubao_business import DoubaoBusiness
 from hybrid_driver.log_config import get_logger
 from hybrid_driver.mcp.config import DoubaoMCPConfig
-from hybrid_driver.mcp.doubao_playwright import DoubaoPlaywrightAutomation, DoubaoResult
+from hybrid_driver.mcp.doubao_playwright import AutomationCancelled, DoubaoPlaywrightAutomation, DoubaoResult
+from hybrid_driver.proxy.proxy_provider import get_proxy_config_for_selenium
 from hybrid_driver.services.doubao_types import DoubaoChunk
 
 LOGGER = get_logger(__name__)
+
+
+@dataclass
+class _BridgeSession:
+    business: DoubaoBusiness
+    cdp_endpoint: str
 
 
 class DoubaoBridgeService:
@@ -23,8 +31,6 @@ class DoubaoBridgeService:
 
     def __init__(self, config: DoubaoMCPConfig) -> None:
         self._config = config
-        self._business: Optional[DoubaoBusiness] = None
-        self._lock = threading.RLock()
 
     # ------------------------------------------------------------------
     # public api
@@ -47,11 +53,9 @@ class DoubaoBridgeService:
         try:
             return loop.run_until_complete(asyncio.wait_for(_collect(), self._config.response_timeout))
         except asyncio.TimeoutError as exc:
-            self._handle_timeout(exc)
             raise TimeoutError("豆包查询超时") from exc
         finally:
             loop.close()
-            self._release_business()
 
     async def stream_execute(self, query: str) -> AsyncIterator[DoubaoChunk]:
         """异步流式执行查询，逐个返回 DoubaoChunk。"""
@@ -59,22 +63,31 @@ class DoubaoBridgeService:
         if not query or not query.strip():
             raise ValueError("query 不能为空")
 
-        pw_config, cdp_endpoint = self._prepare_playwright_config()
+        session: _BridgeSession | None = None
+        try:
+            session = await asyncio.to_thread(self._create_session)
+        except Exception:
+            LOGGER.exception("[Bridge] 创建 DoubaoBusiness 失败")
+            raise
+
+        pw_config = replace(self._config, cdp_endpoint=session.cdp_endpoint)
         LOGGER.info(
-            "[Bridge] 流式执行豆包查询，query_len=%d endpoint=%s",
+            "[Bridge] 流式执行豆包查询，query_len={} endpoint={}",
             len(query),
-            cdp_endpoint,
+            session.cdp_endpoint,
         )
 
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[Optional[DoubaoChunk]] = asyncio.Queue()
         timeout = self._config.response_timeout
-        automation_holder: dict[str, Optional[DoubaoPlaywrightAutomation]] = {"automation": None}
+        cancel_event = threading.Event()
         cancelled = False
 
         def listener(chunk: DoubaoChunk) -> None:
+            if cancel_event.is_set():
+                return
             LOGGER.debug(
-                "[Bridge] <- chunk seq=%s source=%s len=%d final=%s",
+                "[Bridge] <- chunk seq={} source={} len={} final={}",
                 chunk.sequence,
                 chunk.source,
                 len(chunk.delta),
@@ -86,10 +99,12 @@ class DoubaoBridgeService:
             LOGGER.debug("[Bridge] worker thread started")
             try:
                 with DoubaoPlaywrightAutomation(pw_config) as automation:
-                    automation_holder["automation"] = automation
                     automation.add_chunk_listener(listener)
+                    automation.set_cancel_checker(cancel_event.is_set)
                     result = automation.search(query)
-                LOGGER.info("[Bridge] Playwright 流式查询完成，answer_len=%d", len(result.answer_text or ""))
+                LOGGER.info("[Bridge] Playwright 流式查询完成，answer_len={}", len(result.answer_text or ""))
+            except AutomationCancelled:
+                LOGGER.info("[Bridge] Playwright 查询被上游取消")
             except Exception as exc:  # noqa: BLE001
                 LOGGER.exception("[Bridge] Playwright 流式查询失败")
                 error_chunk = DoubaoChunk(
@@ -103,7 +118,6 @@ class DoubaoBridgeService:
                 )
                 loop.call_soon_threadsafe(queue.put_nowait, error_chunk)
             finally:
-                automation_holder["automation"] = None
                 loop.call_soon_threadsafe(queue.put_nowait, None)
                 LOGGER.debug("[Bridge] worker thread finished")
 
@@ -129,32 +143,23 @@ class DoubaoBridgeService:
         except asyncio.CancelledError:
             cancelled = True
             LOGGER.warning("[Bridge] 上游取消流式查询，开始清理资源")
-            automation = automation_holder.get("automation")
-            if automation is not None:
-                automation.shutdown()
+            cancel_event.set()
             raise
         except asyncio.TimeoutError as exc:
-            self._handle_timeout(exc)
-            automation = automation_holder.get("automation")
-            if automation is not None:
-                automation.shutdown()
+            cancel_event.set()
             raise TimeoutError("豆包查询超时") from exc
         finally:
+            cancel_event.set()
             worker_thread.join(timeout=1)
             if worker_thread.is_alive():
                 LOGGER.warning("[Bridge] worker thread 未在预期时间内结束")
-            self._release_business()
+            await asyncio.to_thread(self._cleanup_session, session)
             if cancelled:
                 LOGGER.debug("[Bridge] 流式查询已取消，资源释放完毕")
 
     def shutdown(self) -> None:
-        with self._lock:
-            if not self._business:
-                return
-            try:
-                self._business.cleanup()
-            finally:
-                self._business = None
+        """当前为按请求创建会话，暂无全局资源可释放。"""
+        return
 
     # ------------------------------------------------------------------
     # internal helpers
@@ -178,55 +183,6 @@ class DoubaoBridgeService:
             metadata=metadata,
         )
 
-    def _prepare_playwright_config(self) -> tuple[DoubaoMCPConfig, str]:
-        with self._lock:
-            business = self._ensure_business()
-            driver = business.get_driver()
-            if driver is None:
-                raise RuntimeError("Selenium driver 未成功创建")
-            cdp_endpoint = self._get_cdp_endpoint(business)
-        pw_config = replace(self._config, cdp_endpoint=cdp_endpoint)
-        return pw_config, cdp_endpoint
-
-    def _ensure_business(self) -> DoubaoBusiness:
-        if self._business and self._business.get_driver() and self._config.reuse_session:
-            return self._business
-        if self._business and not self._config.reuse_session:
-            try:
-                self._business.cleanup()
-            finally:
-                self._business = None
-
-        session_id = f"bridge-{threading.get_ident():x}"
-        user_id = "bridge_doubao"
-        overrides = {
-            "hub_url": self._config.remote_url,
-            "home_url": self._config.base_url,
-        }
-        business = DoubaoBusiness(session_id=session_id, user_id=user_id, site_overrides=overrides)
-        options = business.get_chrome_options()
-        for argument in self._config.chrome_arguments:
-            options.add_argument(argument)
-        if self._config.accept_insecure_certs:
-            options.set_capability("acceptInsecureCerts", True)
-        for key, value in self._config.remote_capabilities.items():
-            options.set_capability(key, value)
-
-        business.initialize().initialize_pages()
-        if not business.open_home_page():
-            business.cleanup()
-            raise RuntimeError("豆包首页打开失败")
-
-        driver = business.get_driver()
-        if driver is None:
-            business.cleanup()
-            raise RuntimeError("豆包业务未返回有效 WebDriver")
-
-        driver.implicitly_wait(0)
-        driver.set_page_load_timeout(self._config.navigation_timeout)
-        self._business = business
-        return business
-
     def _get_cdp_endpoint(self, business: DoubaoBusiness) -> str:
         manager = getattr(business, "webdriver_manager", None)
         if manager is None or not hasattr(manager, "get_cdp_endpoint"):
@@ -237,15 +193,63 @@ class DoubaoBridgeService:
         rewritten = self._config.apply_cdp_override(endpoint)
         return rewritten or endpoint
 
-    def _handle_timeout(self, exc: Exception | None = None) -> None:
-        LOGGER.error("[Bridge] 豆包查询超时: %s", exc or "timeout")
-        self._release_business()
-
-    def _release_business(self) -> None:
-        with self._lock:
-            if not self._business:
-                return
+    def _create_session(self) -> _BridgeSession:
+        session_id = f"bridge-{uuid.uuid4().hex[:8]}"
+        user_id = f"bridge_doubao_{session_id}"
+        overrides = {
+            "hub_url": self._config.remote_url,
+            "home_url": self._config.base_url,
+        }
+        business = DoubaoBusiness(session_id=session_id, user_id=user_id, site_overrides=overrides)
+        options = business.get_chrome_options()
+        proxy_provider = (self._config.proxy_provider or "").strip()
+        if proxy_provider:
+            LOGGER.info("[Bridge] 准备获取代理配置，provider= {}", proxy_provider)
+            proxy_config = None
             try:
-                self._business.cleanup()
-            finally:
-                self._business = None
+                proxy_config = get_proxy_config_for_selenium(proxy_provider)
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.warning("[Bridge] 获取代理配置失败，改用直连: %s", exc)
+            if proxy_config:
+                LOGGER.info(
+                    "[Bridge] 使用代理 %s:%s（provider=%s）",
+                    proxy_config.get("ip"),
+                    proxy_config.get("port"),
+                    proxy_config.get("username"),
+                    proxy_config.get("password"),
+                    proxy_provider,
+                )
+                options.set_capability("se:proxyConfig", proxy_config)
+            else:
+                LOGGER.warning("[Bridge] 未获取到代理配置，改用直连")
+        for argument in self._config.chrome_arguments:
+            options.add_argument(argument)
+        if self._config.accept_insecure_certs:
+            options.set_capability("acceptInsecureCerts", True)
+        for key, value in self._config.remote_capabilities.items():
+            options.set_capability(key, value)
+
+        business.initialize()
+        business.initialize_pages()
+        # if not business.open_home_page():
+        #     business.cleanup()
+        #     raise RuntimeError("豆包首页打开失败")
+
+
+        driver = business.get_driver()
+        if driver is None:
+            business.cleanup()
+            raise RuntimeError("豆包业务未返回有效 WebDriver")
+
+        driver.implicitly_wait(0)
+        driver.set_page_load_timeout(self._config.navigation_timeout)
+        cdp_endpoint = self._get_cdp_endpoint(business)
+        return _BridgeSession(business=business, cdp_endpoint=cdp_endpoint)
+
+    def _cleanup_session(self, session: Optional[_BridgeSession]) -> None:
+        if not session:
+            return
+        try:
+            session.business.cleanup()
+        except Exception:  # noqa: BLE001
+            LOGGER.warning("[Bridge] 清理业务会话失败", exc_info=True)

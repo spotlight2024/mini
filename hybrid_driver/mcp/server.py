@@ -27,7 +27,7 @@ LOGGER = get_logger(__name__)
 try:
     CONFIG = DoubaoMCPConfig.from_env()
 except ConfigError as exc:  # noqa: BYB101 - 初始化阶段必须失败
-    LOGGER.error("加载 Doubao MCP 配置失败: %s", exc)
+    LOGGER.error("加载 Doubao MCP 配置失败: {}", exc)
     raise
 
 SERVICE = DoubaoStreamService(CONFIG)
@@ -42,6 +42,7 @@ class SearchRequest(BaseModel):
     """HTTP 搜索请求模型。"""
 
     searchContent: str = Field(..., description="豆包查询内容")
+    engine: str | None = Field(None, description="执行引擎，可选 selenium 或 playwright")
 
 
 class SearchResponse(BaseModel):
@@ -52,6 +53,7 @@ class SearchResponse(BaseModel):
     answer_lines: list[str]
     raw_text: str
     metadata: dict[str, Any]
+    engine: str
 
 
 async def get_service() -> DoubaoStreamService:
@@ -67,16 +69,17 @@ def _chunk_to_payload(chunk: DoubaoChunk) -> dict[str, Any]:
 async def _stream_chunks(
     service: DoubaoStreamService,
     query: str,
+    engine: str | None,
 ) -> AsyncIterator[str]:
     try:
-        async for chunk in service.stream_search(query):
+        async for chunk in service.stream_search(query, engine=engine):
             message = json.dumps(_chunk_to_payload(chunk), ensure_ascii=False)
             yield f"{message}\n"
     except TimeoutError as exc:
-        LOGGER.warning("流式查询超时: %s", exc)
+        LOGGER.warning("流式查询超时: {}", exc)
         raise HTTPException(status_code=504, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001 - 向上游返回统一异常
-        LOGGER.exception("流式查询失败: %s", exc)
+        LOGGER.exception("流式查询失败: {}", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
@@ -86,25 +89,40 @@ async def _stream_chunks(
 )
 async def doubao_search(
     searchContent: str,
+    engine: str | None = None,
     ctx: Context[ServerSession, None, Request] | None = None,
 ) -> CallToolResult:
     if ctx is not None:
-        await ctx.info(f"开始处理豆包搜索，请求 id={ctx.request_id}")
+        await ctx.info(f"开始处理豆包搜索，请求 id={ctx.request_id} engine={engine or 'default'}")
 
     chunks: list[DoubaoChunk] = []
-    stream = SERVICE.stream_search(searchContent)
+    stream = SERVICE.stream_search(searchContent, engine=engine)
+
+    async def _emit_to_ctx(target_ctx: Context[ServerSession, None, Request], chunk: DoubaoChunk) -> None:
+        payload = json.dumps(_chunk_to_payload(chunk), ensure_ascii=False)
+        text_piece = chunk.delta or chunk.full_text or ""
+        stream_method = getattr(target_ctx, "stream_text", None)
+        if callable(stream_method):
+            try:
+                await stream_method(text_piece, final=chunk.is_final)
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.debug("ctx.stream_text 调用失败，回退到 info 日志: {}", exc)
+                if text_piece:
+                    await target_ctx.info(text_piece)
+        elif text_piece:
+            await target_ctx.info(text_piece)
+        await target_ctx.debug(payload)
     try:
         async for chunk in stream:
             chunks.append(chunk)
             if ctx is not None:
-                payload = json.dumps(_chunk_to_payload(chunk), ensure_ascii=False)
-                await ctx.info(payload)
+                await _emit_to_ctx(ctx, chunk)
     except TimeoutError as exc:
         if ctx is not None:
             await ctx.error(f"豆包查询超时: {exc}")
         raise HTTPException(status_code=504, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
-        LOGGER.exception("豆包搜索失败: %s", exc)
+        LOGGER.exception("豆包搜索失败: {}", exc)
         if ctx is not None:
             await ctx.error(f"豆包查询失败: {exc}")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -115,8 +133,10 @@ async def doubao_search(
         raise HTTPException(status_code=500, detail="未获取到豆包回答")
 
     final_text = chunks[-1].full_text
+    final_engine = (chunks[-1].metadata or {}).get("engine", SERVICE.default_engine)
     structured_content = {
         "query": searchContent,
+        "engine": final_engine,
         "chunks": [_chunk_to_payload(chunk) for chunk in chunks],
     }
     if ctx is not None:
@@ -138,7 +158,7 @@ async def app_lifespan(_: FastAPI):  # noqa: D401 - FastAPI 生命周期钩子
             try:
                 await SERVICE.shutdown()
             except Exception as exc:  # noqa: BLE001
-                LOGGER.warning("关闭流式服务出现异常: %s", exc)
+                LOGGER.warning("关闭流式服务出现异常: {}", exc)
 
 
 app = FastAPI(
@@ -156,9 +176,9 @@ async def search_endpoint(
     service: DoubaoStreamService = Depends(get_service),
 ) -> SearchResponse:
     try:
-        result = await service.search(payload.searchContent)
+        result = await service.search(payload.searchContent, engine=payload.engine)
     except Exception as exc:  # noqa: BLE001
-        LOGGER.exception("搜索失败: %s", exc)
+        LOGGER.exception("搜索失败: {}", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return SearchResponse(
@@ -167,18 +187,20 @@ async def search_endpoint(
         answer_lines=result.answer_lines,
         raw_text=result.raw_text,
         metadata=result.metadata or {},
+        engine=(result.metadata or {}).get("engine", service.default_engine),
     )
 
 
 @app.get("/api/search/stream")
 async def search_stream_endpoint(
     query: str,
+    engine: str | None = None,
     service: DoubaoStreamService = Depends(get_service),
 ) -> StreamingResponse:
     if not query.strip():
         raise HTTPException(status_code=400, detail="query 不能为空")
 
-    generator = _stream_chunks(service, query)
+    generator = _stream_chunks(service, query, engine)
     return StreamingResponse(generator, media_type="application/jsonl")
 
 
