@@ -9,13 +9,7 @@ import sys
 import uvicorn
 
 # 添加项目根目录到Python路径
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
-
-# 将项目根目录置于优先级最高的位置，避免脚本所在目录遮蔽第三方包
-sys.path.insert(0, PROJECT_ROOT)
-if SCRIPT_DIR in sys.path:
-    sys.path.remove(SCRIPT_DIR)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from hybrid_driver.config.settings import Settings
 from hybrid_driver.server_optimized import app
