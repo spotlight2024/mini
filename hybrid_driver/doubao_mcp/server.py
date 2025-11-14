@@ -7,7 +7,7 @@ import json
 from dataclasses import asdict
 from typing import Any, AsyncIterator
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.requests import Request
@@ -18,7 +18,7 @@ from mcp.server.session import ServerSession
 from mcp.types import CallToolResult, TextContent
 
 from hybrid_driver.log_config import get_logger
-from hybrid_driver.mcp.config import ConfigError, DoubaoMCPConfig
+from hybrid_driver.doubao_mcp.config import ConfigError, DoubaoMCPConfig
 from hybrid_driver.services.doubao_stream_service import DoubaoStreamService
 from hybrid_driver.services.doubao_types import DoubaoChunk
 
@@ -36,6 +36,8 @@ MCP_SERVER = FastMCP(
     streamable_http_path="/",
     instructions="调用 doubao.search 工具以流式获取豆包回答",
 )
+_session_stack: contextlib.AsyncExitStack | None = None
+_ROUTER = APIRouter(prefix="/api", tags=["Doubao MCP"])
 
 
 class SearchRequest(BaseModel):
@@ -147,30 +149,57 @@ async def doubao_search(
     )
 
 
-@contextlib.asynccontextmanager
-async def app_lifespan(_: FastAPI):  # noqa: D401 - FastAPI 生命周期钩子
-    async with contextlib.AsyncExitStack() as stack:
-        await stack.enter_async_context(MCP_SERVER.session_manager.run())
-        try:
-            yield
-        finally:
-            LOGGER.info("FastAPI 应用停止，准备清理资源")
-            try:
-                await SERVICE.shutdown()
-            except Exception as exc:  # noqa: BLE001
-                LOGGER.warning("关闭流式服务出现异常: {}", exc)
+async def _startup_event() -> None:
+    """初始化 MCP Session，供 HTTP/SSE 复用。"""
+    global _session_stack  # noqa: PLW0603 - 生命周期需要保存全局状态
+    stack = contextlib.AsyncExitStack()
+    await stack.enter_async_context(MCP_SERVER.session_manager.run())
+    _session_stack = stack
 
 
-app = FastAPI(
-    title="Hybrid Driver Doubao Streaming Service",
-    description="提供豆包搜索的 HTTP 与 MCP 接入能力",
-    version="1.0.0",
-    lifespan=app_lifespan,
-)
-app.mount("/mcp", MCP_SERVER.streamable_http_app())
+async def _shutdown_event() -> None:
+    """释放 MCP 相关资源。"""
+    global _session_stack  # noqa: PLW0603
+    stack = _session_stack
+    _session_stack = None
+    if stack is not None:
+        await stack.aclose()
+    try:
+        await SERVICE.shutdown()
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("关闭流式服务出现异常: {}", exc)
 
 
-@app.post("/api/search", response_model=SearchResponse)
+def register_events(app: FastAPI) -> None:
+    """向指定 FastAPI 实例注册启动/关闭事件。"""
+    flag = "_doubao_mcp_events_registered"
+    if getattr(app.state, flag, False):
+        return
+    app.add_event_handler("startup", _startup_event)
+    app.add_event_handler("shutdown", _shutdown_event)
+    setattr(app.state, flag, True)
+
+
+def register_routes(app: FastAPI, *, prefix: str | None = None) -> None:
+    """将豆包相关 HTTP 路由挂载到目标应用。"""
+    include_kwargs: dict[str, Any] = {}
+    if prefix is not None:
+        include_kwargs["prefix"] = prefix
+    app.include_router(_ROUTER, **include_kwargs)
+
+
+def mount_transport(app: FastAPI, path: str = "/mcp") -> None:
+    """挂载 MCP Streamable HTTP 子应用到指定路径。"""
+    attr_name = "_doubao_mcp_transport_paths"
+    mounted_paths: set[str] = getattr(app.state, attr_name, set())
+    if path in mounted_paths:
+        return
+    app.mount(path, MCP_SERVER.streamable_http_app())
+    mounted_paths.add(path)
+    setattr(app.state, attr_name, mounted_paths)
+
+
+@_ROUTER.post("/search", response_model=SearchResponse)
 async def search_endpoint(
     payload: SearchRequest,
     service: DoubaoStreamService = Depends(get_service),
@@ -191,7 +220,7 @@ async def search_endpoint(
     )
 
 
-@app.get("/api/search/stream")
+@_ROUTER.get("/search/stream")
 async def search_stream_endpoint(
     query: str,
     engine: str | None = None,
@@ -204,9 +233,43 @@ async def search_stream_endpoint(
     return StreamingResponse(generator, media_type="application/jsonl")
 
 
-@app.get("/health", response_class=JSONResponse)
-async def healthcheck() -> dict[str, str]:
-    return {"status": "ok"}
+def create_app(
+    *,
+    http_prefix: str | None = None,
+    transport_path: str = "/mcp",
+    fastapi_kwargs: dict[str, Any] | None = None,
+) -> FastAPI:
+    """创建独立运行的豆包 MCP FastAPI 应用。"""
+    kwargs: dict[str, Any] = {
+        "title": "Hybrid Driver Doubao Streaming Service",
+        "description": "提供豆包搜索的 HTTP 与 MCP 接入能力",
+        "version": "1.0.0",
+    }
+    if fastapi_kwargs:
+        kwargs.update(fastapi_kwargs)
+
+    app = FastAPI(**kwargs)
+    register_events(app)
+    register_routes(app, prefix=http_prefix)
+    mount_transport(app, path=transport_path)
+
+    @app.get("/health", response_class=JSONResponse)
+    async def healthcheck() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.get("/")
+    async def root() -> dict[str, Any]:
+        return {
+            "message": "SpotLight Hybrid Driver Doubao MCP Service",
+            "version": kwargs["version"],
+            "docs": "/docs",
+            "mcp_transport": transport_path,
+        }
+
+    return app
+
+
+app = create_app()
 
 
 def run_streamable_http() -> None:
@@ -217,7 +280,7 @@ def run_streamable_http() -> None:
 
 
 def main() -> None:
-    """兼容历史调用。推荐使用 `uvicorn hybrid_driver.mcp.server:app`."""
+    """兼容历史调用。推荐使用 `uvicorn hybrid_driver.doubao_mcp.server:app`."""
 
     run_streamable_http()
 

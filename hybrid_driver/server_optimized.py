@@ -14,6 +14,7 @@ from hybrid_driver.api.test import taobao_test_api, taobao_test_api_optimized
 from hybrid_driver.device_pool import DevicePool
 from hybrid_driver.log_config import get_logger
 from hybrid_driver.native import script_executor
+from hybrid_driver.doubao_mcp import server as doubao_mcp_server
 from hybrid_driver.operation import OperationItem, OperationSequence
 from hybrid_driver.webdriver.selenium_executor import SeleniumWebExecutor
 
@@ -47,6 +48,10 @@ import os
 screenshot_dir = "/app/@web_screenshot"
 if os.path.exists(screenshot_dir):
     app.mount("/@web_screenshot", StaticFiles(directory=screenshot_dir, html=True), name="screenshots")
+
+doubao_mcp_server.register_events(app)
+doubao_mcp_server.register_routes(app)
+doubao_mcp_server.mount_transport(app)
 
 @app.get("/health")
 def health_check():

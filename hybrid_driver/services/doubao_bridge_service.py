@@ -12,8 +12,8 @@ from typing import Optional
 
 from hybrid_driver.business_framework.business.doubao_business import DoubaoBusiness
 from hybrid_driver.log_config import get_logger
-from hybrid_driver.mcp.config import DoubaoMCPConfig
-from hybrid_driver.mcp.doubao_playwright import AutomationCancelled, DoubaoPlaywrightAutomation, DoubaoResult
+from hybrid_driver.doubao_mcp.config import DoubaoMCPConfig
+from hybrid_driver.doubao_mcp.doubao_playwright import AutomationCancelled, DoubaoPlaywrightAutomation, DoubaoResult
 from hybrid_driver.proxy.proxy_provider import get_proxy_config_for_selenium
 from hybrid_driver.services.doubao_types import DoubaoChunk
 

@@ -11,8 +11,8 @@ import time
 from typing import AsyncIterator, Optional
 
 from hybrid_driver.log_config import get_logger
-from hybrid_driver.mcp.config import DoubaoMCPConfig
-from hybrid_driver.mcp.doubao_playwright import DoubaoResult
+from hybrid_driver.doubao_mcp.config import DoubaoMCPConfig
+from hybrid_driver.doubao_mcp.doubao_playwright import DoubaoResult
 from hybrid_driver.services.doubao_bridge_service import DoubaoBridgeService
 from hybrid_driver.services.doubao_selenium_service import DoubaoSeleniumService
 from hybrid_driver.services.doubao_types import DoubaoChunk
