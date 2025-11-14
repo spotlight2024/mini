@@ -16,16 +16,9 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=10001
       - LOG_LEVEL=DEBUG
-      - API_RELOAD=true
+      - API_RELOAD=false
       - WEBDRIVER_MODE=local
       # 时区设置
       - TZ=Asia/Shanghai
-    volumes:
-      # 开发环境：挂载源代码目录，支持热重载
-      - ../../hybrid_driver:/app/hybrid_driver
-      - ./logs:/app/logs
-      - ./data:/app/data
-      - ./cache:/app/cache
-      - ../../@web_screenshot:/app/@web_screenshot
     restart: unless-stopped
-    command: ["python", "hybrid_driver/start_api_server.py", "--host", "0.0.0.0", "--port", "10001", "--reload"]
+    command: ["python", "hybrid_driver/start_api_server.py", "--host", "0.0.0.0", "--port", "10001", "--no-reload"]

@@ -16,9 +16,11 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=10001
       - LOG_LEVEL=INFO
+      - API_RELOAD=false
       # 时区设置
       - TZ=Asia/Shanghai
     restart: unless-stopped
+    command: ["python", "hybrid_driver/start_api_server.py", "--host", "0.0.0.0", "--port", "10001", "--no-reload"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:10001/health"]
       interval: 30s

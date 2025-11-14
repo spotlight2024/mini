@@ -25,7 +25,19 @@ def main():
         "--port", type=int, default=Settings.API_PORT, help="服务器端口"
     )
     parser.add_argument("--debug", action="store_true", help="启用调试模式")
-    parser.add_argument("--reload", action="store_true", help="启用自动重载")
+    parser.add_argument(
+        "--reload",
+        dest="reload",
+        action="store_true",
+        default=None,
+        help="启用自动重载",
+    )
+    parser.add_argument(
+        "--no-reload",
+        dest="reload",
+        action="store_false",
+        help="禁用自动重载",
+    )
 
     args = parser.parse_args()
 
@@ -33,7 +45,8 @@ def main():
     print(f"地址: http://{args.host}:{args.port}")
     print(f"文档: http://{args.host}:{args.port}/docs")
     print(f"调试模式: {args.debug}")
-    print(f"自动重载: {args.reload}")
+    reload_enabled = Settings.API_RELOAD if args.reload is None else args.reload
+    print(f"自动重载: {reload_enabled}")
     print("-" * 50)
 
     try:
@@ -41,7 +54,7 @@ def main():
             "hybrid_driver.server_optimized:app",
             host=args.host,
             port=args.port,
-            reload=True,
+            reload=reload_enabled,
             log_level=Settings.LOG_LEVEL.lower(),
         )
     except KeyboardInterrupt:
